@@ -2,8 +2,6 @@
 
 [Documentation](docs) - [Examples](examples)
 
-A scripting language made for ease of use
-
 ## Why Syphon?
 
 Here is our main goals:
