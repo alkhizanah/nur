@@ -12,7 +12,7 @@ process = import("process")
 
 - argv
 
-The arguments provided to `syphon run` command as an array of strings
+The arguments provided to `nur run` command as an array of strings
 
 - env
 

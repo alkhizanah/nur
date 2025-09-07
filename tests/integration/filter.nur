@@ -1,4 +1,4 @@
-tester = import("tester.sy")
+tester = import("tester.nur")
 
 tester.run("pass-through on an empty map", fn () {
     unfiltered_map = {}

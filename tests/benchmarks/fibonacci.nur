@@ -1,4 +1,4 @@
-benchmarker = import("benchmarker.sy")
+benchmarker = import("benchmarker.nur")
 
 benchmarker.run("fibonacci linear function", fn () {
     fib = fn (n) {

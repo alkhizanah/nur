@@ -1,4 +1,4 @@
-tester = import("tester.sy")
+tester = import("tester.nur")
 
 tester.run("concatenate an array", fn () {
     arr = [0, 1, 2]

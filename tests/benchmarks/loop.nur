@@ -1,4 +1,4 @@
-benchmarker = import("benchmarker.sy")
+benchmarker = import("benchmarker.nur")
 
 benchmarker.run("empty loop", fn () {
     i = -1

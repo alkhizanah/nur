@@ -1,4 +1,4 @@
-tester = import("tester.sy")
+tester = import("tester.nur")
 
 tester.run("reverse an array", fn () {
     reversed_arr = reverse(["0", 1, 2, [3]])

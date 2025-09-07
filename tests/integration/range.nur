@@ -1,4 +1,4 @@
-tester = import("tester.sy")
+tester = import("tester.nur")
 
 tester.run("generate a range array", fn () {
     range_arr = range(6)

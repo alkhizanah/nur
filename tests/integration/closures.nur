@@ -1,4 +1,4 @@
-tester = import("tester.sy")
+tester = import("tester.nur")
 
 tester.run("1 level closure", fn () {
     high = fn () {

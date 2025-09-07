@@ -358,7 +358,7 @@ export({"hey": 5})
 Evaluates a file and gives you the exported value
 
 ```
-import("some_file.sy") # {"hey": 5}
+import("some_file.nur") # {"hey": 5}
 ```
 
 - eval

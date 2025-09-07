@@ -1,6 +1,6 @@
 unicode = import("unicode")
 
-tester = import("tester.sy")
+tester = import("tester.nur")
 
 tester.run("encode an english character", fn () {
     return unicode.utf8_encode(69) == "E"

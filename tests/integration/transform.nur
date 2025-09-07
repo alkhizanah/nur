@@ -1,4 +1,4 @@
-tester = import("tester.sy")
+tester = import("tester.nur")
 
 tester.run("pass-through an empty map", fn () {
     untransformed_map = {}

@@ -88,7 +88,7 @@ fs.read_all(fd) # ""
 Gives you the currently working directory
 
 ```
-fs.cwd() # "/home/yhya/Programming/syphon"
+fs.cwd() # "/home/yhya/Programming/nur"
 ```
 
 - chdir

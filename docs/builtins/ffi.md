@@ -69,7 +69,7 @@ ffi.dll.close(libc)
 
 - to_cstring
 
-Casts a Syphon string to a C string (which also called "null-terminated string")
+Casts a Nur string to a C string (which is also called a "null-terminated string")
 
 ```
 libc.puts(ffi.to_cstring("Hello, world!"))

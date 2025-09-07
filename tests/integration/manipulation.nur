@@ -1,4 +1,4 @@
-tester = import("tester.sy")
+tester = import("tester.nur")
 
 tester.run("manipulate the last element with negative indexing", fn () {
     arr = [0, 1, 2, 3, 4, 5]
