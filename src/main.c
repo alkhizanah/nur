@@ -14,7 +14,7 @@ static void usage(const char *program) {
     fprintf(stderr, "\trun <input_file_path> - execute the specified file\n");
 #ifndef RELEASE_MODE
     fprintf(stderr, "\trelease               - optimize the executable "
-                    "and strip away rebuilding capabilities\n");
+                    "and disable rebuilding\n");
 #endif
     fprintf(stderr, "\n");
 }
