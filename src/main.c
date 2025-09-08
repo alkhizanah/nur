@@ -100,9 +100,9 @@ static void rebuild(const char **argv) {
             exit(1);
         } else if (pid == 0) {
             execlp("clang", "clang", "-o", argv[0], "-std=c23", "-Wall",
-                   "-Wextra", "src/main.c", NULL);
+                   "-Wextra", "src/main.c", nullptr);
         } else {
-            wait(NULL);
+            wait(nullptr);
 
             execvp(argv[0], (char *const *)argv);
         }
@@ -165,9 +165,9 @@ int main(int argc, const char **argv) {
             exit(1);
         } else if (pid == 0) {
             execlp("clang", "clang", "-o", program, "-std=c23", "-Wall",
-                   "-Wextra", "-O3", "-DRELEASE_MODE", "src/main.c", NULL);
+                   "-Wextra", "-O3", "-DRELEASE_MODE", "src/main.c", nullptr);
         } else {
-            waitpid(pid, NULL, WEXITED);
+            wait(nullptr);
 
             printf("ok: rebuilt the executable in release mode, rebuilding "
                    "capabilities are disabled now\n");
