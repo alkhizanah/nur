@@ -86,8 +86,6 @@ static void rebuild(const char **argv) {
     closedir(src_dir);
 
     if (needs_rebuild(argv[0], (const char **)input_paths, input_paths_len)) {
-        remove(argv[0]);
-
         while (input_paths_len > 0) {
             free(input_paths[--input_paths_len]);
         }
@@ -159,8 +157,6 @@ int main(int argc, const char **argv) {
         printf("todo: execute %s\n", input_file_path);
 #ifndef RELEASE_MODE
     } else if (strcmp(command, "release") == 0) {
-        remove(program);
-
         pid_t pid = fork();
 
         if (pid == -1) {
