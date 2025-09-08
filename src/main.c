@@ -9,16 +9,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define shift(array_len, array_ptr) ((array_len)--, *(array_ptr)++)
+#define SHIFT(array_len, array_ptr) ((array_len)--, *(array_ptr)++)
 
-#define check_oom(object_ptr)                                                  \
-    do {                                                                       \
-        if (object_ptr == nullptr) {                                           \
-            fprintf(stderr, "error: out of memory\n");                         \
-                                                                               \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (false)
+static inline void check_oom(void *object_ptr) {
+    if (object_ptr == nullptr) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+}
 
 #ifndef RELEASE_MODE
 static bool needs_rebuild(const char *output_path, const char **input_paths,
@@ -35,7 +34,7 @@ static bool needs_rebuild(const char *output_path, const char **input_paths,
     auto output_path_timestamp = stat_buf.st_mtime;
 
     while (input_paths_len != 0) {
-        auto input_path = shift(input_paths_len, input_paths);
+        auto input_path = SHIFT(input_paths_len, input_paths);
 
         if (stat(input_path, &stat_buf) != 0) {
             fprintf(stderr, "error: could not check %s statistics: %s\n",
@@ -105,7 +104,7 @@ static void rebuild(const char **argv) {
             execlp("clang", "clang", "-o", argv[0], "-std=c23", "-Wall",
                    "-Wextra", "src/main.c", NULL);
         } else {
-            waitpid(pid, NULL, WEXITED);
+            wait(NULL);
 
             execvp(argv[0], (char *const *)argv);
         }
@@ -136,7 +135,7 @@ int main(int argc, const char **argv) {
     rebuild(argv);
 #endif // RELEASE_MODE
 
-    auto program = shift(argc, argv);
+    auto program = SHIFT(argc, argv);
 
     if (argc == 0) {
         usage(program);
@@ -145,7 +144,7 @@ int main(int argc, const char **argv) {
         return 1;
     }
 
-    auto command = shift(argc, argv);
+    auto command = SHIFT(argc, argv);
 
     if (strcmp(command, "run") == 0) {
         if (argc == 0) {
@@ -155,7 +154,7 @@ int main(int argc, const char **argv) {
             return 1;
         }
 
-        auto input_file_path = shift(argc, argv);
+        auto input_file_path = SHIFT(argc, argv);
 
         printf("todo: execute %s\n", input_file_path);
 #ifndef RELEASE_MODE
