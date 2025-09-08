@@ -10,10 +10,9 @@
 #include <unistd.h>
 
 #include "macros.h"
-#include "oom.h"
 
 bool is_rebuild_needed(const char *output_path, const char **input_paths,
-                   size_t input_paths_len) {
+                       size_t input_paths_len) {
     struct stat stat_buf = {};
 
     if (stat(output_path, &stat_buf) != 0) {
@@ -60,7 +59,11 @@ void rebuild_if_needed(const char **argv) {
 
     char **input_paths = malloc(input_paths_capacity * sizeof(*input_paths));
 
-    check_oom(input_paths);
+    if (input_paths == nullptr) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
 
     size_t input_paths_len = 0;
 
@@ -69,7 +72,11 @@ void rebuild_if_needed(const char **argv) {
 
         *input_path = malloc((4 + 256) * sizeof(char));
 
-        check_oom(*input_path);
+        if (*input_path == nullptr) {
+            fprintf(stderr, "error: out of memory\n");
+
+            exit(1);
+        }
 
         strncpy(*input_path, "src/", 4);
         strncpy(*input_path + 4, src_entry->d_name, 256);
@@ -77,7 +84,8 @@ void rebuild_if_needed(const char **argv) {
 
     closedir(src_dir);
 
-    if (is_rebuild_needed(argv[0], (const char **)input_paths, input_paths_len)) {
+    if (is_rebuild_needed(argv[0], (const char **)input_paths,
+                          input_paths_len)) {
         while (input_paths_len > 0) {
             free(input_paths[--input_paths_len]);
         }

@@ -1,7 +1,6 @@
 #include <stdio.h>
 
 #include "macros.h"
-#include "oom.c"
 
 #ifndef RELEASE_MODE
 #include "rebuild.c"
