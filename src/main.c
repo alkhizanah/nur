@@ -1,10 +1,10 @@
 #include <stdio.h>
 
-#include "macros.h"
-
 #ifndef RELEASE_MODE
 #include "rebuild.c"
 #endif // RELEASE_MODE
+
+#define SHIFT(array_len, array_ptr) ((array_len)--, *(array_ptr)++)
 
 static void usage(const char *program) {
     fprintf(stderr, "usage: %s <command> [options..] [arguments..]\n\n",
@@ -23,7 +23,7 @@ int main(int argc, const char **argv) {
     rebuild_if_needed(argv);
 #endif // RELEASE_MODE
 
-    auto program = SHIFT(argc, argv);
+    const char *program = SHIFT(argc, argv);
 
     if (argc == 0) {
         usage(program);
@@ -32,7 +32,7 @@ int main(int argc, const char **argv) {
         return 1;
     }
 
-    auto command = SHIFT(argc, argv);
+    const char *command = SHIFT(argc, argv);
 
     if (strcmp(command, "run") == 0) {
         if (argc == 0) {
@@ -42,7 +42,7 @@ int main(int argc, const char **argv) {
             return 1;
         }
 
-        auto input_file_path = SHIFT(argc, argv);
+        const char *input_file_path = SHIFT(argc, argv);
 
         printf("todo: execute %s\n", input_file_path);
 #ifndef RELEASE_MODE

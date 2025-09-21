@@ -9,7 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "macros.h"
+#define SHIFT(array_len, array_ptr) ((array_len)--, *(array_ptr)++)
 
 bool is_rebuild_needed(const char *output_path, const char **input_paths,
                        size_t input_paths_len) {
@@ -22,10 +22,10 @@ bool is_rebuild_needed(const char *output_path, const char **input_paths,
         exit(1);
     }
 
-    auto output_path_timestamp = stat_buf.st_mtime;
+    time_t output_path_timestamp = stat_buf.st_mtime;
 
     while (input_paths_len != 0) {
-        auto input_path = SHIFT(input_paths_len, input_paths);
+        const char *input_path = SHIFT(input_paths_len, input_paths);
 
         if (stat(input_path, &stat_buf) != 0) {
             fprintf(stderr, "error: could not check %s statistics: %s\n",
@@ -34,7 +34,7 @@ bool is_rebuild_needed(const char *output_path, const char **input_paths,
             exit(1);
         }
 
-        auto input_path_timestamp = stat_buf.st_mtime;
+        time_t input_path_timestamp = stat_buf.st_mtime;
 
         if (input_path_timestamp > output_path_timestamp) {
             return true;
@@ -45,7 +45,7 @@ bool is_rebuild_needed(const char *output_path, const char **input_paths,
 }
 
 void rebuild_if_needed(const char **argv) {
-    auto src_dir = opendir("src");
+    DIR *src_dir = opendir("src");
 
     size_t input_paths_capacity = 0;
 
@@ -68,7 +68,7 @@ void rebuild_if_needed(const char **argv) {
     size_t input_paths_len = 0;
 
     while ((src_entry = readdir(src_dir))) {
-        auto input_path = &input_paths[input_paths_len++];
+        char **input_path = &input_paths[input_paths_len++];
 
         *input_path = malloc((4 + 256) * sizeof(char));
 
