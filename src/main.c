@@ -1,29 +1,49 @@
+#include <malloc.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
 
-#ifndef RELEASE_MODE
-#include "rebuild.c"
-#endif // RELEASE_MODE
+#include "array.h"
 
-#define SHIFT(array_len, array_ptr) ((array_len)--, *(array_ptr)++)
+#include "os.c"
 
 static void usage(const char *program) {
     fprintf(stderr, "usage: %s <command> [options..] [arguments..]\n\n",
             program);
     fprintf(stderr, "commands:\n");
     fprintf(stderr, "\trun <input_file_path> - execute the specified file\n");
-#ifndef RELEASE_MODE
-    fprintf(stderr, "\trelease               - optimize the executable "
-                    "and disable rebuilding\n");
-#endif
     fprintf(stderr, "\n");
 }
 
 int main(int argc, const char **argv) {
-#ifndef RELEASE_MODE
-    rebuild_if_needed(argv);
-#endif // RELEASE_MODE
+#ifndef NO_REBUILD
+    size_t input_paths_len;
 
-    const char *program = SHIFT(argc, argv);
+    char **input_paths = traverse_directory("src", &input_paths_len);
+
+    if (is_rebuild_needed(argv[0], (const char **)input_paths,
+                          input_paths_len)) {
+        if (!execute_command((const char *[]){"clang", "-o", argv[0],
+                                              "-std=c23", "-Wall", "-Wextra",
+                                              "src/main.c", NULL})) {
+            fprintf(stderr, "error: could not rebuild the executable\n");
+
+            return 1;
+        }
+
+        execute_command(argv);
+
+        return 0;
+    } else {
+        while (--input_paths_len) {
+            free(input_paths[input_paths_len]);
+        }
+
+        free(input_paths);
+    }
+#endif
+
+    const char *program = ARRAY_SHIFT(argc, argv);
 
     if (argc == 0) {
         usage(program);
@@ -32,7 +52,7 @@ int main(int argc, const char **argv) {
         return 1;
     }
 
-    const char *command = SHIFT(argc, argv);
+    const char *command = ARRAY_SHIFT(argc, argv);
 
     if (strcmp(command, "run") == 0) {
         if (argc == 0) {
@@ -42,13 +62,9 @@ int main(int argc, const char **argv) {
             return 1;
         }
 
-        const char *input_file_path = SHIFT(argc, argv);
+        const char *input_file_path = ARRAY_SHIFT(argc, argv);
 
         printf("todo: execute %s\n", input_file_path);
-#ifndef RELEASE_MODE
-    } else if (strcmp(command, "release") == 0) {
-        rebuild_in_release_mode(program);
-#endif // RELEASE_MODE
     } else {
         usage(program);
         fprintf(stderr, "error: unknown command: %s\n", command);

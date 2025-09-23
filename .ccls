@@ -1,4 +1,3 @@
 clang
--std=c23
 -Wall
 -Wextra
