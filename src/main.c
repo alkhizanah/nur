@@ -1,7 +1,7 @@
 #include <malloc.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include "array.h"
 
@@ -21,8 +21,16 @@ int main(int argc, const char **argv) {
 
     char **input_paths = traverse_directory("src", &input_paths_len);
 
-    if (is_rebuild_needed(argv[0], (const char **)input_paths,
-                          input_paths_len)) {
+    bool is_needed =
+        is_rebuild_needed(argv[0], (const char **)input_paths, input_paths_len);
+
+    while (--input_paths_len) {
+        free(input_paths[input_paths_len]);
+    }
+
+    free(input_paths);
+
+    if (is_needed) {
         if (!execute_command((const char *[]){"clang", "-o", argv[0],
                                               "-std=c23", "-Wall", "-Wextra",
                                               "src/main.c", NULL})) {
@@ -34,12 +42,6 @@ int main(int argc, const char **argv) {
         execute_command(argv);
 
         return 0;
-    } else {
-        while (--input_paths_len) {
-            free(input_paths[input_paths_len]);
-        }
-
-        free(input_paths);
     }
 #endif
 
