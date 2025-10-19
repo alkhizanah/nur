@@ -18,6 +18,10 @@ typedef enum {
     TOK_STRING,
     TOK_OPAREN,
     TOK_CPAREN,
+    TOK_OBRACE,
+    TOK_CBRACE,
+    TOK_OBRACKET,
+    TOK_CBRACKET,
 } TokenTag;
 
 typedef struct {

@@ -26,6 +26,26 @@ Token lexer_next(Lexer *lexer) {
         token.range.end = lexer->index;
         break;
 
+    case '{':
+        token.tag = TOK_OBRACE;
+        token.range.end = lexer->index;
+        break;
+
+    case '}':
+        token.tag = TOK_CBRACE;
+        token.range.end = lexer->index;
+        break;
+
+    case '[':
+        token.tag = TOK_OBRACKET;
+        token.range.end = lexer->index;
+        break;
+
+    case ']':
+        token.tag = TOK_CBRACKET;
+        token.range.end = lexer->index;
+        break;
+
     case '"':
     case '\'': {
         token.tag = TOK_STRING;
