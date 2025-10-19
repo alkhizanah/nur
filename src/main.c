@@ -5,6 +5,7 @@
 
 #include "array.h"
 
+#include "lexer.c"
 #include "os.c"
 
 static void usage(const char *program) {
@@ -65,7 +66,26 @@ int main(int argc, const char **argv) {
 
         const char *input_file_path = ARRAY_SHIFT(argc, argv);
 
-        printf("todo: execute %s\n", input_file_path);
+        // NOTE(alsakandari): The input file content lives until our program
+        // dies, it should not be freed at all, this is not a memory leak since
+        // we use it frequently
+        char *input_file_content = read_entire_file(input_file_path);
+
+        Lexer lexer = {.buffer = input_file_content};
+
+        Token token;
+
+        while ((token = lexer_next(&lexer)).tag != TOK_EOF) {
+            if (token.tag == TOK_INVALID) {
+                printf("INVALID TOKEN: %.*s\n",
+                       (int)(token.range.end - token.range.start),
+                       input_file_content + token.range.start);
+            } else {
+                printf("TOKEN(%d): %.*s\n", token.tag,
+                       (int)(token.range.end - token.range.start),
+                       input_file_content + token.range.start);
+            }
+        }
     } else {
         usage(program);
         fprintf(stderr, "error: unknown command: %s\n", command);

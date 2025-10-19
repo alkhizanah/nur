@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+/// Read an entire file into a heap allocated chunk of null-terminated bytes
+char *read_entire_file(const char *file_path);
+
 /// Traverse the directory recursively and collect the relative path of each
 /// child
 char **traverse_directory(const char *dir_path, size_t *children_count);

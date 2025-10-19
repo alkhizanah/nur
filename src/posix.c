@@ -20,7 +20,8 @@ char **traverse_directory(const char *dir_path, size_t *children_count) {
     DIR *dir = opendir(dir_path);
 
     if (dir == NULL) {
-        fprintf(stderr, "error: could not traverse directory '%s': %s\n", dir_path, strerror(errno));
+        fprintf(stderr, "error: could not traverse directory '%s': %s\n",
+                dir_path, strerror(errno));
 
         exit(1);
     }
