@@ -68,10 +68,11 @@ Token lexer_next(Lexer *lexer) {
     }
 
     default:
-        if (isalpha(character)) {
+        if (isalpha(character) || character == '_') {
             token.tag = TOK_IDENTIFIER;
 
-            while (isalpha(lexer->buffer[lexer->index]))
+            while (isalpha(lexer->buffer[lexer->index]) ||
+                   lexer->buffer[lexer->index] == '_')
                 lexer->index++;
 
             token.range.end = lexer->index;
