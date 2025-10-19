@@ -4,10 +4,8 @@
 #include "lexer.h"
 
 Token lexer_next(Lexer *lexer) {
-    while (isspace(lexer->buffer[lexer->index++]))
-        ;
-
-    lexer->index--;
+    while (isspace(lexer->buffer[lexer->index]))
+        lexer->index++;
 
     Token token = {.range = {lexer->index, lexer->index}};
 
@@ -53,21 +51,23 @@ Token lexer_next(Lexer *lexer) {
         if (isalpha(character)) {
             token.tag = TOK_IDENTIFIER;
 
-            while (isalpha(lexer->buffer[lexer->index++]))
-                ;
+            while (isalpha(lexer->buffer[lexer->index]))
+                lexer->index++;
 
-            token.range.end = --lexer->index;
+            token.range.end = lexer->index;
         } else if (isdigit(character)) {
             token.tag = TOK_INT;
 
             while (isdigit(lexer->buffer[lexer->index]) ||
-                   lexer->buffer[lexer->index++] == '.') {
-                if (lexer->buffer[lexer->index - 1] == '.') {
+                   lexer->buffer[lexer->index] == '.') {
+                if (lexer->buffer[lexer->index] == '.') {
                     token.tag = TOK_FLOAT;
                 }
+
+                lexer->index++;
             }
 
-            token.range.end = --lexer->index;
+            token.range.end = lexer->index;
         } else {
             token.tag = TOK_INVALID;
             token.range.end = lexer->index;
