@@ -46,6 +46,115 @@ Token lexer_next(Lexer *lexer) {
         token.range.end = lexer->index;
         break;
 
+    case '=':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_EQL;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_ASSIGN;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '!':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_NOT_EQL;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_LOGICAL_NOT;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '+':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_PLUS_ASSIGN;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_PLUS;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '-':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_MINUS_ASSIGN;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_MINUS;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '*':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_MULTIPLY_ASSIGN;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_MULTIPLY;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '/':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_DIVIDE_ASSIGN;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_DIVIDE;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '%':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_MODULO_ASSIGN;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_MODULO;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '<':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_LESS_THAN_OR_EQL;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_LESS_THAN;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '>':
+        if (lexer->buffer[lexer->index] == '=') {
+            token.tag = TOK_GREATER_THAN_OR_EQL;
+            token.range.end = ++lexer->index;
+        } else {
+            token.tag = TOK_GREATER_THAN;
+            token.range.end = lexer->index;
+        }
+
+        break;
+
+    case '.':
+        token.tag = TOK_DOT;
+        token.range.end = lexer->index;
+        break;
+
+    case ',':
+        token.tag = TOK_COMMA;
+        token.range.end = lexer->index;
+        break;
+
     case '"':
     case '\'': {
         token.tag = TOK_STRING;

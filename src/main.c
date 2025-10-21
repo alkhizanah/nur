@@ -25,8 +25,8 @@ int main(int argc, const char **argv) {
     bool should_rebuild =
         is_rebuild_needed(argv[0], (const char **)input_paths, input_paths_len);
 
-    while (--input_paths_len) {
-        free(input_paths[input_paths_len]);
+    for (size_t i = 0; i < input_paths_len; i++) {
+        free(input_paths[i]);
     }
 
     free(input_paths);
@@ -66,9 +66,6 @@ int main(int argc, const char **argv) {
 
         const char *input_file_path = ARRAY_SHIFT(argc, argv);
 
-        // NOTE(alsakandari): The input file content lives until our program
-        // dies, it should not be freed at all, this is not a memory leak since
-        // we use it frequently
         char *input_file_content = read_entire_file(input_file_path);
 
         Lexer lexer = {.buffer = input_file_content};
@@ -86,6 +83,8 @@ int main(int argc, const char **argv) {
                        input_file_content + token.range.start);
             }
         }
+
+        free(input_file_content);
     } else {
         usage(program);
         fprintf(stderr, "error: unknown command: %s\n", command);

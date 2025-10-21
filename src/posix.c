@@ -84,8 +84,6 @@ char **traverse_directory(const char *dir_path, size_t *children_count) {
 
         children_paths[i++] = relative_path;
 
-        // If it is a directory, traverse it recursivly and then concatenate it
-        // into our list
         if (S_ISDIR(stat_buf.st_mode)) {
             size_t other_paths_len;
 
