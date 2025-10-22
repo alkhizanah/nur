@@ -180,7 +180,7 @@ Token lexer_next(Lexer *lexer) {
         if (isalpha(character) || character == '_') {
             token.tag = TOK_IDENTIFIER;
 
-            while (isalpha(lexer->buffer[lexer->index]) ||
+            while (isalnum(lexer->buffer[lexer->index]) ||
                    lexer->buffer[lexer->index] == '_')
                 lexer->index++;
 
@@ -188,7 +188,7 @@ Token lexer_next(Lexer *lexer) {
         } else if (isdigit(character)) {
             token.tag = TOK_INT;
 
-            while (isdigit(lexer->buffer[lexer->index]) ||
+            while (isalnum(lexer->buffer[lexer->index]) ||
                    lexer->buffer[lexer->index] == '.') {
                 if (lexer->buffer[lexer->index] == '.') {
                     token.tag = TOK_FLOAT;
