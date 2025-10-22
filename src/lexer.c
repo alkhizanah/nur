@@ -168,8 +168,14 @@ Token lexer_next(Lexer *lexer) {
                 escaping = false;
             } else if (lexer->buffer[lexer->index] == '\\') {
                 escaping = true;
+            } else if (lexer->buffer[lexer->index-1] == '\0' || lexer->buffer[lexer->index-1] == '\n' ) {
+            token.tag = TOK_INVALID;
+            token.range.end = lexer->index;
+            break;
             }
         }
+        
+        
 
         token.range.end = lexer->index - 1;
 

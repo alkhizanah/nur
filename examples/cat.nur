@@ -36,3 +36,4 @@ if length(process.argv) < 2 {
 } else {
     concatenate_files()
 }
+"something
