@@ -98,7 +98,15 @@ Token lexer_next(Lexer *lexer) {
             break;
 
         case '*':
-            if (lexer->buffer[lexer->index] == '=') {
+            if (lexer->buffer[lexer->index] == '*') {
+                if (lexer->buffer[++lexer->index] == '=') {
+                    token.tag = TOK_EXPONENT_ASSIGN;
+                    token.range.end = ++lexer->index;
+                } else {
+                    token.tag = TOK_EXPONENT;
+                    token.range.end = lexer->index;
+                }
+            } else if (lexer->buffer[lexer->index] == '=') {
                 token.tag = TOK_MULTIPLY_ASSIGN;
                 token.range.end = ++lexer->index;
             } else {
