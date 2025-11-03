@@ -162,6 +162,16 @@ Token lexer_next(Lexer *lexer) {
             token.range.end = lexer->index;
             break;
 
+        case ':':
+            token.tag = TOK_COLON;
+            token.range.end = lexer->index;
+            break;
+
+        case ';':
+            token.tag = TOK_SEMICOLON;
+            token.range.end = lexer->index;
+            break;
+
         case '"':
         case '\'': {
             token.tag = TOK_STRING;
