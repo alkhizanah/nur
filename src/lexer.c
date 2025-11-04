@@ -1,5 +1,7 @@
 #include <ctype.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
 #include "lexer.h"
 
@@ -208,13 +210,32 @@ Token lexer_next(Lexer *lexer) {
 
         default:
             if (isalpha(character) || character == '_') {
-                token.tag = TOK_IDENTIFIER;
-
                 while (isalnum(lexer->buffer[lexer->index]) ||
                        lexer->buffer[lexer->index] == '_')
                     lexer->index++;
 
                 token.range.end = lexer->index;
+
+                const char *ident_start = lexer->buffer + token.range.start;
+                size_t ident_len = token.range.end - token.range.start;
+
+                if (strncmp(ident_start, "if", ident_len) == 0) {
+                    token.tag = TOK_KEYWORD_IF;
+                } else if (strncmp(ident_start, "else", ident_len) == 0) {
+                    token.tag = TOK_KEYWORD_ELSE;
+                } else if (strncmp(ident_start, "while", ident_len) == 0) {
+                    token.tag = TOK_KEYWORD_WHILE;
+                } else if (strncmp(ident_start, "break", ident_len) == 0) {
+                    token.tag = TOK_KEYWORD_BREAK;
+                } else if (strncmp(ident_start, "continue", ident_len) == 0) {
+                    token.tag = TOK_KEYWORD_CONTINUE;
+                } else if (strncmp(ident_start, "fn", ident_len) == 0) {
+                    token.tag = TOK_KEYWORD_FN;
+                } else if (strncmp(ident_start, "return", ident_len) == 0) {
+                    token.tag = TOK_KEYWORD_RETURN;
+                } else {
+                    token.tag = TOK_IDENTIFIER;
+                }
             } else if (isdigit(character)) {
                 token.tag = TOK_INT;
 
