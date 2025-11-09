@@ -4,9 +4,9 @@
 #include <string.h>
 
 #include "array.h"
-
-#include "lexer.c"
-#include "os.c"
+#include "lexer.h"
+#include "os.h"
+#include "parser.h"
 
 static void usage(const char *program) {
     fprintf(stderr, "usage: %s <command> [options..] [arguments..]\n\n",
@@ -32,8 +32,7 @@ int main(int argc, const char **argv) {
     free(input_paths);
 
     if (should_rebuild) {
-        if (!execute_command((const char *[]){"cc", "-o", argv[0], "-Wall",
-                                              "-Wextra", "src/main.c", NULL})) {
+        if (!execute_command((const char *[]){"cc", "-o", argv[0], "src/one.c", NULL})) {
             fprintf(stderr, "error: could not rebuild the executable\n");
 
             return 1;
@@ -68,21 +67,9 @@ int main(int argc, const char **argv) {
 
         char *input_file_content = read_entire_file(input_file_path);
 
-        Lexer lexer = {.buffer = input_file_content};
+        Parser parser = {.lexer = {.buffer = input_file_content}};
 
-        Token token;
-
-        while ((token = lexer_next(&lexer)).tag != TOK_EOF) {
-            if (token.tag == TOK_INVALID) {
-                printf("INVALID TOKEN: %.*s\n",
-                       (int)(token.range.end - token.range.start),
-                       input_file_content + token.range.start);
-            } else {
-                printf("TOKEN(%d): %.*s\n", token.tag,
-                       (int)(token.range.end - token.range.start),
-                       input_file_content + token.range.start);
-            }
-        }
+        parser_parse(&parser);
 
         free(input_file_content);
     } else {
