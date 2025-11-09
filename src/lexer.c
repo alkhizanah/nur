@@ -259,3 +259,10 @@ retry:
 
     return token;
 }
+
+Token lexer_peek(Lexer *lexer) {
+    size_t index = lexer->index;
+    Token token = lexer_next(lexer);
+    lexer->index = index;
+    return token;
+}
