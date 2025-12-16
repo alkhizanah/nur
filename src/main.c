@@ -32,7 +32,8 @@ int main(int argc, const char **argv) {
     free(input_paths);
 
     if (should_rebuild) {
-        if (!execute_command((const char *[]){"cc", "-o", argv[0], "src/one.c", NULL})) {
+        if (!execute_command(
+                (const char *[]){"cc", "-o", argv[0], "src/one.c", NULL})) {
             fprintf(stderr, "error: could not rebuild the executable\n");
 
             return 1;
@@ -67,7 +68,8 @@ int main(int argc, const char **argv) {
 
         char *input_file_content = read_entire_file(input_file_path);
 
-        Parser parser = {.lexer = {.buffer = input_file_content}};
+        Parser parser = {.file_path = input_file_path,
+                         .lexer = {.buffer = input_file_content}};
 
         parser_parse(&parser);
 

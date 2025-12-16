@@ -49,6 +49,7 @@ typedef struct {
 } Ast;
 
 typedef struct {
+    const char *file_path;
     Lexer lexer;
     Ast ast;
 } Parser;

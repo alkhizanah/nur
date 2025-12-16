@@ -1,6 +1,8 @@
 #include "parser.h"
 #include "array.h"
+#include "diagnoser.h"
 #include "lexer.h"
+#include "source_location.h"
 
 typedef enum : uint8_t {
     PR_LOWEST,
@@ -66,7 +68,10 @@ static void parser_push_node(Parser *parser, AstNodeTag tag,
 static AstNodeIdx parser_parse_binary_expr(Parser *parser, AstNodeIdx lhs) {
     switch (lexer_peek(&parser->lexer).tag) {
     default:
-        fprintf(stderr, "error: unknown operator\n");
+        diagnoser_error(source_location_of(parser->file_path,
+                                           parser->lexer.buffer,
+                                           lexer_peek(&parser->lexer).range),
+                        "unknown operator\n");
 
         exit(1);
     }
@@ -75,7 +80,10 @@ static AstNodeIdx parser_parse_binary_expr(Parser *parser, AstNodeIdx lhs) {
 static AstNodeIdx parser_parse_unary_expr(Parser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     default:
-        fprintf(stderr, "error: unknown expression\n");
+        diagnoser_error(source_location_of(parser->file_path,
+                                           parser->lexer.buffer,
+                                           lexer_peek(&parser->lexer).range),
+                        "unknown expression\n");
 
         exit(1);
     }

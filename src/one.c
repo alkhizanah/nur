@@ -1,4 +1,6 @@
+#include "diagnoser.c"
 #include "lexer.c"
+#include "main.c"
 #include "os.c"
 #include "parser.c"
-#include "main.c"
+#include "source_location.c"
