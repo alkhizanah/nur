@@ -5,6 +5,8 @@
 #include "lexer.h"
 
 typedef enum : uint8_t {
+    // Payload: lhs is an index in extra.items, and rhs is the amount of nodes
+    NODE_BLOCK,
     // Payload: lhs is the Range.start and rhs is the Range.end
     NODE_IDENTIFIER,
     // Payload: lhs is the high bits (i >> 32) and rhs is the low bits
@@ -19,9 +21,11 @@ typedef enum : uint8_t {
     NODE_ASSIGN,
 } AstNodeTag;
 
+typedef uint32_t AstNodeIdx;
+
 typedef struct {
-    uint32_t lhs;
-    uint32_t rhs;
+    AstNodeIdx lhs;
+    AstNodeIdx rhs;
 } AstNodePayload;
 
 typedef struct {
@@ -32,7 +36,16 @@ typedef struct {
 } AstNodes;
 
 typedef struct {
+    uint32_t *items;
+    size_t len;
+    size_t capacity;
+} AstExtra;
+
+// Note: the last element in nodes is a NODE_BLOCK which is considered the root
+// of the current module
+typedef struct {
     AstNodes nodes;
+    AstExtra extra;
 } Ast;
 
 typedef struct {
