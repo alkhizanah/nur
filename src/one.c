@@ -1,6 +1,6 @@
+#include "ast.c"
 #include "diagnoser.c"
 #include "lexer.c"
 #include "main.c"
 #include "os.c"
-#include "parser.c"
 #include "source_location.c"

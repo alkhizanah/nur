@@ -4,9 +4,9 @@
 #include <string.h>
 
 #include "array.h"
+#include "ast.h"
 #include "lexer.h"
 #include "os.h"
-#include "parser.h"
 
 static void usage(const char *program) {
     fprintf(stderr, "usage: %s <command> [options..] [arguments..]\n\n",
@@ -68,10 +68,10 @@ int main(int argc, const char **argv) {
 
         char *input_file_content = read_entire_file(input_file_path);
 
-        Parser parser = {.file_path = input_file_path,
-                         .lexer = {.buffer = input_file_content}};
+        AstParser parser = {.file_path = input_file_path,
+                            .lexer = {.buffer = input_file_content}};
 
-        parser_parse(&parser);
+        ast_parse(&parser);
 
         free(input_file_content);
     } else {

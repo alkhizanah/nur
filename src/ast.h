@@ -52,6 +52,6 @@ typedef struct {
     const char *file_path;
     Lexer lexer;
     Ast ast;
-} Parser;
+} AstParser;
 
-void parser_parse(Parser *);
+void ast_parse(AstParser *);

@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "ast.h"
 #include "array.h"
 #include "diagnoser.h"
 #include "lexer.h"
@@ -14,9 +14,9 @@ typedef enum : uint8_t {
     PR_PREFIX,
     PR_CALL,
     PR_SUBSCRIPT,
-} Precedence;
+} OperatorPrecedence;
 
-static Precedence parser_precedence_of(TokenTag token) {
+static OperatorPrecedence operator_precedence_of(TokenTag token) {
     switch (token) {
     case TOK_ASSIGN:
     case TOK_PLUS_ASSIGN:
@@ -59,8 +59,8 @@ static Precedence parser_precedence_of(TokenTag token) {
     }
 }
 
-static AstNodeIdx parser_push_node(Parser *parser, AstNodeTag tag,
-                                   AstNodePayload payload) {
+static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
+                                AstNodePayload payload) {
     if (parser->ast.nodes.len + 1 > parser->ast.nodes.capacity) {
         size_t new_cap =
             parser->ast.nodes.capacity ? parser->ast.nodes.capacity * 2 : 4;
@@ -88,7 +88,7 @@ static AstNodeIdx parser_push_node(Parser *parser, AstNodeTag tag,
     return parser->ast.nodes.len++;
 }
 
-static AstNodeIdx parser_parse_binary_expr(Parser *parser, AstNodeIdx lhs) {
+static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
     switch (lexer_peek(&parser->lexer).tag) {
     default:
         diagnoser_error(source_location_of(parser->file_path,
@@ -100,8 +100,18 @@ static AstNodeIdx parser_parse_binary_expr(Parser *parser, AstNodeIdx lhs) {
     }
 }
 
-static AstNodeIdx parser_parse_unary_expr(Parser *parser) {
+static AstNodeIdx ast_parse_identifier(AstParser *parser) {
+    Token identifier = lexer_next(&parser->lexer);
+
+    return ast_push_node(parser, NODE_IDENTIFIER,
+                         (AstNodePayload){.lhs = identifier.range.start,
+                                          .rhs = identifier.range.end});
+}
+
+static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
+    case TOK_IDENTIFIER:
+        return ast_parse_identifier(parser);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -112,30 +122,32 @@ static AstNodeIdx parser_parse_unary_expr(Parser *parser) {
     }
 }
 
-static AstNodeIdx parser_parse_expr(Parser *parser, Precedence precedence) {
-    AstNodeIdx lhs = parser_parse_unary_expr(parser);
+static AstNodeIdx ast_parse_expr(AstParser *parser,
+                                 OperatorPrecedence precedence) {
+    AstNodeIdx lhs = ast_parse_unary_expr(parser);
 
-    while (parser_precedence_of(lexer_peek(&parser->lexer).tag) > precedence) {
-        lhs = parser_parse_binary_expr(parser, lhs);
+    while (operator_precedence_of(lexer_peek(&parser->lexer).tag) >
+           precedence) {
+        lhs = ast_parse_binary_expr(parser, lhs);
     }
 
     return lhs;
 }
 
-static AstNodeIdx parser_parse_stmt(Parser *parser) {
+static AstNodeIdx ast_parse_stmt(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     default:
-        return parser_parse_expr(parser, PR_LOWEST);
+        return ast_parse_expr(parser, PR_LOWEST);
     }
 }
 
-void parser_parse(Parser *parser) {
+void ast_parse(AstParser *parser) {
     // We intentionally make our own AstExtra so it won't be modified by other
-    // "parser_parse_*" functions
+    // "ast_parse_*" functions
     AstExtra stmts = {0};
 
     while (lexer_peek(&parser->lexer).tag != TOK_EOF) {
-        AstNodeIdx stmt = parser_parse_stmt(parser);
+        AstNodeIdx stmt = ast_parse_stmt(parser);
 
         ARRAY_PUSH(&stmts, stmt);
     }
@@ -144,8 +156,8 @@ void parser_parse(Parser *parser) {
 
     ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
 
-    parser_push_node(parser, NODE_BLOCK,
-                     (AstNodePayload){.lhs = stmts_index, .rhs = stmts.len});
+    ast_push_node(parser, NODE_BLOCK,
+                  (AstNodePayload){.lhs = stmts_index, .rhs = stmts.len});
 
     ARRAY_FREE(&stmts);
 }
