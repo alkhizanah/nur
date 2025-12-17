@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "lexer.h"
@@ -24,6 +26,8 @@ typedef enum : uint8_t {
 } AstNodeTag;
 
 typedef uint32_t AstNodeIdx;
+
+#define INVALID_NODE_IDX UINT32_MAX
 
 typedef struct {
     AstNodeIdx lhs;
@@ -63,4 +67,4 @@ typedef struct {
     Ast ast;
 } AstParser;
 
-void ast_parse(AstParser *);
+bool ast_parse(AstParser *);

@@ -78,6 +78,7 @@ static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
             parser->ast.nodes.payloads == NULL) {
             fprintf(stderr, "error: out of memory\n");
 
+            // We shouldn't return INVALID_NODE_IDX as being out of memory is irrecoverible (not sure)
             exit(1);
         }
 
@@ -98,7 +99,7 @@ static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
                                            lexer_peek(&parser->lexer).range),
                         "unknown operator\n");
 
-        exit(1);
+        return INVALID_NODE_IDX;
     }
 }
 
@@ -162,7 +163,7 @@ static AstNodeIdx ast_parse_string(AstParser *parser) {
                                        }),
                     "invalid string escape character: '%c'\n", escaped);
 
-                exit(1);
+                return INVALID_NODE_IDX;
             }
 
             unescaping = false;
@@ -196,7 +197,7 @@ static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
                                            lexer_peek(&parser->lexer).range),
                         "unknown expression\n");
 
-        exit(1);
+        return INVALID_NODE_IDX;
     }
 }
 
@@ -206,6 +207,10 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
 
     while (operator_precedence_of(lexer_peek(&parser->lexer).tag) >
            precedence) {
+        if (lhs == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
+        }
+
         lhs = ast_parse_binary_expr(parser, lhs);
     }
 
@@ -219,13 +224,17 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
     }
 }
 
-void ast_parse(AstParser *parser) {
+bool ast_parse(AstParser *parser) {
     // We intentionally make our own AstExtra so it won't be modified by
     // other "ast_parse_*" functions
     AstExtra stmts = {0};
 
     while (lexer_peek(&parser->lexer).tag != TOK_EOF) {
         AstNodeIdx stmt = ast_parse_stmt(parser);
+
+        if (stmt == INVALID_NODE_IDX) {
+            return false;
+        }
 
         ARRAY_PUSH(&stmts, stmt);
     }
@@ -238,4 +247,6 @@ void ast_parse(AstParser *parser) {
                   (AstNodePayload){.lhs = stmts_index, .rhs = stmts.len});
 
     ARRAY_FREE(&stmts);
+
+    return true;
 }

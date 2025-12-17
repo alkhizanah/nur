@@ -71,7 +71,9 @@ int main(int argc, const char **argv) {
         AstParser parser = {.file_path = input_file_path,
                             .lexer = {.buffer = input_file_content}};
 
-        ast_parse(&parser);
+        if (!ast_parse(&parser)) {
+            return 1;
+        }
 
         free(input_file_content);
     } else {
