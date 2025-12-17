@@ -78,7 +78,8 @@ static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
             parser->ast.nodes.payloads == NULL) {
             fprintf(stderr, "error: out of memory\n");
 
-            // We shouldn't return INVALID_NODE_IDX as being out of memory is irrecoverible (not sure)
+            // We shouldn't return INVALID_NODE_IDX as being out of memory is
+            // irrecoverible (not sure)
             exit(1);
         }
 
@@ -97,7 +98,7 @@ static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
                                            lexer_peek(&parser->lexer).range),
-                        "unknown operator\n");
+                        "unknown binary operator\n");
 
         return INVALID_NODE_IDX;
     }
@@ -185,12 +186,55 @@ static AstNodeIdx ast_parse_string(AstParser *parser) {
                          .rhs = unescaped_string_end - unescaped_string_start});
 }
 
+static AstNodeIdx ast_parse_int(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    uint64_t v = 0;
+
+    const char *s = parser->lexer.buffer + token.range.start;
+    uint32_t s_len = token.range.end - token.range.start;
+
+    for (uint32_t i = 0; i < s_len; i++) {
+        // TODO: This is assuming decimal digits only, hexadecmial (0x0), octal
+        // (0o0), binary (0b0) need special treatment
+        if (s[i] < '0' || s[i] > '9') {
+            diagnoser_error(source_location_of(parser->file_path,
+                                               parser->lexer.buffer,
+                                               token.range),
+                            "unsuitable digit in number: '%c'\n", s[i]);
+
+            return INVALID_NODE_IDX;
+        }
+
+        uint64_t digit = s[i] - '0';
+
+        if (v > UINT64_MAX / 10 || (v == UINT64_MAX / 10 && digit > UINT64_MAX % 10)) {
+            diagnoser_error(source_location_of(parser->file_path,
+                                               parser->lexer.buffer,
+                                               token.range),
+                            "number is too big to be represented\n");
+
+            return INVALID_NODE_IDX;
+        }
+
+        v = v * 10 + digit;
+    }
+
+    return ast_push_node(parser, NODE_INT,
+                         (AstNodePayload){
+                             .lhs = v >> 32,
+                             .rhs = v,
+                         });
+}
+
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_IDENTIFIER:
         return ast_parse_identifier(parser);
     case TOK_STRING:
         return ast_parse_string(parser);
+    case TOK_INT:
+        return ast_parse_int(parser);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
