@@ -1,7 +1,7 @@
 #ifdef _WIN32
-#include "windows.c"
+#include "platform_windows.c"
 #else
-#include "posix.c"
+#include "platform_posix.c"
 #endif
 
 #include <errno.h>
@@ -9,9 +9,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "os.h"
+#include "platform.h"
 
-char *read_entire_file(const char *file_path) {
+char *platform_read_entire_file(const char *file_path) {
     FILE *file = fopen(file_path, "r");
 
     if (file == NULL) {

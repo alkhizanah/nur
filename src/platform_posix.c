@@ -12,9 +12,9 @@
 #include <unistd.h>
 
 #include "array.h"
-#include "os.h"
+#include "platform.h"
 
-char **traverse_directory(const char *dir_path, size_t *children_count) {
+char **platform_traverse_directory(const char *dir_path, size_t *children_count) {
     size_t dir_path_len = strlen(dir_path);
 
     DIR *dir = opendir(dir_path);
@@ -88,7 +88,7 @@ char **traverse_directory(const char *dir_path, size_t *children_count) {
             size_t other_paths_len;
 
             char **other_paths =
-                traverse_directory(relative_path, &other_paths_len);
+                platform_traverse_directory(relative_path, &other_paths_len);
 
             *children_count += other_paths_len;
 
@@ -107,7 +107,7 @@ char **traverse_directory(const char *dir_path, size_t *children_count) {
     return children_paths;
 }
 
-bool is_rebuild_needed(const char *output_path, const char **input_paths,
+bool platform_is_rebuild_needed(const char *output_path, const char **input_paths,
                        size_t input_paths_len) {
     struct stat stat_buf = {};
 
@@ -140,7 +140,7 @@ bool is_rebuild_needed(const char *output_path, const char **input_paths,
     return false;
 }
 
-bool execute_command(const char **argv) {
+bool platform_execute_command(const char **argv) {
     pid_t pid = fork();
 
     switch (pid) {

@@ -6,7 +6,7 @@
 #include "array.h"
 #include "ast.h"
 #include "lexer.h"
-#include "os.h"
+#include "platform.h"
 
 static void usage(const char *program) {
     fprintf(stderr, "usage: %s <command> [options..] [arguments..]\n\n",
@@ -20,10 +20,10 @@ int main(int argc, const char **argv) {
 #ifndef NO_REBUILD
     size_t input_paths_len;
 
-    char **input_paths = traverse_directory("src", &input_paths_len);
+    char **input_paths = platform_traverse_directory("src", &input_paths_len);
 
     bool should_rebuild =
-        is_rebuild_needed(argv[0], (const char **)input_paths, input_paths_len);
+        platform_is_rebuild_needed(argv[0], (const char **)input_paths, input_paths_len);
 
     for (size_t i = 0; i < input_paths_len; i++) {
         free(input_paths[i]);
@@ -32,14 +32,14 @@ int main(int argc, const char **argv) {
     free(input_paths);
 
     if (should_rebuild) {
-        if (!execute_command(
+        if (!platform_execute_command(
                 (const char *[]){"cc", "-o", argv[0], "src/one.c", NULL})) {
             fprintf(stderr, "error: could not rebuild the executable\n");
 
             return 1;
         }
 
-        execute_command(argv);
+        platform_execute_command(argv);
 
         return 0;
     }
@@ -66,7 +66,7 @@ int main(int argc, const char **argv) {
 
         const char *input_file_path = ARRAY_SHIFT(argc, argv);
 
-        char *input_file_content = read_entire_file(input_file_path);
+        char *input_file_content = platform_read_entire_file(input_file_path);
 
         AstParser parser = {.file_path = input_file_path,
                             .lexer = {.buffer = input_file_content}};

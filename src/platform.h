@@ -4,16 +4,16 @@
 #include <stddef.h>
 
 /// Read an entire file into a heap allocated chunk of null-terminated bytes
-char *read_entire_file(const char *file_path);
+char *platform_read_entire_file(const char *file_path);
 
 /// Traverse the directory recursively and collect the relative path of each
 /// child
-char **traverse_directory(const char *dir_path, size_t *children_count);
+char **platform_traverse_directory(const char *dir_path, size_t *children_count);
 
 /// Check whether a rebuild of a program is needed, by checking if one of its
 /// source files are modified after the program's compilation
-bool is_rebuild_needed(const char *output_path, const char **input_paths,
+bool platform_is_rebuild_needed(const char *output_path, const char **input_paths,
                        size_t input_paths_len);
 
 /// Execute a command and return whether it was successful or not
-bool execute_command(const char **argv);
+bool platform_execute_command(const char **argv);
