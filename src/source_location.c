@@ -4,8 +4,8 @@ SourceLocation source_location_of(const char *file_path, const char *buffer,
                                   Range range) {
     SourceLocation loc = {file_path, 1, 1};
 
-    for (const char *end = buffer + range.start; buffer < end; buffer++) {
-        if (*buffer == '\n') {
+    for (uint32_t i = 0; i < range.start; i++) {
+        if (buffer[i] == '\n') {
             loc.line += 1;
             loc.column = 1;
         } else {

@@ -5,18 +5,20 @@
 #include "lexer.h"
 
 typedef enum : uint8_t {
-    // Payload: lhs is an index in extra.items, and rhs is the amount of nodes
+    // Payload: lhs is an index to a AstNodeIdx list in extra.items, and rhs is
+    // the amount of nodes
     NODE_BLOCK,
     // Payload: lhs is the Range.start and rhs is the Range.end
     NODE_IDENTIFIER,
+    // Payload: lhs is an index to a character list in strings.items, and rhs is
+    // the amount of characters
+    NODE_STRING,
     // Payload: lhs is the high bits (i >> 32) and rhs is the low bits
     // ((uint32_t)i)
     NODE_INT,
     // Payload: lhs is the high bits (bitcasted_f >> 32) and rhs is the low bits
     // ((uint32_t)bitcasted_f)
     NODE_FLOAT,
-    // Payload: lhs is the Range.start and rhs is the Range.end
-    NODE_STRING,
     // Payload: lhs is an index to a target node, rhs is an index to a value
     NODE_ASSIGN,
 } AstNodeTag;
@@ -36,6 +38,12 @@ typedef struct {
 } AstNodes;
 
 typedef struct {
+    char *items;
+    size_t len;
+    size_t capacity;
+} AstStrings;
+
+typedef struct {
     uint32_t *items;
     size_t len;
     size_t capacity;
@@ -45,6 +53,7 @@ typedef struct {
 // of the current module
 typedef struct {
     AstNodes nodes;
+    AstStrings strings;
     AstExtra extra;
 } Ast;
 

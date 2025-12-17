@@ -1,5 +1,7 @@
-#include "ast.h"
+#include <stdbool.h>
+
 #include "array.h"
+#include "ast.h"
 #include "diagnoser.h"
 #include "lexer.h"
 #include "source_location.h"
@@ -101,17 +103,93 @@ static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
 }
 
 static AstNodeIdx ast_parse_identifier(AstParser *parser) {
-    Token identifier = lexer_next(&parser->lexer);
+    Token token = lexer_next(&parser->lexer);
 
-    return ast_push_node(parser, NODE_IDENTIFIER,
-                         (AstNodePayload){.lhs = identifier.range.start,
-                                          .rhs = identifier.range.end});
+    return ast_push_node(
+        parser, NODE_IDENTIFIER,
+        (AstNodePayload){.lhs = token.range.start, .rhs = token.range.end});
+}
+
+static AstNodeIdx ast_parse_string(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    bool unescaping = false;
+
+    uint32_t unescaped_string_start = parser->ast.strings.len;
+
+    size_t len = token.range.end - token.range.start;
+
+    for (size_t i = 0; i < len; i++) {
+        const char escaped = parser->lexer.buffer[token.range.start + i];
+
+        char unescaped;
+
+        if (unescaping) {
+            switch (escaped) {
+            case '\\':
+                unescaped = '\\';
+                break;
+            case 'n':
+                unescaped = '\n';
+                break;
+            case 'r':
+                unescaped = '\r';
+                break;
+            case 't':
+                unescaped = '\t';
+                break;
+            case 'e':
+                unescaped = 27;
+                break;
+            case 'v':
+                unescaped = 11;
+                break;
+            case 'b':
+                unescaped = 8;
+                break;
+            case 'f':
+                unescaped = 12;
+                break;
+            case '"':
+                unescaped = '"';
+                break;
+            default:
+                diagnoser_error(
+                    source_location_of(parser->file_path, parser->lexer.buffer,
+                                       (Range){
+                                           .start = token.range.start + i,
+                                           .end = token.range.start + i + 1,
+                                       }),
+                    "invalid string escape character: '%c'\n", escaped);
+
+                exit(1);
+            }
+
+            unescaping = false;
+        } else if (escaped == '\\') {
+            unescaping = true;
+            continue;
+        } else {
+            unescaped = escaped;
+        }
+
+        ARRAY_PUSH(&parser->ast.strings, unescaped);
+    }
+
+    uint32_t unescaped_string_end = parser->ast.strings.len;
+
+    return ast_push_node(
+        parser, NODE_STRING,
+        (AstNodePayload){.lhs = unescaped_string_start,
+                         .rhs = unescaped_string_end - unescaped_string_start});
 }
 
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_IDENTIFIER:
         return ast_parse_identifier(parser);
+    case TOK_STRING:
+        return ast_parse_string(parser);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -142,8 +220,8 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
 }
 
 void ast_parse(AstParser *parser) {
-    // We intentionally make our own AstExtra so it won't be modified by other
-    // "ast_parse_*" functions
+    // We intentionally make our own AstExtra so it won't be modified by
+    // other "ast_parse_*" functions
     AstExtra stmts = {0};
 
     while (lexer_peek(&parser->lexer).tag != TOK_EOF) {
