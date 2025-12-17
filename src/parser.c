@@ -59,10 +59,33 @@ static Precedence parser_precedence_of(TokenTag token) {
     }
 }
 
-static void parser_push_node(Parser *parser, AstNodeTag tag,
-                             AstNodePayload payload) {
-    ARRAY_PUSH_(&parser->ast.nodes, tags, tag);
-    ARRAY_PUSH_(&parser->ast.nodes, payloads, payload);
+static AstNodeIdx parser_push_node(Parser *parser, AstNodeTag tag,
+                                   AstNodePayload payload) {
+    if (parser->ast.nodes.len + 1 > parser->ast.nodes.capacity) {
+        size_t new_cap =
+            parser->ast.nodes.capacity ? parser->ast.nodes.capacity * 2 : 4;
+
+        parser->ast.nodes.tags = realloc(
+            parser->ast.nodes.tags, sizeof(*parser->ast.nodes.tags) * new_cap);
+
+        parser->ast.nodes.payloads =
+            realloc(parser->ast.nodes.payloads,
+                    sizeof(*parser->ast.nodes.payloads) * new_cap);
+
+        if (parser->ast.nodes.tags == NULL ||
+            parser->ast.nodes.payloads == NULL) {
+            fprintf(stderr, "error: out of memory\n");
+
+            exit(1);
+        }
+
+        parser->ast.nodes.capacity = new_cap;
+    }
+
+    parser->ast.nodes.tags[parser->ast.nodes.len] = tag;
+    parser->ast.nodes.payloads[parser->ast.nodes.len] = payload;
+
+    return parser->ast.nodes.len++;
 }
 
 static AstNodeIdx parser_parse_binary_expr(Parser *parser, AstNodeIdx lhs) {

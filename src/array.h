@@ -7,7 +7,7 @@
 
 #define ARRAY_SHIFT(array_len, array_ptr) ((array_len)--, *(array_ptr)++)
 
-#define ARRAY_PUSH_(arr, items, item)                                          \
+#define ARRAY_PUSH(arr, item)                                                  \
     do {                                                                       \
         if ((arr)->len + 1 > (arr)->capacity) {                                \
             size_t new_cap = (arr)->capacity ? (arr)->capacity * 2 : 4;        \
@@ -26,8 +26,6 @@
                                                                                \
         (arr)->items[(arr)->len++] = (item);                                   \
     } while (0)
-
-#define ARRAY_PUSH(arr, item) ARRAY_PUSH_(arr, items, item)
 
 #define ARRAY_FREE(arr)                                                        \
     do {                                                                       \
