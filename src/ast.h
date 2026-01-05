@@ -53,8 +53,6 @@ typedef struct {
     size_t capacity;
 } AstExtra;
 
-// Note: the last element in nodes is a NODE_BLOCK which is considered the root
-// of the current module
 typedef struct {
     AstNodes nodes;
     AstStrings strings;
@@ -67,4 +65,6 @@ typedef struct {
     Ast ast;
 } AstParser;
 
-bool ast_parse(AstParser *);
+AstNodeIdx ast_parse(AstParser *);
+
+void ast_display(const Ast *, const char *buffer, AstNodeIdx node);

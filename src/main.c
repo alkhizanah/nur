@@ -71,9 +71,13 @@ int main(int argc, const char **argv) {
         AstParser parser = {.file_path = input_file_path,
                             .lexer = {.buffer = input_file_content}};
 
-        if (!ast_parse(&parser)) {
+        AstNodeIdx program = ast_parse(&parser);
+
+        if (program == INVALID_NODE_IDX) {
             return 1;
         }
+
+        // ast_display(&parser.ast, parser.lexer.buffer, program);
 
         free(input_file_content);
     } else {

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 
 #include "array.h"
@@ -208,7 +209,8 @@ static AstNodeIdx ast_parse_int(AstParser *parser) {
 
         uint64_t digit = s[i] - '0';
 
-        if (v > UINT64_MAX / 10 || (v == UINT64_MAX / 10 && digit > UINT64_MAX % 10)) {
+        if (v > UINT64_MAX / 10 ||
+            (v == UINT64_MAX / 10 && digit > UINT64_MAX % 10)) {
             diagnoser_error(source_location_of(parser->file_path,
                                                parser->lexer.buffer,
                                                token.range),
@@ -268,29 +270,72 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
     }
 }
 
-bool ast_parse(AstParser *parser) {
-    // We intentionally make our own AstExtra so it won't be modified by
-    // other "ast_parse_*" functions
+AstNodeIdx ast_parse(AstParser *parser) {
+    // We intentionally make our own AstExtra to make it contiguous
     AstExtra stmts = {0};
 
     while (lexer_peek(&parser->lexer).tag != TOK_EOF) {
         AstNodeIdx stmt = ast_parse_stmt(parser);
 
         if (stmt == INVALID_NODE_IDX) {
-            return false;
+            return INVALID_NODE_IDX;
         }
 
         ARRAY_PUSH(&stmts, stmt);
     }
 
-    uint32_t stmts_index = parser->ast.extra.len;
+    uint32_t stmts_start = parser->ast.extra.len;
 
     ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
 
-    ast_push_node(parser, NODE_BLOCK,
-                  (AstNodePayload){.lhs = stmts_index, .rhs = stmts.len});
+    AstNodeIdx program =
+        ast_push_node(parser, NODE_BLOCK,
+                      (AstNodePayload){.lhs = stmts_start, .rhs = stmts.len});
 
     ARRAY_FREE(&stmts);
 
-    return true;
+    return program;
+}
+
+void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
+    AstNodeIdx lhs = ast->nodes.payloads[node].lhs;
+    AstNodeIdx rhs = ast->nodes.payloads[node].rhs;
+
+    switch (ast->nodes.tags[node]) {
+    case NODE_BLOCK:
+        for (uint32_t i = lhs; i < rhs; i++) {
+            ast_display(ast, buffer, ast->extra.items[i]);
+            printf("\n");
+        }
+
+        break;
+
+    case NODE_INT:
+        printf("%lu", ((uint64_t)lhs << 32) | rhs);
+        break;
+
+    case NODE_FLOAT: {
+        uint64_t v = ((uint64_t)lhs << 32) | rhs;
+        printf("%lf", *(double *)&v);
+        break;
+    }
+
+    case NODE_IDENTIFIER:
+        printf("%.*s", (int)(rhs - lhs), buffer + lhs);
+        break;
+
+    case NODE_STRING:
+        printf("\"%.*s\"", (int)rhs, ast->strings.items + lhs);
+        break;
+
+    case NODE_ASSIGN:
+        ast_display(ast, buffer, lhs);
+        printf(" = ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    default:
+        assert(false && "UNREACHABLE");
+        break;
+    }
 }
