@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <errno.h>
+#include <float.h>
 #include <stdbool.h>
 
 #include "array.h"
@@ -190,42 +192,68 @@ static AstNodeIdx ast_parse_string(AstParser *parser) {
 static AstNodeIdx ast_parse_int(AstParser *parser) {
     Token token = lexer_next(&parser->lexer);
 
-    uint64_t v = 0;
+    char *endptr;
 
-    const char *s = parser->lexer.buffer + token.range.start;
-    uint32_t s_len = token.range.end - token.range.start;
+    errno = 0;
 
-    for (uint32_t i = 0; i < s_len; i++) {
-        // TODO: This is assuming decimal digits only, hexadecmial (0x0), octal
-        // (0o0), binary (0b0) need special treatment
-        if (s[i] < '0' || s[i] > '9') {
-            diagnoser_error(source_location_of(parser->file_path,
-                                               parser->lexer.buffer,
-                                               token.range),
-                            "unsuitable digit in number: '%c'\n", s[i]);
+    uint64_t v = strtoull(parser->lexer.buffer + token.range.start, &endptr, 0);
 
-            return INVALID_NODE_IDX;
-        }
+    if (errno == ERANGE) {
+        diagnoser_error(source_location_of(parser->file_path,
+                                           parser->lexer.buffer, token.range),
+                        "number too big to be represented\n");
 
-        uint64_t digit = s[i] - '0';
+        return INVALID_NODE_IDX;
+    }
 
-        if (v > UINT64_MAX / 10 ||
-            (v == UINT64_MAX / 10 && digit > UINT64_MAX % 10)) {
-            diagnoser_error(source_location_of(parser->file_path,
-                                               parser->lexer.buffer,
-                                               token.range),
-                            "number is too big to be represented\n");
+    if (endptr != parser->lexer.buffer + token.range.end) {
+        diagnoser_error(source_location_of(parser->file_path,
+                                           parser->lexer.buffer, token.range),
+                        "unsuitable digit in number: '%c'\n", *endptr);
 
-            return INVALID_NODE_IDX;
-        }
-
-        v = v * 10 + digit;
+        return INVALID_NODE_IDX;
     }
 
     return ast_push_node(parser, NODE_INT,
                          (AstNodePayload){
                              .lhs = v >> 32,
                              .rhs = v,
+                         });
+}
+
+static AstNodeIdx ast_parse_float(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    char *endptr;
+
+    errno = 0;
+
+    double v = strtod(parser->lexer.buffer + token.range.start, &endptr);
+
+    if (errno == ERANGE) {
+        diagnoser_error(source_location_of(parser->file_path,
+                                           parser->lexer.buffer, token.range),
+                        "number too big to be represented\n");
+
+        return INVALID_NODE_IDX;
+    }
+
+    if (endptr != parser->lexer.buffer + token.range.end) {
+        diagnoser_error(source_location_of(parser->file_path,
+                                           parser->lexer.buffer, token.range),
+                        "unsuitable digit in number: '%c'\n", *endptr);
+
+        return INVALID_NODE_IDX;
+    }
+
+    uint64_t vi;
+
+    memcpy(&vi, &v, sizeof(double));
+
+    return ast_push_node(parser, NODE_FLOAT,
+                         (AstNodePayload){
+                             .lhs = vi >> 32,
+                             .rhs = vi,
                          });
 }
 
@@ -237,6 +265,8 @@ static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
         return ast_parse_string(parser);
     case TOK_INT:
         return ast_parse_int(parser);
+    case TOK_FLOAT:
+        return ast_parse_float(parser);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -315,8 +345,10 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         break;
 
     case NODE_FLOAT: {
-        uint64_t v = ((uint64_t)lhs << 32) | rhs;
-        printf("%lf", *(double *)&v);
+        uint64_t vi = ((uint64_t)lhs << 32) | rhs;
+        double v;
+        memcpy(&v, &vi, sizeof(double));
+        printf("%lf", v);
         break;
     }
 
