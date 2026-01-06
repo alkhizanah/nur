@@ -65,7 +65,7 @@ static OperatorPrecedence operator_precedence_of(TokenTag token) {
 }
 
 static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
-                                AstNodePayload payload) {
+                                AstNodePayload payload, uint32_t source_start) {
     if (parser->ast.nodes.len + 1 > parser->ast.nodes.capacity) {
         size_t new_cap =
             parser->ast.nodes.capacity ? parser->ast.nodes.capacity * 2 : 4;
@@ -77,8 +77,13 @@ static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
             realloc(parser->ast.nodes.payloads,
                     sizeof(*parser->ast.nodes.payloads) * new_cap);
 
+        parser->ast.nodes.source_starts =
+            realloc(parser->ast.nodes.source_starts,
+                    sizeof(*parser->ast.nodes.source_starts) * new_cap);
+
         if (parser->ast.nodes.tags == NULL ||
-            parser->ast.nodes.payloads == NULL) {
+            parser->ast.nodes.payloads == NULL ||
+            parser->ast.nodes.source_starts == NULL) {
             fprintf(stderr, "error: out of memory\n");
 
             // We shouldn't return INVALID_NODE_IDX as being out of memory is
@@ -91,12 +96,45 @@ static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
 
     parser->ast.nodes.tags[parser->ast.nodes.len] = tag;
     parser->ast.nodes.payloads[parser->ast.nodes.len] = payload;
+    parser->ast.nodes.source_starts[parser->ast.nodes.len] = source_start;
 
     return parser->ast.nodes.len++;
 }
 
+static AstNodeIdx ast_parse_expr(AstParser *parser,
+                                 OperatorPrecedence precedence);
+
+static AstNodeIdx ast_parse_assign(AstParser *parser, AstNodeIdx target,
+                                   AstNodeTag tag) {
+    uint32_t source_start = lexer_next(&parser->lexer).range.start;
+
+    AstNodeIdx value = ast_parse_expr(parser, PR_ASSIGN);
+
+    return ast_push_node(parser, tag,
+                         (AstNodePayload){
+                             .lhs = target,
+                             .rhs = value,
+                         },
+                         source_start);
+}
+
 static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
     switch (lexer_peek(&parser->lexer).tag) {
+    case TOK_ASSIGN:
+        return ast_parse_assign(parser, lhs, NODE_ASSIGN);
+    case TOK_PLUS_ASSIGN:
+        return ast_parse_assign(parser, lhs, NODE_ASSIGN_ADD);
+    case TOK_MINUS_ASSIGN:
+        return ast_parse_assign(parser, lhs, NODE_ASSIGN_SUB);
+    case TOK_MULTIPLY_ASSIGN:
+        return ast_parse_assign(parser, lhs, NODE_ASSIGN_MUL);
+    case TOK_DIVIDE_ASSIGN:
+        return ast_parse_assign(parser, lhs, NODE_ASSIGN_DIV);
+    case TOK_EXPONENT_ASSIGN:
+        return ast_parse_assign(parser, lhs, NODE_ASSIGN_POW);
+    case TOK_MODULO_ASSIGN:
+        return ast_parse_assign(parser, lhs, NODE_ASSIGN_MOD);
+
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -112,7 +150,8 @@ static AstNodeIdx ast_parse_identifier(AstParser *parser) {
 
     return ast_push_node(
         parser, NODE_IDENTIFIER,
-        (AstNodePayload){.lhs = token.range.start, .rhs = token.range.end});
+        (AstNodePayload){.lhs = token.range.start, .rhs = token.range.end},
+        token.range.start);
 }
 
 static AstNodeIdx ast_parse_string(AstParser *parser) {
@@ -186,7 +225,8 @@ static AstNodeIdx ast_parse_string(AstParser *parser) {
     return ast_push_node(
         parser, NODE_STRING,
         (AstNodePayload){.lhs = unescaped_string_start,
-                         .rhs = unescaped_string_end - unescaped_string_start});
+                         .rhs = unescaped_string_end - unescaped_string_start},
+        token.range.start);
 }
 
 static AstNodeIdx ast_parse_int(AstParser *parser) {
@@ -218,7 +258,8 @@ static AstNodeIdx ast_parse_int(AstParser *parser) {
                          (AstNodePayload){
                              .lhs = v >> 32,
                              .rhs = v,
-                         });
+                         },
+                         token.range.start);
 }
 
 static AstNodeIdx ast_parse_float(AstParser *parser) {
@@ -254,7 +295,8 @@ static AstNodeIdx ast_parse_float(AstParser *parser) {
                          (AstNodePayload){
                              .lhs = vi >> 32,
                              .rhs = vi,
-                         });
+                         },
+                         token.range.start);
 }
 
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
@@ -318,9 +360,9 @@ AstNodeIdx ast_parse(AstParser *parser) {
 
     ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
 
-    AstNodeIdx program =
-        ast_push_node(parser, NODE_BLOCK,
-                      (AstNodePayload){.lhs = stmts_start, .rhs = stmts.len});
+    AstNodeIdx program = ast_push_node(
+        parser, NODE_BLOCK,
+        (AstNodePayload){.lhs = stmts_start, .rhs = stmts.len}, 0);
 
     ARRAY_FREE(&stmts);
 
@@ -363,6 +405,42 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     case NODE_ASSIGN:
         ast_display(ast, buffer, lhs);
         printf(" = ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_ASSIGN_ADD:
+        ast_display(ast, buffer, lhs);
+        printf(" += ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_ASSIGN_SUB:
+        ast_display(ast, buffer, lhs);
+        printf(" -= ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_ASSIGN_DIV:
+        ast_display(ast, buffer, lhs);
+        printf(" /= ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_ASSIGN_MUL:
+        ast_display(ast, buffer, lhs);
+        printf(" *= ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_ASSIGN_POW:
+        ast_display(ast, buffer, lhs);
+        printf(" **= ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_ASSIGN_MOD:
+        ast_display(ast, buffer, lhs);
+        printf(" %%= ");
         ast_display(ast, buffer, rhs);
         break;
 

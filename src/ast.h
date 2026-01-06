@@ -21,8 +21,15 @@ typedef enum : uint8_t {
     // Payload: lhs is the high bits (bitcasted_f >> 32) and rhs is the low bits
     // ((uint32_t)bitcasted_f)
     NODE_FLOAT,
-    // Payload: lhs is an index to a target node, rhs is an index to a value
+    // Payload of ASSIGN_*: lhs is an index to a target node, rhs is an index to
+    // a value
     NODE_ASSIGN,
+    NODE_ASSIGN_ADD,
+    NODE_ASSIGN_SUB,
+    NODE_ASSIGN_MUL,
+    NODE_ASSIGN_DIV,
+    NODE_ASSIGN_POW,
+    NODE_ASSIGN_MOD,
 } AstNodeTag;
 
 typedef uint32_t AstNodeIdx;
@@ -37,6 +44,7 @@ typedef struct {
 typedef struct {
     AstNodeTag *tags;
     AstNodePayload *payloads;
+    uint32_t *source_starts;
     size_t len;
     size_t capacity;
 } AstNodes;
