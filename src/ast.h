@@ -21,6 +21,8 @@ typedef enum : uint8_t {
     // Payload: lhs is the high bits (bitcasted_f >> 32) and rhs is the low bits
     // ((uint32_t)bitcasted_f)
     NODE_FLOAT,
+    // Payload: rhs is the negated value
+    NODE_NEG,
     // Payload of ASSIGN_*: lhs is an index to a target node, rhs is an index to
     // a value
     NODE_ASSIGN,

@@ -299,6 +299,15 @@ static AstNodeIdx ast_parse_float(AstParser *parser) {
                          token.range.start);
 }
 
+static AstNodeIdx ast_parse_neg(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstNodeIdx value = ast_parse_expr(parser, PR_PREFIX);
+
+    return ast_push_node(parser, NODE_NEG, (AstNodePayload){.rhs = value},
+                         token.range.start);
+}
+
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_IDENTIFIER:
@@ -309,6 +318,8 @@ static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
         return ast_parse_int(parser);
     case TOK_FLOAT:
         return ast_parse_float(parser);
+    case TOK_MINUS:
+        return ast_parse_neg(parser);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
