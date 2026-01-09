@@ -335,15 +335,110 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
     return lhs;
 }
 
+static AstNodeIdx ast_parse_stmt(AstParser *parser);
+
+static AstNodeIdx ast_parse_block(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstExtra stmts = {0};
+
+    while (lexer_peek(&parser->lexer).tag != TOK_CBRACE) {
+        AstNodeIdx stmt = ast_parse_stmt(parser);
+
+        if (stmt == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
+        }
+
+        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+            SourceLocation block_location = source_location_of(
+                parser->file_path, parser->lexer.buffer, token.range);
+
+            diagnoser_error(block_location, "braces did not get closed\n");
+
+            return INVALID_NODE_IDX;
+        }
+
+        ARRAY_PUSH(&stmts, stmt);
+    }
+
+    lexer_next(&parser->lexer);
+
+    uint32_t stmts_start = parser->ast.extra.len;
+
+    ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
+
+    AstNodeIdx block =
+        ast_push_node(parser, NODE_BLOCK,
+                      (AstNodePayload){.lhs = stmts_start, .rhs = stmts.len},
+                      token.range.start);
+
+    ARRAY_FREE(&stmts);
+
+    return block;
+}
+
+static AstNodeIdx ast_parse_return(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    if (lexer_peek(&parser->lexer).tag == TOK_CBRACE) {
+        // For example at the end of a function:
+        //
+        // fn () {
+        //     return
+        // }
+        //
+        // or at the end of an if statement;
+        //
+        // if val {
+        //     return
+        // }
+        return ast_push_node(parser, NODE_RETURN,
+                             (AstNodePayload){.lhs = false}, token.range.start);
+    }
+
+    if (lexer_peek(&parser->lexer).tag == TOK_SEMICOLON) {
+        // Maybe to skip other code:
+        //
+        // fn () {
+        //     return;
+        //
+        //     println(...);
+        // }
+        lexer_next(&parser->lexer);
+
+        return ast_push_node(parser, NODE_RETURN,
+                             (AstNodePayload){.lhs = false}, token.range.start);
+    }
+
+    AstNodeIdx value = ast_parse_expr(parser, PR_LOWEST);
+
+    return ast_push_node(parser, NODE_RETURN,
+                         (AstNodePayload){.lhs = true, .rhs = value},
+                         token.range.start);
+}
+
 static AstNodeIdx ast_parse_stmt(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
+    case TOK_OBRACE:
+        return ast_parse_block(parser);
+
+    case TOK_KEYWORD_RETURN:
+        return ast_parse_return(parser);
+
+    case TOK_KEYWORD_BREAK:
+        return ast_push_node(parser, NODE_BREAK, (AstNodePayload){},
+                             lexer_next(&parser->lexer).range.start);
+
+    case TOK_KEYWORD_CONTINUE:
+        return ast_push_node(parser, NODE_CONTINUE, (AstNodePayload){},
+                             lexer_next(&parser->lexer).range.start);
+
     default:
         return ast_parse_expr(parser, PR_LOWEST);
     }
 }
 
 AstNodeIdx ast_parse(AstParser *parser) {
-    // We intentionally make our own AstExtra to make it contiguous
     AstExtra stmts = {0};
 
     while (lexer_peek(&parser->lexer).tag != TOK_EOF) {
@@ -373,12 +468,29 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     AstNodeIdx lhs = ast->nodes.payloads[node].lhs;
     AstNodeIdx rhs = ast->nodes.payloads[node].rhs;
 
+    static int ast_display_depth = 0;
+
     switch (ast->nodes.tags[node]) {
     case NODE_BLOCK:
-        for (uint32_t i = lhs; i < rhs; i++) {
-            ast_display(ast, buffer, ast->extra.items[i]);
+        printf("{\n");
+
+        ast_display_depth += 1;
+
+        for (uint32_t i = 0; i < rhs; i++) {
+            printf("%*.s", ast_display_depth * 4, "");
+
+            ast_display(ast, buffer, ast->extra.items[lhs + i]);
+
             printf("\n");
         }
+
+        ast_display_depth -= 1;
+
+        if (ast_display_depth > 0) {
+            printf("%*.s", ast_display_depth * 4, "");
+        }
+
+        printf("}");
 
         break;
 
@@ -442,6 +554,26 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         ast_display(ast, buffer, lhs);
         printf(" %%= ");
         ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_RETURN:
+        printf("return");
+
+        if (lhs) {
+            printf(" ");
+            ast_display(ast, buffer, rhs);
+        } else {
+            printf(";");
+        }
+
+        break;
+
+    case NODE_BREAK:
+        printf("break");
+        break;
+
+    case NODE_CONTINUE:
+        printf("continue");
         break;
 
     default:

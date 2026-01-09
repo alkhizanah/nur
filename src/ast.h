@@ -30,6 +30,12 @@ typedef enum : uint8_t {
     NODE_ASSIGN_DIV,
     NODE_ASSIGN_POW,
     NODE_ASSIGN_MOD,
+    // Payload: lhs is a boolean value that decides whether rhs is used or not,
+    // and rhs is the value being returend
+    NODE_RETURN,
+    // No payload is needed for NODE_BREAK and NODE_CONTINUE
+    NODE_BREAK,
+    NODE_CONTINUE,
 } AstNodeTag;
 
 typedef uint32_t AstNodeIdx;
