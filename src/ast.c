@@ -106,16 +106,70 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
 
 static AstNodeIdx ast_parse_assign(AstParser *parser, AstNodeIdx target,
                                    AstNodeTag tag) {
-    uint32_t source_start = lexer_next(&parser->lexer).range.start;
+    Token token = lexer_next(&parser->lexer);
 
     AstNodeIdx value = ast_parse_expr(parser, PR_ASSIGN);
+
+    if (value == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
 
     return ast_push_node(parser, tag,
                          (AstNodePayload){
                              .lhs = target,
                              .rhs = value,
                          },
-                         source_start);
+                         token.range.start);
+}
+
+static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstExtra arguments = {0};
+
+    while (lexer_peek(&parser->lexer).tag != TOK_CPAREN) {
+        AstNodeIdx argument = ast_parse_expr(parser, PR_LOWEST);
+
+        if (argument == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
+        }
+
+        if (lexer_peek(&parser->lexer).tag == TOK_COMMA) {
+            lexer_next(&parser->lexer);
+        }
+
+        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+            SourceLocation call_location = source_location_of(
+                parser->file_path, parser->lexer.buffer, token.range);
+
+            diagnoser_error(call_location, "parentheses did not get closed\n");
+
+            return INVALID_NODE_IDX;
+        }
+
+        ARRAY_PUSH(&arguments, argument);
+    }
+
+    lexer_next(&parser->lexer);
+
+    if (arguments.len == 0) {
+        return ast_push_node(
+            parser, NODE_CALL,
+            (AstNodePayload){.lhs = callee, .rhs = INVALID_EXTRA_IDX},
+            token.range.start);
+    } else {
+        uint32_t index = parser->ast.extra.len;
+
+        ARRAY_PUSH(&parser->ast.extra, arguments.len);
+
+        ARRAY_EXPAND(&parser->ast.extra, arguments.items, arguments.len);
+
+        ARRAY_FREE(&arguments);
+
+        return ast_push_node(parser, NODE_CALL,
+                             (AstNodePayload){.lhs = callee, .rhs = index},
+                             token.range.start);
+    }
 }
 
 static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
@@ -134,7 +188,8 @@ static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
         return ast_parse_assign(parser, lhs, NODE_ASSIGN_POW);
     case TOK_MODULO_ASSIGN:
         return ast_parse_assign(parser, lhs, NODE_ASSIGN_MOD);
-
+    case TOK_OPAREN:
+        return ast_parse_call(parser, lhs);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -304,6 +359,10 @@ static AstNodeIdx ast_parse_neg(AstParser *parser) {
 
     AstNodeIdx value = ast_parse_expr(parser, PR_PREFIX);
 
+    if (value == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
     return ast_push_node(parser, NODE_NEG, (AstNodePayload){.rhs = value},
                          token.range.start);
 }
@@ -423,6 +482,10 @@ static AstNodeIdx ast_parse_return(AstParser *parser) {
 
     AstNodeIdx value = ast_parse_expr(parser, PR_LOWEST);
 
+    if (value == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
     return ast_push_node(parser, NODE_RETURN,
                          (AstNodePayload){.lhs = true, .rhs = value},
                          token.range.start);
@@ -432,18 +495,14 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_OBRACE:
         return ast_parse_block(parser);
-
     case TOK_KEYWORD_RETURN:
         return ast_parse_return(parser);
-
     case TOK_KEYWORD_BREAK:
         return ast_push_node(parser, NODE_BREAK, (AstNodePayload){},
                              lexer_next(&parser->lexer).range.start);
-
     case TOK_KEYWORD_CONTINUE:
         return ast_push_node(parser, NODE_CONTINUE, (AstNodePayload){},
                              lexer_next(&parser->lexer).range.start);
-
     default:
         return ast_parse_expr(parser, PR_LOWEST);
     }
@@ -585,6 +644,27 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
 
     case NODE_CONTINUE:
         printf("continue");
+        break;
+
+    case NODE_CALL:
+        ast_display(ast, buffer, lhs);
+
+        printf("(");
+
+        if (rhs != INVALID_EXTRA_IDX) {
+            uint32_t start = rhs + 1;
+            uint32_t len = ast->extra.items[rhs];
+
+            ast_display(ast, buffer, ast->extra.items[start]);
+
+            for (uint32_t i = 1; i < len; i++) {
+                printf(", ");
+                ast_display(ast, buffer, ast->extra.items[start + i]);
+            }
+        }
+
+        printf(")");
+
         break;
 
     default:

@@ -38,11 +38,17 @@ typedef enum : uint8_t {
     // No payload is needed for NODE_BREAK and NODE_CONTINUE
     NODE_BREAK,
     NODE_CONTINUE,
+    // Payload: lhs is the callee and rhs is an index to AstExtra, first element
+    // at the index is the amount of arguments, and the elements after are an
+    // indices to the arguments, if rhs is INVALID_EXTRA_IDX then there are no
+    // arguments passed to the function
+    NODE_CALL,
 } AstNodeTag;
 
 typedef uint32_t AstNodeIdx;
 
 #define INVALID_NODE_IDX UINT32_MAX
+#define INVALID_EXTRA_IDX UINT32_MAX
 
 typedef struct {
     AstNodeIdx lhs;
