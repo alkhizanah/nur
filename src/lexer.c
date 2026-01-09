@@ -5,6 +5,26 @@
 
 #include "lexer.h"
 
+static bool strings_equal(const char *lhs, uint32_t lhs_len, const char *rhs,
+                          uint32_t rhs_len) {
+
+    if (lhs == rhs)
+        return true;
+
+    if (lhs_len != rhs_len)
+        return false;
+
+    return strncmp(lhs, rhs, lhs_len) == 0;
+}
+
+static inline bool token_is(const char *buffer, Token token,
+                            const char *value) {
+    return token.tag != TOK_INVALID &&
+           strings_equal(buffer + token.range.start,
+                         token.range.end - token.range.start, value,
+                         strlen(value));
+}
+
 Token lexer_next(Lexer *lexer) {
 retry:
     while (isspace(lexer->buffer[lexer->index]))
@@ -216,25 +236,22 @@ retry:
 
             token.range.end = lexer->index;
 
-            const char *ident_start = lexer->buffer + token.range.start;
-            size_t ident_len = token.range.end - token.range.start;
+            token.tag = TOK_IDENTIFIER;
 
-            if (strncmp(ident_start, "if", ident_len) == 0) {
+            if (token_is(lexer->buffer, token, "if")) {
                 token.tag = TOK_KEYWORD_IF;
-            } else if (strncmp(ident_start, "else", ident_len) == 0) {
+            } else if (token_is(lexer->buffer, token, "else")) {
                 token.tag = TOK_KEYWORD_ELSE;
-            } else if (strncmp(ident_start, "while", ident_len) == 0) {
+            } else if (token_is(lexer->buffer, token, "while")) {
                 token.tag = TOK_KEYWORD_WHILE;
-            } else if (strncmp(ident_start, "break", ident_len) == 0) {
+            } else if (token_is(lexer->buffer, token, "break")) {
                 token.tag = TOK_KEYWORD_BREAK;
-            } else if (strncmp(ident_start, "continue", ident_len) == 0) {
+            } else if (token_is(lexer->buffer, token, "continue")) {
                 token.tag = TOK_KEYWORD_CONTINUE;
-            } else if (strncmp(ident_start, "fn", ident_len) == 0) {
+            } else if (token_is(lexer->buffer, token, "fn")) {
                 token.tag = TOK_KEYWORD_FN;
-            } else if (strncmp(ident_start, "return", ident_len) == 0) {
+            } else if (token_is(lexer->buffer, token, "return")) {
                 token.tag = TOK_KEYWORD_RETURN;
-            } else {
-                token.tag = TOK_IDENTIFIER;
             }
         } else if (isdigit(character)) {
             token.tag = TOK_INT;
