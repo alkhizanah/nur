@@ -23,6 +23,13 @@ typedef enum : uint8_t {
     NODE_FLOAT,
     // Payload: rhs is the negated value
     NODE_NEG,
+    // Payload: lhs (op) rhs, no need to explain this
+    NODE_ADD,
+    NODE_SUB,
+    NODE_MUL,
+    NODE_DIV,
+    NODE_POW,
+    NODE_MOD,
     // Payload of ASSIGN_*: lhs is an index to a target node, rhs is an index to
     // a value
     NODE_ASSIGN,

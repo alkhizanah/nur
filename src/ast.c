@@ -172,6 +172,21 @@ static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
     }
 }
 
+static AstNodeIdx ast_parse_binary_op(AstParser *parser, AstNodeIdx lhs,
+                                      AstNodeTag tag,
+                                      OperatorPrecedence precedence) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstNodeIdx rhs = ast_parse_expr(parser, precedence);
+
+    if (rhs == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
+    return ast_push_node(parser, tag, (AstNodePayload){.lhs = lhs, .rhs = rhs},
+                         token.range.start);
+}
+
 static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_ASSIGN:
@@ -190,6 +205,18 @@ static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
         return ast_parse_assign(parser, lhs, NODE_ASSIGN_MOD);
     case TOK_OPAREN:
         return ast_parse_call(parser, lhs);
+    case TOK_PLUS:
+        return ast_parse_binary_op(parser, lhs, NODE_ADD, PR_SUM);
+    case TOK_MINUS:
+        return ast_parse_binary_op(parser, lhs, NODE_SUB, PR_SUM);
+    case TOK_MULTIPLY:
+        return ast_parse_binary_op(parser, lhs, NODE_MUL, PR_PRODUCT);
+    case TOK_DIVIDE:
+        return ast_parse_binary_op(parser, lhs, NODE_DIV, PR_PRODUCT);
+    case TOK_EXPONENT:
+        return ast_parse_binary_op(parser, lhs, NODE_POW, PR_EXPONENT);
+    case TOK_MODULO:
+        return ast_parse_binary_op(parser, lhs, NODE_MOD, PR_PRODUCT);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -623,6 +650,42 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     case NODE_ASSIGN_MOD:
         ast_display(ast, buffer, lhs);
         printf(" %%= ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_ADD:
+        ast_display(ast, buffer, lhs);
+        printf(" + ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_SUB:
+        ast_display(ast, buffer, lhs);
+        printf(" - ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_DIV:
+        ast_display(ast, buffer, lhs);
+        printf(" / ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_MUL:
+        ast_display(ast, buffer, lhs);
+        printf(" * ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_POW:
+        ast_display(ast, buffer, lhs);
+        printf(" ** ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_MOD:
+        ast_display(ast, buffer, lhs);
+        printf(" %% ");
         ast_display(ast, buffer, rhs);
         break;
 
