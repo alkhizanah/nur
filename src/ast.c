@@ -217,6 +217,18 @@ static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
         return ast_parse_binary_op(parser, lhs, NODE_POW, PR_EXPONENT);
     case TOK_MODULO:
         return ast_parse_binary_op(parser, lhs, NODE_MOD, PR_PRODUCT);
+    case TOK_EQL:
+        return ast_parse_binary_op(parser, lhs, NODE_EQL, PR_COMPARISON);
+    case TOK_NOT_EQL:
+        return ast_parse_binary_op(parser, lhs, NODE_NEQ, PR_COMPARISON);
+    case TOK_LESS_THAN:
+        return ast_parse_binary_op(parser, lhs, NODE_LT, PR_COMPARISON);
+    case TOK_LESS_THAN_OR_EQL:
+        return ast_parse_binary_op(parser, lhs, NODE_LTE, PR_COMPARISON);
+    case TOK_GREATER_THAN:
+        return ast_parse_binary_op(parser, lhs, NODE_GT, PR_COMPARISON);
+    case TOK_GREATER_THAN_OR_EQL:
+        return ast_parse_binary_op(parser, lhs, NODE_GTE, PR_COMPARISON);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -686,6 +698,42 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     case NODE_MOD:
         ast_display(ast, buffer, lhs);
         printf(" %% ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_EQL:
+        ast_display(ast, buffer, lhs);
+        printf(" == ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_NEQ:
+        ast_display(ast, buffer, lhs);
+        printf(" != ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_LT:
+        ast_display(ast, buffer, lhs);
+        printf(" < ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_LTE:
+        ast_display(ast, buffer, lhs);
+        printf(" <= ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_GT:
+        ast_display(ast, buffer, lhs);
+        printf(" > ");
+        ast_display(ast, buffer, rhs);
+        break;
+
+    case NODE_GTE:
+        ast_display(ast, buffer, lhs);
+        printf(" >= ");
         ast_display(ast, buffer, rhs);
         break;
 

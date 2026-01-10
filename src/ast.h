@@ -30,6 +30,12 @@ typedef enum : uint8_t {
     NODE_DIV,
     NODE_POW,
     NODE_MOD,
+    NODE_EQL,
+    NODE_NEQ,
+    NODE_LT,
+    NODE_GT,
+    NODE_LTE,
+    NODE_GTE,
     // Payload of ASSIGN_*: lhs is an index to a target node, rhs is an index to
     // a value
     NODE_ASSIGN,
