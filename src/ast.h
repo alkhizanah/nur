@@ -123,9 +123,11 @@ typedef struct {
 } Ast;
 
 typedef struct {
+    Ast ast;
     const char *file_path;
     Lexer lexer;
-    Ast ast;
+    Token next_token;
+    Token current_token;
 } AstParser;
 
 AstNodeIdx ast_parse(AstParser *);

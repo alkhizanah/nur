@@ -61,4 +61,3 @@ typedef struct {
 } Token;
 
 Token lexer_next(Lexer *);
-Token lexer_peek(Lexer *);

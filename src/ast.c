@@ -62,6 +62,14 @@ static OperatorPrecedence operator_precedence_of(TokenTag token) {
     }
 }
 
+static inline Token advance(AstParser *parser) {
+    parser->current_token = parser->next_token;
+    parser->next_token = lexer_next(&parser->lexer);
+    return parser->current_token;
+}
+
+static inline Token peek(const AstParser *parser) { return parser->next_token; }
+
 static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
                                 AstNodePayload payload, uint32_t source_start) {
     if (parser->ast.nodes.len + 1 > parser->ast.nodes.capacity) {
@@ -105,18 +113,18 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
                                  OperatorPrecedence precedence);
 
 static AstNodeIdx ast_parse_block(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstExtra stmts = {0};
 
-    while (lexer_peek(&parser->lexer).tag != TOK_CBRACE) {
+    while (peek(parser).tag != TOK_CBRACE) {
         AstNodeIdx stmt = ast_parse_stmt(parser);
 
         if (stmt == INVALID_NODE_IDX) {
             return INVALID_NODE_IDX;
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+        if (peek(parser).tag == TOK_EOF) {
             diagnoser_error(source_location_of(parser->file_path,
                                                parser->lexer.buffer,
                                                token.range),
@@ -128,7 +136,7 @@ static AstNodeIdx ast_parse_block(AstParser *parser) {
         ARRAY_PUSH(&stmts, stmt);
     }
 
-    lexer_next(&parser->lexer);
+    advance(parser);
 
     uint32_t stmts_start = parser->ast.extra.len;
 
@@ -146,7 +154,7 @@ static AstNodeIdx ast_parse_block(AstParser *parser) {
 
 static AstNodeIdx ast_parse_assign(AstParser *parser, AstNodeIdx target,
                                    AstNodeTag tag) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstNodeIdx value = ast_parse_expr(parser, PR_ASSIGN);
 
@@ -163,22 +171,22 @@ static AstNodeIdx ast_parse_assign(AstParser *parser, AstNodeIdx target,
 }
 
 static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstExtra arguments = {0};
 
-    while (lexer_peek(&parser->lexer).tag != TOK_CPAREN) {
+    while (peek(parser).tag != TOK_CPAREN) {
         AstNodeIdx argument = ast_parse_expr(parser, PR_LOWEST);
 
         if (argument == INVALID_NODE_IDX) {
             return INVALID_NODE_IDX;
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_COMMA) {
-            lexer_next(&parser->lexer);
+        if (peek(parser).tag == TOK_COMMA) {
+            advance(parser);
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+        if (peek(parser).tag == TOK_EOF) {
             diagnoser_error(source_location_of(parser->file_path,
                                                parser->lexer.buffer,
                                                token.range),
@@ -190,7 +198,7 @@ static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
         ARRAY_PUSH(&arguments, argument);
     }
 
-    lexer_next(&parser->lexer);
+    advance(parser);
 
     if (arguments.len == 0) {
         return ast_push_node(
@@ -213,7 +221,7 @@ static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
 }
 
 static AstNodeIdx ast_parse_identifier(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     return ast_push_node(
         parser, NODE_IDENTIFIER,
@@ -223,12 +231,12 @@ static AstNodeIdx ast_parse_identifier(AstParser *parser) {
 
 static AstNodeIdx ast_parse_member_access(AstParser *parser,
                                           AstNodeIdx target) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
-    if (lexer_peek(&parser->lexer).tag != TOK_IDENTIFIER) {
+    if (peek(parser).tag != TOK_IDENTIFIER) {
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
-                                           lexer_peek(&parser->lexer).range),
+                                           peek(parser).range),
                         "expected an identifier after '.'\n");
 
         return INVALID_NODE_IDX;
@@ -243,11 +251,11 @@ static AstNodeIdx ast_parse_member_access(AstParser *parser,
 
 static AstNodeIdx ast_parse_subscript_access(AstParser *parser,
                                              AstNodeIdx target) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstNodeIdx start = ast_parse_expr(parser, PR_LOWEST);
 
-    if (lexer_peek(&parser->lexer).tag != TOK_CBRACKET) {
+    if (peek(parser).tag != TOK_CBRACKET) {
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer, token.range),
                         "'[' did not get closed\n");
@@ -255,7 +263,7 @@ static AstNodeIdx ast_parse_subscript_access(AstParser *parser,
         return INVALID_NODE_IDX;
     }
 
-    lexer_next(&parser->lexer);
+    advance(parser);
 
     return ast_push_node(parser, NODE_SUBSCRIPT,
                          (AstNodePayload){.lhs = target, .rhs = start},
@@ -265,7 +273,7 @@ static AstNodeIdx ast_parse_subscript_access(AstParser *parser,
 static AstNodeIdx ast_parse_binary_op(AstParser *parser, AstNodeIdx lhs,
                                       AstNodeTag tag,
                                       OperatorPrecedence precedence) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstNodeIdx rhs = ast_parse_expr(parser, precedence);
 
@@ -278,7 +286,7 @@ static AstNodeIdx ast_parse_binary_op(AstParser *parser, AstNodeIdx lhs,
 }
 
 static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
-    switch (lexer_peek(&parser->lexer).tag) {
+    switch (peek(parser).tag) {
     case TOK_ASSIGN:
         return ast_parse_assign(parser, lhs, NODE_ASSIGN);
     case TOK_PLUS_ASSIGN:
@@ -326,7 +334,7 @@ static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
-                                           lexer_peek(&parser->lexer).range),
+                                           peek(parser).range),
                         "unknown binary operator\n");
 
         return INVALID_NODE_IDX;
@@ -334,7 +342,7 @@ static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
 }
 
 static AstNodeIdx ast_parse_string(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     bool unescaping = false;
 
@@ -409,7 +417,7 @@ static AstNodeIdx ast_parse_string(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_int(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     char *endptr;
 
@@ -442,7 +450,7 @@ static AstNodeIdx ast_parse_int(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_float(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     char *endptr;
 
@@ -479,7 +487,7 @@ static AstNodeIdx ast_parse_float(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_parentheses_expr(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstNodeIdx value = ast_parse_expr(parser, PR_LOWEST);
 
@@ -487,7 +495,7 @@ static AstNodeIdx ast_parse_parentheses_expr(AstParser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    if (lexer_peek(&parser->lexer).tag != TOK_CPAREN) {
+    if (peek(parser).tag != TOK_CPAREN) {
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer, token.range),
                         "'(' did not get closed\n");
@@ -495,33 +503,33 @@ static AstNodeIdx ast_parse_parentheses_expr(AstParser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    lexer_next(&parser->lexer);
+    advance(parser);
 
     return value;
 }
 
 static AstNodeIdx ast_parse_function(AstParser *parser) {
-    Token fn_token = lexer_next(&parser->lexer);
+    Token fn_token = advance(parser);
 
-    if (lexer_peek(&parser->lexer).tag != TOK_OPAREN) {
+    if (peek(parser).tag != TOK_OPAREN) {
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
-                                           lexer_peek(&parser->lexer).range),
+                                           peek(parser).range),
                         "expected '('\n");
 
         return INVALID_NODE_IDX;
     }
 
-    Token oparen_token = lexer_next(&parser->lexer);
+    Token oparen_token = advance(parser);
 
     AstExtra parameters = {0};
 
-    while (lexer_peek(&parser->lexer).tag != TOK_CPAREN) {
-        if (lexer_peek(&parser->lexer).tag != TOK_IDENTIFIER) {
-            diagnoser_error(
-                source_location_of(parser->file_path, parser->lexer.buffer,
-                                   lexer_peek(&parser->lexer).range),
-                "expected a parameter name to be an identifier\n");
+    while (peek(parser).tag != TOK_CPAREN) {
+        if (peek(parser).tag != TOK_IDENTIFIER) {
+            diagnoser_error(source_location_of(parser->file_path,
+                                               parser->lexer.buffer,
+                                               peek(parser).range),
+                            "expected a parameter name to be an identifier\n");
 
             return INVALID_NODE_IDX;
         }
@@ -532,11 +540,11 @@ static AstNodeIdx ast_parse_function(AstParser *parser) {
             return INVALID_NODE_IDX;
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_COMMA) {
-            lexer_next(&parser->lexer);
+        if (peek(parser).tag == TOK_COMMA) {
+            advance(parser);
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+        if (peek(parser).tag == TOK_EOF) {
             diagnoser_error(source_location_of(parser->file_path,
                                                parser->lexer.buffer,
                                                oparen_token.range),
@@ -548,12 +556,12 @@ static AstNodeIdx ast_parse_function(AstParser *parser) {
         ARRAY_PUSH(&parameters, parameter);
     }
 
-    lexer_next(&parser->lexer);
+    advance(parser);
 
-    if (lexer_peek(&parser->lexer).tag != TOK_OBRACE) {
+    if (peek(parser).tag != TOK_OBRACE) {
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
-                                           lexer_peek(&parser->lexer).range),
+                                           peek(parser).range),
                         "expected '{'\n");
 
         return INVALID_NODE_IDX;
@@ -586,22 +594,22 @@ static AstNodeIdx ast_parse_function(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_array(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstExtra values = {0};
 
-    while (lexer_peek(&parser->lexer).tag != TOK_CBRACKET) {
+    while (peek(parser).tag != TOK_CBRACKET) {
         AstNodeIdx value = ast_parse_expr(parser, PR_LOWEST);
 
         if (value == INVALID_NODE_IDX) {
             return INVALID_NODE_IDX;
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_COMMA) {
-            lexer_next(&parser->lexer);
+        if (peek(parser).tag == TOK_COMMA) {
+            advance(parser);
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+        if (peek(parser).tag == TOK_EOF) {
             diagnoser_error(source_location_of(parser->file_path,
                                                parser->lexer.buffer,
                                                token.range),
@@ -613,7 +621,7 @@ static AstNodeIdx ast_parse_array(AstParser *parser) {
         ARRAY_PUSH(&values, value);
     }
 
-    lexer_next(&parser->lexer);
+    advance(parser);
 
     uint32_t start = parser->ast.extra.len;
 
@@ -629,28 +637,28 @@ static AstNodeIdx ast_parse_array(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_map(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstExtra keys = {0};
     AstExtra values = {0};
 
-    while (lexer_peek(&parser->lexer).tag != TOK_CBRACE) {
+    while (peek(parser).tag != TOK_CBRACE) {
         AstNodeIdx key = ast_parse_expr(parser, PR_LOWEST);
 
         if (key == INVALID_NODE_IDX) {
             return INVALID_NODE_IDX;
         }
 
-        if (lexer_peek(&parser->lexer).tag != TOK_COLON) {
-            diagnoser_error(
-                source_location_of(parser->file_path, parser->lexer.buffer,
-                                   lexer_peek(&parser->lexer).range),
-                "expected ':'\n");
+        if (peek(parser).tag != TOK_COLON) {
+            diagnoser_error(source_location_of(parser->file_path,
+                                               parser->lexer.buffer,
+                                               peek(parser).range),
+                            "expected ':'\n");
 
             return INVALID_NODE_IDX;
         }
 
-        lexer_next(&parser->lexer);
+        advance(parser);
 
         AstNodeIdx value = ast_parse_expr(parser, PR_LOWEST);
 
@@ -658,11 +666,11 @@ static AstNodeIdx ast_parse_map(AstParser *parser) {
             return INVALID_NODE_IDX;
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_COMMA) {
-            lexer_next(&parser->lexer);
+        if (peek(parser).tag == TOK_COMMA) {
+            advance(parser);
         }
 
-        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+        if (peek(parser).tag == TOK_EOF) {
             diagnoser_error(source_location_of(parser->file_path,
                                                parser->lexer.buffer,
                                                token.range),
@@ -675,7 +683,7 @@ static AstNodeIdx ast_parse_map(AstParser *parser) {
         ARRAY_PUSH(&values, value);
     }
 
-    lexer_next(&parser->lexer);
+    advance(parser);
 
     if (keys.len == 0) {
         return ast_push_node(parser, NODE_MAP,
@@ -705,7 +713,7 @@ static AstNodeIdx ast_parse_map(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_unary_op(AstParser *parser, AstNodeTag tag) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstNodeIdx value = ast_parse_expr(parser, PR_PREFIX);
 
@@ -718,7 +726,7 @@ static AstNodeIdx ast_parse_unary_op(AstParser *parser, AstNodeTag tag) {
 }
 
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
-    switch (lexer_peek(&parser->lexer).tag) {
+    switch (peek(parser).tag) {
     case TOK_IDENTIFIER:
         return ast_parse_identifier(parser);
     case TOK_STRING:
@@ -742,7 +750,7 @@ static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
-                                           lexer_peek(&parser->lexer).range),
+                                           peek(parser).range),
                         "unknown expression\n");
 
         return INVALID_NODE_IDX;
@@ -753,8 +761,7 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
                                  OperatorPrecedence precedence) {
     AstNodeIdx lhs = ast_parse_unary_expr(parser);
 
-    while (operator_precedence_of(lexer_peek(&parser->lexer).tag) >
-           precedence) {
+    while (operator_precedence_of(peek(parser).tag) > precedence) {
         if (lhs == INVALID_NODE_IDX) {
             return INVALID_NODE_IDX;
         }
@@ -766,7 +773,7 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
 }
 
 static AstNodeIdx ast_parse_while_loop(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstNodeIdx condition = ast_parse_expr(parser, PR_LOWEST);
 
@@ -774,10 +781,10 @@ static AstNodeIdx ast_parse_while_loop(AstParser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    if (lexer_peek(&parser->lexer).tag != TOK_OBRACE) {
+    if (peek(parser).tag != TOK_OBRACE) {
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
-                                           lexer_peek(&parser->lexer).range),
+                                           peek(parser).range),
                         "expected '{'\n");
 
         return INVALID_NODE_IDX;
@@ -798,7 +805,7 @@ static AstNodeIdx ast_parse_while_loop(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_conditional(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
     AstNodeIdx condition = ast_parse_expr(parser, PR_LOWEST);
 
@@ -806,10 +813,10 @@ static AstNodeIdx ast_parse_conditional(AstParser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    if (lexer_peek(&parser->lexer).tag != TOK_OBRACE) {
+    if (peek(parser).tag != TOK_OBRACE) {
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
-                                           lexer_peek(&parser->lexer).range),
+                                           peek(parser).range),
                         "expected '{'\n");
 
         return INVALID_NODE_IDX;
@@ -823,10 +830,10 @@ static AstNodeIdx ast_parse_conditional(AstParser *parser) {
 
     AstNodeIdx false_case = INVALID_NODE_IDX;
 
-    if (lexer_peek(&parser->lexer).tag == TOK_KEYWORD_ELSE) {
-        lexer_next(&parser->lexer);
+    if (peek(parser).tag == TOK_KEYWORD_ELSE) {
+        advance(parser);
 
-        switch (lexer_peek(&parser->lexer).tag) {
+        switch (peek(parser).tag) {
         case TOK_KEYWORD_IF:
             false_case = ast_parse_conditional(parser);
 
@@ -846,10 +853,10 @@ static AstNodeIdx ast_parse_conditional(AstParser *parser) {
             break;
 
         default: {
-            diagnoser_error(
-                source_location_of(parser->file_path, parser->lexer.buffer,
-                                   lexer_peek(&parser->lexer).range),
-                "expected '{' or 'if'\n");
+            diagnoser_error(source_location_of(parser->file_path,
+                                               parser->lexer.buffer,
+                                               peek(parser).range),
+                            "expected '{' or 'if'\n");
 
             return INVALID_NODE_IDX;
         }
@@ -867,9 +874,9 @@ static AstNodeIdx ast_parse_conditional(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_return(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
+    Token token = advance(parser);
 
-    if (lexer_peek(&parser->lexer).tag == TOK_CBRACE) {
+    if (peek(parser).tag == TOK_CBRACE) {
         // For example at the end of a function:
         //
         // fn () {
@@ -885,7 +892,7 @@ static AstNodeIdx ast_parse_return(AstParser *parser) {
                              (AstNodePayload){.lhs = false}, token.range.start);
     }
 
-    if (lexer_peek(&parser->lexer).tag == TOK_SEMICOLON) {
+    if (peek(parser).tag == TOK_SEMICOLON) {
         // Maybe to skip other code:
         //
         // fn () {
@@ -893,7 +900,7 @@ static AstNodeIdx ast_parse_return(AstParser *parser) {
         //
         //     println(...);
         // }
-        lexer_next(&parser->lexer);
+        advance(parser);
 
         return ast_push_node(parser, NODE_RETURN,
                              (AstNodePayload){.lhs = false}, token.range.start);
@@ -911,7 +918,7 @@ static AstNodeIdx ast_parse_return(AstParser *parser) {
 }
 
 static AstNodeIdx ast_parse_stmt(AstParser *parser) {
-    switch (lexer_peek(&parser->lexer).tag) {
+    switch (peek(parser).tag) {
     case TOK_OBRACE:
         return ast_parse_block(parser);
     case TOK_KEYWORD_WHILE:
@@ -922,10 +929,10 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
         return ast_parse_return(parser);
     case TOK_KEYWORD_BREAK:
         return ast_push_node(parser, NODE_BREAK, (AstNodePayload){},
-                             lexer_next(&parser->lexer).range.start);
+                             advance(parser).range.start);
     case TOK_KEYWORD_CONTINUE:
         return ast_push_node(parser, NODE_CONTINUE, (AstNodePayload){},
-                             lexer_next(&parser->lexer).range.start);
+                             advance(parser).range.start);
     default:
         return ast_parse_expr(parser, PR_LOWEST);
     }
@@ -934,7 +941,9 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
 AstNodeIdx ast_parse(AstParser *parser) {
     AstExtra stmts = {0};
 
-    while (lexer_peek(&parser->lexer).tag != TOK_EOF) {
+    advance(parser);
+
+    while (peek(parser).tag != TOK_EOF) {
         AstNodeIdx stmt = ast_parse_stmt(parser);
 
         if (stmt == INVALID_NODE_IDX) {
