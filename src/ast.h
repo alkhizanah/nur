@@ -7,9 +7,6 @@
 #include "lexer.h"
 
 typedef enum : uint8_t {
-    // Payload: lhs is an index to a AstNodeIdx list in extra.items, and rhs is
-    // the amount of nodes
-    NODE_BLOCK,
     // Payload: lhs is the Range.start and rhs is the Range.end
     NODE_IDENTIFIER,
     // Payload: lhs is an index to a character list in strings.items, and rhs is
@@ -45,6 +42,15 @@ typedef enum : uint8_t {
     NODE_ASSIGN_DIV,
     NODE_ASSIGN_POW,
     NODE_ASSIGN_MOD,
+    // Payload: lhs is an index to an AstNodeIdx list in extra.items, and rhs is
+    // the amount of nodes
+    NODE_BLOCK,
+    // Payload: lhs is an index to a parameter list in extra.items, first
+    // element is the amount of parameters then after are indices to identifiers
+    // representing the name of the parameters, if lhs is INVALID_EXTRA_IDX then
+    // the function doesn't accept any parameter, and rhs is an index to a block
+    // that is the body of the function
+    NODE_FUNCTION,
     // Payload: lhs is a boolean value that decides whether rhs is used or not,
     // and rhs is the value being returend
     NODE_RETURN,

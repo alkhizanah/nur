@@ -210,17 +210,23 @@ retry:
 
         bool escaping = false;
 
-        while (escaping || lexer->buffer[lexer->index++] != character) {
+        while (true) {
             if (escaping) {
                 escaping = false;
             } else if (lexer->buffer[lexer->index] == '\\') {
                 escaping = true;
-            } else if (lexer->buffer[lexer->index - 1] == '\0' ||
-                       lexer->buffer[lexer->index - 1] == '\n') {
+            } else if (lexer->buffer[lexer->index] == '\0' ||
+                       lexer->buffer[lexer->index] == '\n') {
                 token.tag = TOK_INVALID;
                 token.range.end = lexer->index;
                 break;
+            } else if (lexer->buffer[lexer->index] == character) {
+                lexer->index++;
+
+                break;
             }
+
+            lexer->index++;
         }
 
         token.range.end = lexer->index - 1;

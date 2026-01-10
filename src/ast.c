@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <float.h>
 #include <stdbool.h>
@@ -98,8 +99,50 @@ static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
     return parser->ast.nodes.len++;
 }
 
+static AstNodeIdx ast_parse_stmt(AstParser *parser);
+
 static AstNodeIdx ast_parse_expr(AstParser *parser,
                                  OperatorPrecedence precedence);
+
+static AstNodeIdx ast_parse_block(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstExtra stmts = {0};
+
+    while (lexer_peek(&parser->lexer).tag != TOK_CBRACE) {
+        AstNodeIdx stmt = ast_parse_stmt(parser);
+
+        if (stmt == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
+        }
+
+        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+            diagnoser_error(source_location_of(parser->file_path,
+                                               parser->lexer.buffer,
+                                               token.range),
+                            "'{' did not get closed\n");
+
+            return INVALID_NODE_IDX;
+        }
+
+        ARRAY_PUSH(&stmts, stmt);
+    }
+
+    lexer_next(&parser->lexer);
+
+    uint32_t stmts_start = parser->ast.extra.len;
+
+    ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
+
+    AstNodeIdx block =
+        ast_push_node(parser, NODE_BLOCK,
+                      (AstNodePayload){.lhs = stmts_start, .rhs = stmts.len},
+                      token.range.start);
+
+    ARRAY_FREE(&stmts);
+
+    return block;
+}
 
 static AstNodeIdx ast_parse_assign(AstParser *parser, AstNodeIdx target,
                                    AstNodeTag tag) {
@@ -470,6 +513,91 @@ static AstNodeIdx ast_parse_parentheses_expr(AstParser *parser) {
     return value;
 }
 
+static AstNodeIdx ast_parse_function(AstParser *parser) {
+    Token fn_token = lexer_next(&parser->lexer);
+
+    if (lexer_peek(&parser->lexer).tag != TOK_OPAREN) {
+        diagnoser_error(source_location_of(parser->file_path,
+                                           parser->lexer.buffer,
+                                           lexer_peek(&parser->lexer).range),
+                        "expected '('\n");
+
+        return INVALID_NODE_IDX;
+    }
+
+    Token oparen_token = lexer_next(&parser->lexer);
+
+    AstExtra parameters = {0};
+
+    while (lexer_peek(&parser->lexer).tag != TOK_CPAREN) {
+        if (lexer_peek(&parser->lexer).tag != TOK_IDENTIFIER) {
+            diagnoser_error(
+                source_location_of(parser->file_path, parser->lexer.buffer,
+                                   lexer_peek(&parser->lexer).range),
+                "expected a parameter name to be an identifier\n");
+
+            return INVALID_NODE_IDX;
+        }
+
+        AstNodeIdx parameter = ast_parse_identifier(parser);
+
+        if (parameter == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
+        }
+
+        if (lexer_peek(&parser->lexer).tag == TOK_COMMA) {
+            lexer_next(&parser->lexer);
+        }
+
+        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+            diagnoser_error(source_location_of(parser->file_path,
+                                               parser->lexer.buffer,
+                                               oparen_token.range),
+                            "'(' did not get closed\n");
+
+            return INVALID_NODE_IDX;
+        }
+
+        ARRAY_PUSH(&parameters, parameter);
+    }
+
+    lexer_next(&parser->lexer);
+
+    if (lexer_peek(&parser->lexer).tag != TOK_OBRACE) {
+        diagnoser_error(source_location_of(parser->file_path,
+                                           parser->lexer.buffer,
+                                           lexer_peek(&parser->lexer).range),
+                        "expected '{'\n");
+
+        return INVALID_NODE_IDX;
+    }
+
+    AstNodeIdx block = ast_parse_block(parser);
+
+    if (block == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
+    if (parameters.len == 0) {
+        return ast_push_node(
+            parser, NODE_FUNCTION,
+            (AstNodePayload){.lhs = INVALID_EXTRA_IDX, .rhs = block},
+            fn_token.range.start);
+    } else {
+        uint32_t index = parser->ast.extra.len;
+
+        ARRAY_PUSH(&parser->ast.extra, parameters.len);
+
+        ARRAY_EXPAND(&parser->ast.extra, parameters.items, parameters.len);
+
+        ARRAY_FREE(&parameters);
+
+        return ast_push_node(parser, NODE_FUNCTION,
+                             (AstNodePayload){.lhs = index, .rhs = block},
+                             fn_token.range.start);
+    }
+}
+
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_IDENTIFIER:
@@ -484,6 +612,8 @@ static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
         return ast_parse_neg(parser);
     case TOK_OPAREN:
         return ast_parse_parentheses_expr(parser);
+    case TOK_KEYWORD_FN:
+        return ast_parse_function(parser);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -508,48 +638,6 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
     }
 
     return lhs;
-}
-
-static AstNodeIdx ast_parse_stmt(AstParser *parser);
-
-static AstNodeIdx ast_parse_block(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
-
-    AstExtra stmts = {0};
-
-    while (lexer_peek(&parser->lexer).tag != TOK_CBRACE) {
-        AstNodeIdx stmt = ast_parse_stmt(parser);
-
-        if (stmt == INVALID_NODE_IDX) {
-            return INVALID_NODE_IDX;
-        }
-
-        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
-            diagnoser_error(source_location_of(parser->file_path,
-                                               parser->lexer.buffer,
-                                               token.range),
-                            "'{' did not get closed\n");
-
-            return INVALID_NODE_IDX;
-        }
-
-        ARRAY_PUSH(&stmts, stmt);
-    }
-
-    lexer_next(&parser->lexer);
-
-    uint32_t stmts_start = parser->ast.extra.len;
-
-    ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
-
-    AstNodeIdx block =
-        ast_push_node(parser, NODE_BLOCK,
-                      (AstNodePayload){.lhs = stmts_start, .rhs = stmts.len},
-                      token.range.start);
-
-    ARRAY_FREE(&stmts);
-
-    return block;
 }
 
 static AstNodeIdx ast_parse_while_loop(AstParser *parser) {
@@ -744,6 +832,41 @@ AstNodeIdx ast_parse(AstParser *parser) {
     return program;
 }
 
+void print_string_escaped(const char *s, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)s[i];
+
+        switch (c) {
+        case '\n':
+            printf("\\n");
+            break;
+        case '\r':
+            printf("\\r");
+            break;
+        case '\t':
+            printf("\\t");
+            break;
+        case '\b':
+            printf("\\b");
+            break;
+        case '\f':
+            printf("\\f");
+            break;
+        case '\\':
+            printf("\\\\");
+            break;
+        case '\"':
+            printf("\\\"");
+            break;
+        default:
+            if (isprint(c))
+                putchar(c);
+            else
+                printf("\\x%02X", c);
+        }
+    }
+}
+
 void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     AstNodeIdx lhs = ast->nodes.payloads[node].lhs;
     AstNodeIdx rhs = ast->nodes.payloads[node].rhs;
@@ -791,7 +914,9 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         break;
 
     case NODE_STRING:
-        printf("\"%.*s\"", (int)rhs, ast->strings.items + lhs);
+        printf("\"");
+        print_string_escaped(ast->strings.items + lhs, rhs);
+        printf("\"");
         break;
 
     case NODE_ASSIGN:
@@ -988,6 +1113,27 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         }
 
         printf(")");
+        break;
+
+    case NODE_FUNCTION:
+        printf("fn (");
+
+        if (lhs != INVALID_EXTRA_IDX) {
+            uint32_t start = lhs + 1;
+            uint32_t len = ast->extra.items[lhs];
+
+            ast_display(ast, buffer, ast->extra.items[start]);
+
+            for (uint32_t i = 1; i < len; i++) {
+                printf(", ");
+                ast_display(ast, buffer, ast->extra.items[start + i]);
+            }
+        }
+
+        printf(") ");
+
+        ast_display(ast, buffer, rhs);
+
         break;
 
     case NODE_MEMBER:
