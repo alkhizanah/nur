@@ -18,11 +18,11 @@ static bool strings_equal(const char *lhs, uint32_t lhs_len, const char *rhs,
 }
 
 static inline bool token_is(const char *buffer, Token token,
-                            const char *value) {
+                            const char *value, size_t value_len) {
     return token.tag != TOK_INVALID &&
            strings_equal(buffer + token.range.start,
                          token.range.end - token.range.start, value,
-                         strlen(value));
+                         value_len);
 }
 
 Token lexer_next(Lexer *lexer) {
@@ -244,19 +244,19 @@ retry:
 
             token.tag = TOK_IDENTIFIER;
 
-            if (token_is(lexer->buffer, token, "if")) {
+            if (token_is(lexer->buffer, token, "if", 2)) {
                 token.tag = TOK_KEYWORD_IF;
-            } else if (token_is(lexer->buffer, token, "else")) {
+            } else if (token_is(lexer->buffer, token, "else", 4)) {
                 token.tag = TOK_KEYWORD_ELSE;
-            } else if (token_is(lexer->buffer, token, "while")) {
+            } else if (token_is(lexer->buffer, token, "while", 5)) {
                 token.tag = TOK_KEYWORD_WHILE;
-            } else if (token_is(lexer->buffer, token, "break")) {
+            } else if (token_is(lexer->buffer, token, "break", 5)) {
                 token.tag = TOK_KEYWORD_BREAK;
-            } else if (token_is(lexer->buffer, token, "continue")) {
+            } else if (token_is(lexer->buffer, token, "continue", 8)) {
                 token.tag = TOK_KEYWORD_CONTINUE;
-            } else if (token_is(lexer->buffer, token, "fn")) {
+            } else if (token_is(lexer->buffer, token, "fn", 2)) {
                 token.tag = TOK_KEYWORD_FN;
-            } else if (token_is(lexer->buffer, token, "return")) {
+            } else if (token_is(lexer->buffer, token, "return", 6)) {
                 token.tag = TOK_KEYWORD_RETURN;
             }
         } else if (isdigit(character)) {
