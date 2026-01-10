@@ -585,6 +585,49 @@ static AstNodeIdx ast_parse_function(AstParser *parser) {
     }
 }
 
+static AstNodeIdx ast_parse_array(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstExtra values = {0};
+
+    while (lexer_peek(&parser->lexer).tag != TOK_CBRACKET) {
+        AstNodeIdx value = ast_parse_expr(parser, PR_LOWEST);
+
+        if (value == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
+        }
+
+        if (lexer_peek(&parser->lexer).tag == TOK_COMMA) {
+            lexer_next(&parser->lexer);
+        }
+
+        if (lexer_peek(&parser->lexer).tag == TOK_EOF) {
+            diagnoser_error(source_location_of(parser->file_path,
+                                               parser->lexer.buffer,
+                                               token.range),
+                            "'[' did not get closed\n");
+
+            return INVALID_NODE_IDX;
+        }
+
+        ARRAY_PUSH(&values, value);
+    }
+
+    lexer_next(&parser->lexer);
+
+    uint32_t index = parser->ast.extra.len;
+
+    ARRAY_EXPAND(&parser->ast.extra, values.items, values.len);
+
+    uint32_t len = values.len;
+
+    ARRAY_FREE(&values);
+
+    return ast_push_node(parser, NODE_ARRAY,
+                         (AstNodePayload){.lhs = index, .rhs = len},
+                         token.range.start);
+}
+
 static AstNodeIdx ast_parse_unary_op(AstParser *parser, AstNodeTag tag) {
     Token token = lexer_next(&parser->lexer);
 
@@ -598,7 +641,6 @@ static AstNodeIdx ast_parse_unary_op(AstParser *parser, AstNodeTag tag) {
                          token.range.start);
 }
 
-
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_IDENTIFIER:
@@ -609,14 +651,16 @@ static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
         return ast_parse_int(parser);
     case TOK_FLOAT:
         return ast_parse_float(parser);
-    case TOK_MINUS:
-        return ast_parse_unary_op(parser, NODE_NEG);
-    case TOK_LOGICAL_NOT:
-        return ast_parse_unary_op(parser, NODE_NOT);
     case TOK_OPAREN:
         return ast_parse_parentheses_expr(parser);
     case TOK_KEYWORD_FN:
         return ast_parse_function(parser);
+    case TOK_OBRACKET:
+        return ast_parse_array(parser);
+    case TOK_MINUS:
+        return ast_parse_unary_op(parser, NODE_NEG);
+    case TOK_LOGICAL_NOT:
+        return ast_parse_unary_op(parser, NODE_NOT);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -1103,6 +1147,23 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     case NODE_CONTINUE:
         printf("continue");
         break;
+
+    case NODE_ARRAY: {
+        uint32_t start = lhs;
+        uint32_t len = rhs;
+
+        printf("[");
+
+        ast_display(ast, buffer, ast->extra.items[start]);
+
+        for (uint32_t i = 1; i < len; i++) {
+            printf(", ");
+            ast_display(ast, buffer, ast->extra.items[start + i]);
+        }
+
+        printf("]");
+        break;
+    }
 
     case NODE_CALL:
         ast_display(ast, buffer, lhs);

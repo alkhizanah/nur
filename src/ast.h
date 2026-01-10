@@ -18,6 +18,9 @@ typedef enum : uint8_t {
     // Payload: lhs is the high bits (bitcasted_f >> 32) and rhs is the low bits
     // ((uint32_t)bitcasted_f)
     NODE_FLOAT,
+    // Payload: lhs is an index to a value list in extra.items, rhs is the
+    // amount of values
+    NODE_ARRAY,
     // Payload: (op) rhs, no need to explain this
     NODE_NEG,
     NODE_NOT,
