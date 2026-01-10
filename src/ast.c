@@ -478,19 +478,6 @@ static AstNodeIdx ast_parse_float(AstParser *parser) {
                          token.range.start);
 }
 
-static AstNodeIdx ast_parse_neg(AstParser *parser) {
-    Token token = lexer_next(&parser->lexer);
-
-    AstNodeIdx value = ast_parse_expr(parser, PR_PREFIX);
-
-    if (value == INVALID_NODE_IDX) {
-        return INVALID_NODE_IDX;
-    }
-
-    return ast_push_node(parser, NODE_NEG, (AstNodePayload){.rhs = value},
-                         token.range.start);
-}
-
 static AstNodeIdx ast_parse_parentheses_expr(AstParser *parser) {
     Token token = lexer_next(&parser->lexer);
 
@@ -598,6 +585,20 @@ static AstNodeIdx ast_parse_function(AstParser *parser) {
     }
 }
 
+static AstNodeIdx ast_parse_unary_op(AstParser *parser, AstNodeTag tag) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstNodeIdx value = ast_parse_expr(parser, PR_PREFIX);
+
+    if (value == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
+    return ast_push_node(parser, tag, (AstNodePayload){.rhs = value},
+                         token.range.start);
+}
+
+
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_IDENTIFIER:
@@ -609,7 +610,9 @@ static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     case TOK_FLOAT:
         return ast_parse_float(parser);
     case TOK_MINUS:
-        return ast_parse_neg(parser);
+        return ast_parse_unary_op(parser, NODE_NEG);
+    case TOK_LOGICAL_NOT:
+        return ast_parse_unary_op(parser, NODE_NOT);
     case TOK_OPAREN:
         return ast_parse_parentheses_expr(parser);
     case TOK_KEYWORD_FN:
@@ -962,7 +965,13 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         break;
 
     case NODE_NEG:
-        printf(" -(");
+        printf("-(");
+        ast_display(ast, buffer, rhs);
+        printf(")");
+        break;
+
+    case NODE_NOT:
+        printf("!(");
         ast_display(ast, buffer, rhs);
         printf(")");
         break;
