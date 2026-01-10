@@ -60,8 +60,13 @@ typedef enum : uint8_t {
     NODE_WHILE,
     // Payload: lhs is the condition and rhs is an index to 2 elements in
     // AstExtra where first element is the true case block and the second is the
-    // false case block, if the second element is INVALID_NODE_IDX then the false case block is empty
+    // false case block, if the second element is INVALID_NODE_IDX then the
+    // false case block is empty
     NODE_IF,
+    // Payload: lhs is the target and rhs is an identifier node
+    NODE_MEMBER,
+    // Payload: lhs is the target and rhs is an arbitrary expression
+    NODE_SUBSCRIPT,
 } AstNodeTag;
 
 typedef uint32_t AstNodeIdx;
