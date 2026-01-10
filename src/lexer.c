@@ -5,26 +5,6 @@
 
 #include "lexer.h"
 
-static bool strings_equal(const char *lhs, uint32_t lhs_len, const char *rhs,
-                          uint32_t rhs_len) {
-
-    if (lhs == rhs)
-        return true;
-
-    if (lhs_len != rhs_len)
-        return false;
-
-    return strncmp(lhs, rhs, lhs_len) == 0;
-}
-
-static inline bool token_is(const char *buffer, Token token,
-                            const char *value, size_t value_len) {
-    return token.tag != TOK_INVALID &&
-           strings_equal(buffer + token.range.start,
-                         token.range.end - token.range.start, value,
-                         value_len);
-}
-
 Token lexer_next(Lexer *lexer) {
 retry:
     while (isspace(lexer->buffer[lexer->index]))
@@ -244,19 +224,28 @@ retry:
 
             token.tag = TOK_IDENTIFIER;
 
-            if (token_is(lexer->buffer, token, "if", 2)) {
+            const char *s = lexer->buffer + token.range.start;
+            uint32_t len = token.range.end - token.range.start;
+
+            if (len == 2 && s[0] == 'i' && s[1] == 'f') {
                 token.tag = TOK_KEYWORD_IF;
-            } else if (token_is(lexer->buffer, token, "else", 4)) {
+            } else if (len == 4 && s[0] == 'e' && s[1] == 'l' && s[2] == 's' &&
+                       s[3] == 'e') {
                 token.tag = TOK_KEYWORD_ELSE;
-            } else if (token_is(lexer->buffer, token, "while", 5)) {
+            } else if (len == 5 && s[0] == 'w' && s[1] == 'h' && s[2] == 'i' &&
+                       s[3] == 'l' && s[4] == 'e') {
                 token.tag = TOK_KEYWORD_WHILE;
-            } else if (token_is(lexer->buffer, token, "break", 5)) {
+            } else if (len == 5 && s[0] == 'b' && s[1] == 'r' && s[2] == 'e' &&
+                       s[3] == 'a' && s[4] == 'k') {
                 token.tag = TOK_KEYWORD_BREAK;
-            } else if (token_is(lexer->buffer, token, "continue", 8)) {
+            } else if (len == 8 && s[0] == 'c' && s[1] == 'o' && s[2] == 'n' &&
+                       s[3] == 't' && s[4] == 'i' && s[5] == 'n' &&
+                       s[6] == 'u' && s[7] == 'e') {
                 token.tag = TOK_KEYWORD_CONTINUE;
-            } else if (token_is(lexer->buffer, token, "fn", 2)) {
+            } else if (len == 2 && s[0] == 'f' && s[1] == 'n') {
                 token.tag = TOK_KEYWORD_FN;
-            } else if (token_is(lexer->buffer, token, "return", 6)) {
+            } else if (len == 6 && s[0] == 'r' && s[1] == 'e' && s[2] == 't' &&
+                       s[3] == 'u' && s[4] == 'r' && s[5] == 'n') {
                 token.tag = TOK_KEYWORD_RETURN;
             }
         } else if (isdigit(character)) {

@@ -6,7 +6,7 @@
 
 typedef struct {
     const char *buffer;
-    size_t index;
+    uint32_t index;
 } Lexer;
 
 typedef enum {
