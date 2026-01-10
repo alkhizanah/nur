@@ -486,6 +486,37 @@ static AstNodeIdx ast_parse_block(AstParser *parser) {
     return block;
 }
 
+static AstNodeIdx ast_parse_while_loop(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstNodeIdx condition = ast_parse_expr(parser, PR_LOWEST);
+
+    if (condition == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
+    if (lexer_peek(&parser->lexer).tag != TOK_OBRACE) {
+        SourceLocation block_location =
+            source_location_of(parser->file_path, parser->lexer.buffer,
+                               lexer_peek(&parser->lexer).range);
+
+        diagnoser_error(block_location, "expected '{'\n");
+    }
+
+    AstNodeIdx block = ast_parse_block(parser);
+
+    if (block == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
+    return ast_push_node(parser, NODE_WHILE,
+                         (AstNodePayload){
+                             .lhs = condition,
+                             .rhs = block,
+                         },
+                         token.range.start);
+}
+
 static AstNodeIdx ast_parse_return(AstParser *parser) {
     Token token = lexer_next(&parser->lexer);
 
@@ -534,6 +565,8 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_OBRACE:
         return ast_parse_block(parser);
+    case TOK_KEYWORD_WHILE:
+        return ast_parse_while_loop(parser);
     case TOK_KEYWORD_RETURN:
         return ast_parse_return(parser);
     case TOK_KEYWORD_BREAK:
@@ -775,7 +808,13 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         }
 
         printf(")");
+        break;
 
+    case NODE_WHILE:
+        printf("while ");
+        ast_display(ast, buffer, lhs);
+        printf(" ");
+        ast_display(ast, buffer, rhs);
         break;
 
     default:

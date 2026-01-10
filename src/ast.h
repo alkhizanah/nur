@@ -56,6 +56,8 @@ typedef enum : uint8_t {
     // indices to the arguments, if rhs is INVALID_EXTRA_IDX then there are no
     // arguments passed to the function
     NODE_CALL,
+    // Payload: lhs is the condition of the while loop, and rhs is the block
+    NODE_WHILE,
 } AstNodeTag;
 
 typedef uint32_t AstNodeIdx;
