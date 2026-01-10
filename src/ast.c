@@ -142,7 +142,7 @@ static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
             SourceLocation call_location = source_location_of(
                 parser->file_path, parser->lexer.buffer, token.range);
 
-            diagnoser_error(call_location, "parentheses did not get closed\n");
+            diagnoser_error(call_location, "'(' did not get closed\n");
 
             return INVALID_NODE_IDX;
         }
@@ -406,6 +406,29 @@ static AstNodeIdx ast_parse_neg(AstParser *parser) {
                          token.range.start);
 }
 
+static AstNodeIdx ast_parse_parentheses_expr(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstNodeIdx value = ast_parse_expr(parser, PR_LOWEST);
+
+    if (value == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
+    if (lexer_peek(&parser->lexer).tag != TOK_CPAREN) {
+        SourceLocation parentheses_location = source_location_of(
+            parser->file_path, parser->lexer.buffer, token.range);
+
+        diagnoser_error(parentheses_location, "'(' did not get closed\n");
+
+        return INVALID_NODE_IDX;
+    }
+
+    lexer_next(&parser->lexer);
+
+    return value;
+}
+
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
     switch (lexer_peek(&parser->lexer).tag) {
     case TOK_IDENTIFIER:
@@ -418,6 +441,8 @@ static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
         return ast_parse_float(parser);
     case TOK_MINUS:
         return ast_parse_neg(parser);
+    case TOK_OPAREN:
+        return ast_parse_parentheses_expr(parser);
     default:
         diagnoser_error(source_location_of(parser->file_path,
                                            parser->lexer.buffer,
@@ -432,8 +457,8 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
                                  OperatorPrecedence precedence) {
     AstNodeIdx lhs = ast_parse_unary_expr(parser);
 
-    while (operator_precedence_of(lexer_peek(&parser->lexer).tag) >
-           precedence) {
+    while (operator_precedence_of(
+               lexer_peek(&parser->lexer).tag) > precedence) {
         if (lhs == INVALID_NODE_IDX) {
             return INVALID_NODE_IDX;
         }
@@ -462,7 +487,7 @@ static AstNodeIdx ast_parse_block(AstParser *parser) {
             SourceLocation block_location = source_location_of(
                 parser->file_path, parser->lexer.buffer, token.range);
 
-            diagnoser_error(block_location, "braces did not get closed\n");
+            diagnoser_error(block_location, "'{' did not get closed\n");
 
             return INVALID_NODE_IDX;
         }
@@ -501,6 +526,8 @@ static AstNodeIdx ast_parse_while_loop(AstParser *parser) {
                                lexer_peek(&parser->lexer).range);
 
         diagnoser_error(block_location, "expected '{'\n");
+
+        return INVALID_NODE_IDX;
     }
 
     AstNodeIdx block = ast_parse_block(parser);
@@ -699,39 +726,51 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         break;
 
     case NODE_ADD:
+        printf("(");
         ast_display(ast, buffer, lhs);
         printf(" + ");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_SUB:
+        printf("(");
         ast_display(ast, buffer, lhs);
         printf(" - ");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_DIV:
+        printf("(");
         ast_display(ast, buffer, lhs);
         printf(" / ");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_MUL:
+        printf("(");
         ast_display(ast, buffer, lhs);
         printf(" * ");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_POW:
+        printf("(");
         ast_display(ast, buffer, lhs);
         printf(" ** ");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_MOD:
+        printf("(");
         ast_display(ast, buffer, lhs);
         printf(" %% ");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_EQL:
