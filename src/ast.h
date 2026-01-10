@@ -58,6 +58,10 @@ typedef enum : uint8_t {
     NODE_CALL,
     // Payload: lhs is the condition of the while loop, and rhs is the block
     NODE_WHILE,
+    // Payload: lhs is the condition and rhs is an index to 2 elements in
+    // AstExtra where first element is the true case block and the second is the
+    // false case block, if the second element is INVALID_NODE_IDX then the false case block is empty
+    NODE_IF,
 } AstNodeTag;
 
 typedef uint32_t AstNodeIdx;

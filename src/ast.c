@@ -457,8 +457,8 @@ static AstNodeIdx ast_parse_expr(AstParser *parser,
                                  OperatorPrecedence precedence) {
     AstNodeIdx lhs = ast_parse_unary_expr(parser);
 
-    while (operator_precedence_of(
-               lexer_peek(&parser->lexer).tag) > precedence) {
+    while (operator_precedence_of(lexer_peek(&parser->lexer).tag) >
+           precedence) {
         if (lhs == INVALID_NODE_IDX) {
             return INVALID_NODE_IDX;
         }
@@ -544,6 +544,77 @@ static AstNodeIdx ast_parse_while_loop(AstParser *parser) {
                          token.range.start);
 }
 
+static AstNodeIdx ast_parse_conditional(AstParser *parser) {
+    Token token = lexer_next(&parser->lexer);
+
+    AstNodeIdx condition = ast_parse_expr(parser, PR_LOWEST);
+
+    if (condition == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
+    if (lexer_peek(&parser->lexer).tag != TOK_OBRACE) {
+        SourceLocation block_location =
+            source_location_of(parser->file_path, parser->lexer.buffer,
+                               lexer_peek(&parser->lexer).range);
+
+        diagnoser_error(block_location, "expected '{'\n");
+
+        return INVALID_NODE_IDX;
+    }
+
+    AstNodeIdx true_case = ast_parse_block(parser);
+
+    if (true_case == INVALID_NODE_IDX) {
+        return INVALID_NODE_IDX;
+    }
+
+    AstNodeIdx false_case = INVALID_NODE_IDX;
+
+    if (lexer_peek(&parser->lexer).tag == TOK_KEYWORD_ELSE) {
+        lexer_next(&parser->lexer);
+
+        switch (lexer_peek(&parser->lexer).tag) {
+        case TOK_KEYWORD_IF:
+            false_case = ast_parse_conditional(parser);
+
+            if (false_case == INVALID_NODE_IDX) {
+                return INVALID_NODE_IDX;
+            }
+
+            break;
+
+        case TOK_OBRACE:
+            false_case = ast_parse_block(parser);
+
+            if (false_case == INVALID_NODE_IDX) {
+                return INVALID_NODE_IDX;
+            }
+
+            break;
+
+        default: {
+            SourceLocation block_location =
+                source_location_of(parser->file_path, parser->lexer.buffer,
+                                   lexer_peek(&parser->lexer).range);
+
+            diagnoser_error(block_location, "expected '{' or 'if'\n");
+
+            return INVALID_NODE_IDX;
+        }
+        }
+    }
+
+    uint32_t rhs = parser->ast.extra.len;
+
+    ARRAY_PUSH(&parser->ast.extra, true_case);
+    ARRAY_PUSH(&parser->ast.extra, false_case);
+
+    return ast_push_node(parser, NODE_IF,
+                         (AstNodePayload){.lhs = condition, .rhs = rhs},
+                         token.range.start);
+}
+
 static AstNodeIdx ast_parse_return(AstParser *parser) {
     Token token = lexer_next(&parser->lexer);
 
@@ -594,6 +665,8 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
         return ast_parse_block(parser);
     case TOK_KEYWORD_WHILE:
         return ast_parse_while_loop(parser);
+    case TOK_KEYWORD_IF:
+        return ast_parse_conditional(parser);
     case TOK_KEYWORD_RETURN:
         return ast_parse_return(parser);
     case TOK_KEYWORD_BREAK:
@@ -725,6 +798,12 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         ast_display(ast, buffer, rhs);
         break;
 
+    case NODE_NEG:
+        printf(" -(");
+        ast_display(ast, buffer, rhs);
+        printf(")");
+        break;
+
     case NODE_ADD:
         printf("(");
         ast_display(ast, buffer, lhs);
@@ -774,39 +853,63 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         break;
 
     case NODE_EQL:
+        printf("(");
         ast_display(ast, buffer, lhs);
+        printf(")");
         printf(" == ");
+        printf("(");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_NEQ:
+        printf("(");
         ast_display(ast, buffer, lhs);
+        printf(")");
         printf(" != ");
+        printf("(");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_LT:
+        printf("(");
         ast_display(ast, buffer, lhs);
+        printf(")");
         printf(" < ");
+        printf("(");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_LTE:
+        printf("(");
         ast_display(ast, buffer, lhs);
+        printf(")");
         printf(" <= ");
+        printf("(");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_GT:
+        printf("(");
         ast_display(ast, buffer, lhs);
+        printf(")");
         printf(" > ");
+        printf("(");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_GTE:
+        printf("(");
         ast_display(ast, buffer, lhs);
+        printf(")");
         printf(" >= ");
+        printf("(");
         ast_display(ast, buffer, rhs);
+        printf(")");
         break;
 
     case NODE_RETURN:
@@ -855,6 +958,20 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         printf(" ");
         ast_display(ast, buffer, rhs);
         break;
+
+    case NODE_IF: {
+        AstNodeIdx true_case = ast->extra.items[rhs];
+        AstNodeIdx false_case = ast->extra.items[rhs + 1];
+        printf("if ");
+        ast_display(ast, buffer, lhs);
+        printf(" ");
+        ast_display(ast, buffer, true_case);
+        if (false_case != INVALID_NODE_IDX) {
+            printf(" else ");
+            ast_display(ast, buffer, false_case);
+        }
+        break;
+    }
 
     default:
         assert(false && "UNREACHABLE");
