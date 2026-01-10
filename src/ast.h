@@ -21,6 +21,13 @@ typedef enum : uint8_t {
     // Payload: lhs is an index to a value list in extra.items, rhs is the
     // amount of values
     NODE_ARRAY,
+    // Payload: lhs is an index to the keys list in extra.items in which the
+    // first element is the amount of keys, rhs is an index to the values list
+    // in which the first element is the first value since the amount of values
+    // is the same as the amount of keys derived from the first list, if lhs is
+    // INVALID_EXTRA_IDX then rhs is INVALID_EXTRA_IDX too and this makes an
+    // empty map
+    NODE_MAP,
     // Payload: (op) rhs, no need to explain this
     NODE_NEG,
     NODE_NOT,
