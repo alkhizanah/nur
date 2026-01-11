@@ -1,13 +1,33 @@
-#include <ctype.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
 
 #include "lexer.h"
 
+static const uint8_t CHAR_TABLE[256] = {
+    [' '] = 1 << 0,  ['\t'] = 1 << 0,        ['\n'] = 1 << 0,
+    ['\r'] = 1 << 0, ['a' ... 'z'] = 1 << 1, ['A' ... 'Z'] = 1 << 1,
+    ['_'] = 1 << 1,  ['0' ... '9'] = 1 << 2};
+
+static inline bool is_space(char c) {
+    return (CHAR_TABLE[(uint8_t)c] & (1 << 0)) != 0;
+}
+
+static inline bool is_identifier_continuation(char c) {
+    return (CHAR_TABLE[(uint8_t)c] & ((1 << 1) | (1 << 2))) != 0;
+}
+
+static inline bool is_identifier_beginning(char c) {
+    return (CHAR_TABLE[(uint8_t)c] & (1 << 1)) != 0;
+}
+
+static inline bool is_digit(char c) {
+    return (CHAR_TABLE[(uint8_t)c] & (1 << 2)) != 0;
+}
+
 Token lexer_next(Lexer *lexer) {
 retry:
-    while (isspace(lexer->buffer[lexer->index]))
+    while (is_space(lexer->buffer[lexer->index]))
         lexer->index++;
 
     Token token = {.range = {lexer->index, lexer->index}};
@@ -215,9 +235,8 @@ retry:
     }
 
     default:
-        if (isalpha(character) || character == '_') {
-            while (isalnum(lexer->buffer[lexer->index]) ||
-                   lexer->buffer[lexer->index] == '_')
+        if (is_identifier_beginning(character)) {
+            while (is_identifier_continuation(lexer->buffer[lexer->index]))
                 lexer->index++;
 
             token.range.end = lexer->index;
@@ -248,10 +267,10 @@ retry:
                        s[3] == 'u' && s[4] == 'r' && s[5] == 'n') {
                 token.tag = TOK_KEYWORD_RETURN;
             }
-        } else if (isdigit(character)) {
+        } else if (is_digit(character)) {
             token.tag = TOK_INT;
 
-            while (isalnum(lexer->buffer[lexer->index]) ||
+            while (is_identifier_continuation(lexer->buffer[lexer->index]) ||
                    lexer->buffer[lexer->index] == '.') {
                 if (lexer->buffer[lexer->index] == '.') {
                     token.tag = TOK_FLOAT;
@@ -269,12 +288,5 @@ retry:
         break;
     }
 
-    return token;
-}
-
-Token lexer_peek(Lexer *lexer) {
-    size_t index = lexer->index;
-    Token token = lexer_next(lexer);
-    lexer->index = index;
     return token;
 }
