@@ -82,7 +82,18 @@ static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
     AstNodeIdx i = parser->ast.nodes.len;
 
     ARRAY_PUSH(&parser->ast.nodes, node);
-    ARRAY_PUSH(&parser->ast.sources, source);
+
+    parser->ast.nodes.sources = realloc(parser->ast.nodes.sources,
+                                        parser->ast.nodes.capacity *
+                                            sizeof(*parser->ast.nodes.sources));
+
+    if (parser->ast.nodes.sources == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    parser->ast.nodes.sources[i] = source;
 
     return i;
 }
