@@ -71,40 +71,20 @@ static inline Token advance(AstParser *parser) {
 static inline Token peek(const AstParser *parser) { return parser->next_token; }
 
 static AstNodeIdx ast_push_node(AstParser *parser, AstNodeTag tag,
-                                AstNodePayload payload, uint32_t source_start) {
-    if (parser->ast.nodes.len + 1 > parser->ast.nodes.capacity) {
-        size_t new_cap =
-            parser->ast.nodes.capacity ? parser->ast.nodes.capacity * 2 : 4;
+                                AstNodeIdx lhs, AstNodeIdx rhs,
+                                uint32_t source) {
+    AstNode node = {
+        .lhs = lhs,
+        .rhs = rhs,
+        .tag = tag,
+    };
 
-        parser->ast.nodes.tags = realloc(
-            parser->ast.nodes.tags, sizeof(*parser->ast.nodes.tags) * new_cap);
+    AstNodeIdx i = parser->ast.nodes.len;
 
-        parser->ast.nodes.payloads =
-            realloc(parser->ast.nodes.payloads,
-                    sizeof(*parser->ast.nodes.payloads) * new_cap);
+    ARRAY_PUSH(&parser->ast.nodes, node);
+    ARRAY_PUSH(&parser->ast.sources, source);
 
-        parser->ast.nodes.source_starts =
-            realloc(parser->ast.nodes.source_starts,
-                    sizeof(*parser->ast.nodes.source_starts) * new_cap);
-
-        if (parser->ast.nodes.tags == NULL ||
-            parser->ast.nodes.payloads == NULL ||
-            parser->ast.nodes.source_starts == NULL) {
-            fprintf(stderr, "error: out of memory\n");
-
-            // We shouldn't return INVALID_NODE_IDX as being out of memory is
-            // irrecoverible (not sure)
-            exit(1);
-        }
-
-        parser->ast.nodes.capacity = new_cap;
-    }
-
-    parser->ast.nodes.tags[parser->ast.nodes.len] = tag;
-    parser->ast.nodes.payloads[parser->ast.nodes.len] = payload;
-    parser->ast.nodes.source_starts[parser->ast.nodes.len] = source_start;
-
-    return parser->ast.nodes.len++;
+    return i;
 }
 
 static AstNodeIdx ast_parse_stmt(AstParser *parser);
@@ -142,10 +122,8 @@ static AstNodeIdx ast_parse_block(AstParser *parser) {
 
     ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
 
-    AstNodeIdx block =
-        ast_push_node(parser, NODE_BLOCK,
-                      (AstNodePayload){.lhs = stmts_start, .rhs = stmts.len},
-                      token.range.start);
+    AstNodeIdx block = ast_push_node(parser, NODE_BLOCK, stmts_start, stmts.len,
+                                     token.range.start);
 
     ARRAY_FREE(&stmts);
 
@@ -162,12 +140,7 @@ static AstNodeIdx ast_parse_assign(AstParser *parser, AstNodeIdx target,
         return INVALID_NODE_IDX;
     }
 
-    return ast_push_node(parser, tag,
-                         (AstNodePayload){
-                             .lhs = target,
-                             .rhs = value,
-                         },
-                         token.range.start);
+    return ast_push_node(parser, tag, target, value, token.range.start);
 }
 
 static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
@@ -201,10 +174,8 @@ static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
     advance(parser);
 
     if (arguments.len == 0) {
-        return ast_push_node(
-            parser, NODE_CALL,
-            (AstNodePayload){.lhs = callee, .rhs = INVALID_EXTRA_IDX},
-            token.range.start);
+        return ast_push_node(parser, NODE_CALL, callee, INVALID_EXTRA_IDX,
+                             token.range.start);
     } else {
         uint32_t start = parser->ast.extra.len;
 
@@ -214,8 +185,7 @@ static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
 
         ARRAY_FREE(&arguments);
 
-        return ast_push_node(parser, NODE_CALL,
-                             (AstNodePayload){.lhs = callee, .rhs = start},
+        return ast_push_node(parser, NODE_CALL, callee, start,
                              token.range.start);
     }
 }
@@ -223,10 +193,8 @@ static AstNodeIdx ast_parse_call(AstParser *parser, AstNodeIdx callee) {
 static AstNodeIdx ast_parse_identifier(AstParser *parser) {
     Token token = advance(parser);
 
-    return ast_push_node(
-        parser, NODE_IDENTIFIER,
-        (AstNodePayload){.lhs = token.range.start, .rhs = token.range.end},
-        token.range.start);
+    return ast_push_node(parser, NODE_IDENTIFIER, token.range.start,
+                         token.range.end, token.range.start);
 }
 
 static AstNodeIdx ast_parse_member_access(AstParser *parser,
@@ -244,8 +212,7 @@ static AstNodeIdx ast_parse_member_access(AstParser *parser,
 
     AstNodeIdx identifier = ast_parse_identifier(parser);
 
-    return ast_push_node(parser, NODE_MEMBER,
-                         (AstNodePayload){.lhs = target, .rhs = identifier},
+    return ast_push_node(parser, NODE_MEMBER, target, identifier,
                          token.range.start);
 }
 
@@ -265,8 +232,7 @@ static AstNodeIdx ast_parse_subscript_access(AstParser *parser,
 
     advance(parser);
 
-    return ast_push_node(parser, NODE_SUBSCRIPT,
-                         (AstNodePayload){.lhs = target, .rhs = start},
+    return ast_push_node(parser, NODE_SUBSCRIPT, target, start,
                          token.range.start);
 }
 
@@ -281,8 +247,7 @@ static AstNodeIdx ast_parse_binary_op(AstParser *parser, AstNodeIdx lhs,
         return INVALID_NODE_IDX;
     }
 
-    return ast_push_node(parser, tag, (AstNodePayload){.lhs = lhs, .rhs = rhs},
-                         token.range.start);
+    return ast_push_node(parser, tag, lhs, rhs, token.range.start);
 }
 
 static AstNodeIdx ast_parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
@@ -409,11 +374,9 @@ static AstNodeIdx ast_parse_string(AstParser *parser) {
 
     uint32_t unescaped_string_end = parser->ast.strings.len;
 
-    return ast_push_node(
-        parser, NODE_STRING,
-        (AstNodePayload){.lhs = unescaped_string_start,
-                         .rhs = unescaped_string_end - unescaped_string_start},
-        token.range.start);
+    return ast_push_node(parser, NODE_STRING, unescaped_string_start,
+                         unescaped_string_end - unescaped_string_start,
+                         token.range.start);
 }
 
 static AstNodeIdx ast_parse_int(AstParser *parser) {
@@ -441,12 +404,7 @@ static AstNodeIdx ast_parse_int(AstParser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    return ast_push_node(parser, NODE_INT,
-                         (AstNodePayload){
-                             .lhs = v >> 32,
-                             .rhs = v,
-                         },
-                         token.range.start);
+    return ast_push_node(parser, NODE_INT, v >> 32, v, token.range.start);
 }
 
 static AstNodeIdx ast_parse_float(AstParser *parser) {
@@ -478,12 +436,7 @@ static AstNodeIdx ast_parse_float(AstParser *parser) {
 
     memcpy(&vi, &v, sizeof(double));
 
-    return ast_push_node(parser, NODE_FLOAT,
-                         (AstNodePayload){
-                             .lhs = vi >> 32,
-                             .rhs = vi,
-                         },
-                         token.range.start);
+    return ast_push_node(parser, NODE_FLOAT, vi >> 32, vi, token.range.start);
 }
 
 static AstNodeIdx ast_parse_parentheses_expr(AstParser *parser) {
@@ -574,10 +527,8 @@ static AstNodeIdx ast_parse_function(AstParser *parser) {
     }
 
     if (parameters.len == 0) {
-        return ast_push_node(
-            parser, NODE_FUNCTION,
-            (AstNodePayload){.lhs = INVALID_EXTRA_IDX, .rhs = block},
-            fn_token.range.start);
+        return ast_push_node(parser, NODE_FUNCTION, INVALID_EXTRA_IDX, block,
+                             fn_token.range.start);
     } else {
         uint32_t start = parser->ast.extra.len;
 
@@ -587,8 +538,7 @@ static AstNodeIdx ast_parse_function(AstParser *parser) {
 
         ARRAY_FREE(&parameters);
 
-        return ast_push_node(parser, NODE_FUNCTION,
-                             (AstNodePayload){.lhs = start, .rhs = block},
+        return ast_push_node(parser, NODE_FUNCTION, start, block,
                              fn_token.range.start);
     }
 }
@@ -631,9 +581,7 @@ static AstNodeIdx ast_parse_array(AstParser *parser) {
 
     ARRAY_FREE(&values);
 
-    return ast_push_node(parser, NODE_ARRAY,
-                         (AstNodePayload){.lhs = start, .rhs = len},
-                         token.range.start);
+    return ast_push_node(parser, NODE_ARRAY, start, len, token.range.start);
 }
 
 static AstNodeIdx ast_parse_map(AstParser *parser) {
@@ -686,10 +634,8 @@ static AstNodeIdx ast_parse_map(AstParser *parser) {
     advance(parser);
 
     if (keys.len == 0) {
-        return ast_push_node(parser, NODE_MAP,
-                             (AstNodePayload){.lhs = INVALID_EXTRA_IDX,
-                                              .rhs = INVALID_EXTRA_IDX},
-                             token.range.start);
+        return ast_push_node(parser, NODE_MAP, INVALID_EXTRA_IDX,
+                             INVALID_EXTRA_IDX, token.range.start);
     } else {
         uint32_t keys_start = parser->ast.extra.len;
 
@@ -705,10 +651,8 @@ static AstNodeIdx ast_parse_map(AstParser *parser) {
 
         ARRAY_FREE(&values);
 
-        return ast_push_node(
-            parser, NODE_MAP,
-            (AstNodePayload){.lhs = keys_start, .rhs = values_start},
-            token.range.start);
+        return ast_push_node(parser, NODE_MAP, keys_start, values_start,
+                             token.range.start);
     }
 }
 
@@ -721,8 +665,7 @@ static AstNodeIdx ast_parse_unary_op(AstParser *parser, AstNodeTag tag) {
         return INVALID_NODE_IDX;
     }
 
-    return ast_push_node(parser, tag, (AstNodePayload){.rhs = value},
-                         token.range.start);
+    return ast_push_node(parser, tag, 0, value, token.range.start);
 }
 
 static AstNodeIdx ast_parse_unary_expr(AstParser *parser) {
@@ -797,11 +740,8 @@ static AstNodeIdx ast_parse_while_loop(AstParser *parser) {
     }
 
     return ast_push_node(parser, NODE_WHILE,
-                         (AstNodePayload){
-                             .lhs = condition,
-                             .rhs = block,
-                         },
-                         token.range.start);
+
+                         condition, block, token.range.start);
 }
 
 static AstNodeIdx ast_parse_conditional(AstParser *parser) {
@@ -868,9 +808,7 @@ static AstNodeIdx ast_parse_conditional(AstParser *parser) {
     ARRAY_PUSH(&parser->ast.extra, true_case);
     ARRAY_PUSH(&parser->ast.extra, false_case);
 
-    return ast_push_node(parser, NODE_IF,
-                         (AstNodePayload){.lhs = condition, .rhs = rhs},
-                         token.range.start);
+    return ast_push_node(parser, NODE_IF, condition, rhs, token.range.start);
 }
 
 static AstNodeIdx ast_parse_return(AstParser *parser) {
@@ -888,8 +826,7 @@ static AstNodeIdx ast_parse_return(AstParser *parser) {
         // if val {
         //     return
         // }
-        return ast_push_node(parser, NODE_RETURN,
-                             (AstNodePayload){.lhs = false}, token.range.start);
+        return ast_push_node(parser, NODE_RETURN, false, 0, token.range.start);
     }
 
     if (peek(parser).tag == TOK_SEMICOLON) {
@@ -902,8 +839,7 @@ static AstNodeIdx ast_parse_return(AstParser *parser) {
         // }
         advance(parser);
 
-        return ast_push_node(parser, NODE_RETURN,
-                             (AstNodePayload){.lhs = false}, token.range.start);
+        return ast_push_node(parser, NODE_RETURN, false, 0, token.range.start);
     }
 
     AstNodeIdx value = ast_parse_expr(parser, PR_LOWEST);
@@ -912,9 +848,7 @@ static AstNodeIdx ast_parse_return(AstParser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    return ast_push_node(parser, NODE_RETURN,
-                         (AstNodePayload){.lhs = true, .rhs = value},
-                         token.range.start);
+    return ast_push_node(parser, NODE_RETURN, true, value, token.range.start);
 }
 
 static AstNodeIdx ast_parse_stmt(AstParser *parser) {
@@ -928,10 +862,10 @@ static AstNodeIdx ast_parse_stmt(AstParser *parser) {
     case TOK_KEYWORD_RETURN:
         return ast_parse_return(parser);
     case TOK_KEYWORD_BREAK:
-        return ast_push_node(parser, NODE_BREAK, (AstNodePayload){},
+        return ast_push_node(parser, NODE_BREAK, 0, 0,
                              advance(parser).range.start);
     case TOK_KEYWORD_CONTINUE:
-        return ast_push_node(parser, NODE_CONTINUE, (AstNodePayload){},
+        return ast_push_node(parser, NODE_CONTINUE, 0, 0,
                              advance(parser).range.start);
     default:
         return ast_parse_expr(parser, PR_LOWEST);
@@ -957,9 +891,8 @@ AstNodeIdx ast_parse(AstParser *parser) {
 
     ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
 
-    AstNodeIdx program = ast_push_node(
-        parser, NODE_BLOCK,
-        (AstNodePayload){.lhs = stmts_start, .rhs = stmts.len}, 0);
+    AstNodeIdx program =
+        ast_push_node(parser, NODE_BLOCK, stmts_start, stmts.len, 0);
 
     ARRAY_FREE(&stmts);
 
@@ -1001,22 +934,21 @@ void print_string_escaped(const char *s, size_t len) {
     }
 }
 
-void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
-    AstNodeIdx lhs = ast->nodes.payloads[node].lhs;
-    AstNodeIdx rhs = ast->nodes.payloads[node].rhs;
+void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node_idx) {
+    AstNode node = ast->nodes.items[node_idx];
 
     static int ast_display_depth = 0;
 
-    switch (ast->nodes.tags[node]) {
+    switch (node.tag) {
     case NODE_BLOCK:
         printf("{\n");
 
         ast_display_depth += 1;
 
-        for (uint32_t i = 0; i < rhs; i++) {
+        for (uint32_t i = 0; i < node.rhs; i++) {
             printf("%*.s", ast_display_depth * 4, "");
 
-            ast_display(ast, buffer, ast->extra.items[lhs + i]);
+            ast_display(ast, buffer, ast->extra.items[node.lhs + i]);
 
             printf("\n");
         }
@@ -1032,11 +964,11 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         break;
 
     case NODE_INT:
-        printf("%lu", ((uint64_t)lhs << 32) | rhs);
+        printf("%lu", ((uint64_t)node.lhs << 32) | node.rhs);
         break;
 
     case NODE_FLOAT: {
-        uint64_t vi = ((uint64_t)lhs << 32) | rhs;
+        uint64_t vi = ((uint64_t)node.lhs << 32) | node.rhs;
         double v;
         memcpy(&v, &vi, sizeof(double));
         printf("%lf", v);
@@ -1044,183 +976,183 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     }
 
     case NODE_IDENTIFIER:
-        printf("%.*s", (int)(rhs - lhs), buffer + lhs);
+        printf("%.*s", (int)(node.rhs - node.lhs), buffer + node.lhs);
         break;
 
     case NODE_STRING:
         printf("\"");
-        print_string_escaped(ast->strings.items + lhs, rhs);
+        print_string_escaped(ast->strings.items + node.lhs, node.rhs);
         printf("\"");
         break;
 
     case NODE_ASSIGN:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" = ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_ASSIGN_ADD:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" += ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_ASSIGN_SUB:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" -= ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_ASSIGN_DIV:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" /= ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_ASSIGN_MUL:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" *= ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_ASSIGN_POW:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" **= ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_ASSIGN_MOD:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" %%= ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_NEG:
         printf("-(");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_NOT:
         printf("!(");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_ADD:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" + ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_SUB:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" - ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_DIV:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" / ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_MUL:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" * ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_POW:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" ** ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_MOD:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" %% ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_EQL:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(")");
         printf(" == ");
         printf("(");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_NEQ:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(")");
         printf(" != ");
         printf("(");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_LT:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(")");
         printf(" < ");
         printf("(");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_LTE:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(")");
         printf(" <= ");
         printf("(");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_GT:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(")");
         printf(" > ");
         printf("(");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_GTE:
         printf("(");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(")");
         printf(" >= ");
         printf("(");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf(")");
         break;
 
     case NODE_RETURN:
         printf("return");
 
-        if (lhs) {
+        if (node.lhs) {
             printf(" ");
-            ast_display(ast, buffer, rhs);
+            ast_display(ast, buffer, node.rhs);
         } else {
             printf(";");
         }
@@ -1236,8 +1168,8 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         break;
 
     case NODE_ARRAY: {
-        uint32_t start = lhs;
-        uint32_t len = rhs;
+        uint32_t start = node.lhs;
+        uint32_t len = node.rhs;
 
         printf("[");
 
@@ -1255,11 +1187,11 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     case NODE_MAP:
         printf("{");
 
-        if (lhs != INVALID_EXTRA_IDX) {
-            uint32_t len = ast->extra.items[lhs];
+        if (node.lhs != INVALID_EXTRA_IDX) {
+            uint32_t len = ast->extra.items[node.lhs];
 
-            uint32_t keys_start = lhs + 1;
-            uint32_t values_start = rhs;
+            uint32_t keys_start = node.lhs + 1;
+            uint32_t values_start = node.rhs;
 
             ast_display(ast, buffer, ast->extra.items[keys_start]);
             printf(": ");
@@ -1277,13 +1209,13 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
         break;
 
     case NODE_CALL:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
 
         printf("(");
 
-        if (rhs != INVALID_EXTRA_IDX) {
-            uint32_t start = rhs + 1;
-            uint32_t len = ast->extra.items[rhs];
+        if (node.rhs != INVALID_EXTRA_IDX) {
+            uint32_t start = node.rhs + 1;
+            uint32_t len = ast->extra.items[node.rhs];
 
             ast_display(ast, buffer, ast->extra.items[start]);
 
@@ -1299,9 +1231,9 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
     case NODE_FUNCTION:
         printf("fn (");
 
-        if (lhs != INVALID_EXTRA_IDX) {
-            uint32_t start = lhs + 1;
-            uint32_t len = ast->extra.items[lhs];
+        if (node.lhs != INVALID_EXTRA_IDX) {
+            uint32_t start = node.lhs + 1;
+            uint32_t len = ast->extra.items[node.lhs];
 
             ast_display(ast, buffer, ast->extra.items[start]);
 
@@ -1313,35 +1245,35 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node) {
 
         printf(") ");
 
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
 
         break;
 
     case NODE_MEMBER:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(".");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_SUBSCRIPT:
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf("[");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         printf("]");
         break;
 
     case NODE_WHILE:
         printf("while ");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" ");
-        ast_display(ast, buffer, rhs);
+        ast_display(ast, buffer, node.rhs);
         break;
 
     case NODE_IF: {
-        AstNodeIdx true_case = ast->extra.items[rhs];
-        AstNodeIdx false_case = ast->extra.items[rhs + 1];
+        AstNodeIdx true_case = ast->extra.items[node.rhs];
+        AstNodeIdx false_case = ast->extra.items[node.rhs + 1];
         printf("if ");
-        ast_display(ast, buffer, lhs);
+        ast_display(ast, buffer, node.lhs);
         printf(" ");
         ast_display(ast, buffer, true_case);
         if (false_case != INVALID_NODE_IDX) {

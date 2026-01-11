@@ -94,12 +94,11 @@ typedef uint32_t AstNodeIdx;
 typedef struct {
     AstNodeIdx lhs;
     AstNodeIdx rhs;
-} AstNodePayload;
+    AstNodeTag tag;
+} AstNode;
 
 typedef struct {
-    AstNodeTag *tags;
-    AstNodePayload *payloads;
-    uint32_t *source_starts;
+    AstNode *items;
     size_t len;
     size_t capacity;
 } AstNodes;
@@ -117,9 +116,16 @@ typedef struct {
 } AstExtra;
 
 typedef struct {
+    uint32_t *items;
+    size_t len;
+    size_t capacity;
+} AstSources;
+
+typedef struct {
     AstNodes nodes;
     AstStrings strings;
     AstExtra extra;
+    AstSources sources;
 } Ast;
 
 typedef struct {

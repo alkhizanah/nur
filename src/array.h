@@ -5,12 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define ARRAY_INIT_CAPACITY 256
+
 #define ARRAY_SHIFT(array_len, array_ptr) ((array_len)--, *(array_ptr)++)
 
 #define ARRAY_PUSH(arr, item)                                                  \
     do {                                                                       \
         if ((arr)->len + 1 > (arr)->capacity) {                                \
-            size_t new_cap = (arr)->capacity ? (arr)->capacity * 2 : 4;        \
+            size_t new_cap =                                                   \
+                (arr)->capacity ? (arr)->capacity * 2 : ARRAY_INIT_CAPACITY;   \
                                                                                \
             (arr)->items =                                                     \
                 realloc((arr)->items, sizeof(*(arr)->items) * new_cap);        \
