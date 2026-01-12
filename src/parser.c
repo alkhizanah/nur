@@ -102,12 +102,12 @@ static AstNodeIdx parse_block(AstParser *parser) {
 
     parser_advance(parser);
 
-    uint32_t stmts_start = parser->ast.extra.len;
+    uint32_t stmts_start = parser->ast.extra.count;
 
-    ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
+    ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.count);
 
     AstNodeIdx block = ast_push(&parser->ast, NODE_BLOCK, stmts_start,
-                                stmts.len, token.range.start);
+                                stmts.count, token.range.start);
 
     ARRAY_FREE(&stmts);
 
@@ -157,15 +157,15 @@ static AstNodeIdx parse_call(AstParser *parser, AstNodeIdx callee) {
 
     parser_advance(parser);
 
-    if (arguments.len == 0) {
+    if (arguments.count == 0) {
         return ast_push(&parser->ast, NODE_CALL, callee, INVALID_EXTRA_IDX,
                         token.range.start);
     } else {
-        uint32_t start = parser->ast.extra.len;
+        uint32_t start = parser->ast.extra.count;
 
-        ARRAY_PUSH(&parser->ast.extra, arguments.len);
+        ARRAY_PUSH(&parser->ast.extra, arguments.count);
 
-        ARRAY_EXPAND(&parser->ast.extra, arguments.items, arguments.len);
+        ARRAY_EXPAND(&parser->ast.extra, arguments.items, arguments.count);
 
         ARRAY_FREE(&arguments);
 
@@ -295,11 +295,11 @@ static AstNodeIdx parse_string(AstParser *parser) {
 
     bool unescaping = false;
 
-    uint32_t unescaped_string_start = parser->ast.strings.len;
+    uint32_t unescaped_string_start = parser->ast.strings.count;
 
-    size_t len = token.range.end - token.range.start;
+    size_t count = token.range.end - token.range.start;
 
-    for (size_t i = 0; i < len; i++) {
+    for (size_t i = 0; i < count; i++) {
         const char escaped = parser->lexer.buffer[token.range.start + i];
 
         char unescaped;
@@ -356,7 +356,7 @@ static AstNodeIdx parse_string(AstParser *parser) {
         ARRAY_PUSH(&parser->ast.strings, unescaped);
     }
 
-    uint32_t unescaped_string_end = parser->ast.strings.len;
+    uint32_t unescaped_string_end = parser->ast.strings.count;
 
     return ast_push(&parser->ast, NODE_STRING, unescaped_string_start,
                     unescaped_string_end - unescaped_string_start,
@@ -510,15 +510,15 @@ static AstNodeIdx parse_function(AstParser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    if (parameters.len == 0) {
+    if (parameters.count == 0) {
         return ast_push(&parser->ast, NODE_FUNCTION, INVALID_EXTRA_IDX, block,
                         fn_token.range.start);
     } else {
-        uint32_t start = parser->ast.extra.len;
+        uint32_t start = parser->ast.extra.count;
 
-        ARRAY_PUSH(&parser->ast.extra, parameters.len);
+        ARRAY_PUSH(&parser->ast.extra, parameters.count);
 
-        ARRAY_EXPAND(&parser->ast.extra, parameters.items, parameters.len);
+        ARRAY_EXPAND(&parser->ast.extra, parameters.items, parameters.count);
 
         ARRAY_FREE(&parameters);
 
@@ -557,15 +557,15 @@ static AstNodeIdx parse_array(AstParser *parser) {
 
     parser_advance(parser);
 
-    uint32_t start = parser->ast.extra.len;
+    uint32_t start = parser->ast.extra.count;
 
-    ARRAY_EXPAND(&parser->ast.extra, values.items, values.len);
+    ARRAY_EXPAND(&parser->ast.extra, values.items, values.count);
 
-    uint32_t len = values.len;
+    uint32_t count = values.count;
 
     ARRAY_FREE(&values);
 
-    return ast_push(&parser->ast, NODE_ARRAY, start, len, token.range.start);
+    return ast_push(&parser->ast, NODE_ARRAY, start, count, token.range.start);
 }
 
 static AstNodeIdx parse_map(AstParser *parser) {
@@ -617,21 +617,21 @@ static AstNodeIdx parse_map(AstParser *parser) {
 
     parser_advance(parser);
 
-    if (keys.len == 0) {
+    if (keys.count == 0) {
         return ast_push(&parser->ast, NODE_MAP, INVALID_EXTRA_IDX,
                         INVALID_EXTRA_IDX, token.range.start);
     } else {
-        uint32_t keys_start = parser->ast.extra.len;
+        uint32_t keys_start = parser->ast.extra.count;
 
-        ARRAY_PUSH(&parser->ast.extra, keys.len);
+        ARRAY_PUSH(&parser->ast.extra, keys.count);
 
-        ARRAY_EXPAND(&parser->ast.extra, keys.items, keys.len);
+        ARRAY_EXPAND(&parser->ast.extra, keys.items, keys.count);
 
         ARRAY_FREE(&keys);
 
-        uint32_t values_start = parser->ast.extra.len;
+        uint32_t values_start = parser->ast.extra.count;
 
-        ARRAY_EXPAND(&parser->ast.extra, values.items, values.len);
+        ARRAY_EXPAND(&parser->ast.extra, values.items, values.count);
 
         ARRAY_FREE(&values);
 
@@ -787,7 +787,7 @@ static AstNodeIdx parse_conditional(AstParser *parser) {
         }
     }
 
-    uint32_t rhs = parser->ast.extra.len;
+    uint32_t rhs = parser->ast.extra.count;
 
     ARRAY_PUSH(&parser->ast.extra, true_case);
     ARRAY_PUSH(&parser->ast.extra, false_case);
@@ -871,12 +871,12 @@ AstNodeIdx parse(AstParser *parser) {
         ARRAY_PUSH(&stmts, stmt);
     }
 
-    uint32_t stmts_start = parser->ast.extra.len;
+    uint32_t stmts_start = parser->ast.extra.count;
 
-    ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.len);
+    ARRAY_EXPAND(&parser->ast.extra, stmts.items, stmts.count);
 
     AstNodeIdx program =
-        ast_push(&parser->ast, NODE_BLOCK, stmts_start, stmts.len, 0);
+        ast_push(&parser->ast, NODE_BLOCK, stmts_start, stmts.count, 0);
 
     ARRAY_FREE(&stmts);
 

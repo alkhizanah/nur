@@ -7,11 +7,11 @@
 
 #define ARRAY_INIT_CAPACITY 256
 
-#define ARRAY_SHIFT(array_len, array_ptr) ((array_len)--, *(array_ptr)++)
+#define ARRAY_SHIFT(array_count, array_ptr) ((array_count)--, *(array_ptr)++)
 
 #define ARRAY_PUSH(arr, item)                                                  \
     do {                                                                       \
-        if ((arr)->len + 1 > (arr)->capacity) {                                \
+        if ((arr)->count + 1 > (arr)->capacity) {                                \
             size_t new_cap =                                                   \
                 (arr)->capacity ? (arr)->capacity * 2 : ARRAY_INIT_CAPACITY;   \
                                                                                \
@@ -27,20 +27,20 @@
             (arr)->capacity = new_cap;                                         \
         }                                                                      \
                                                                                \
-        (arr)->items[(arr)->len++] = (item);                                   \
+        (arr)->items[(arr)->count++] = (item);                                   \
     } while (0)
 
 #define ARRAY_FREE(arr)                                                        \
     do {                                                                       \
         free((arr)->items);                                                    \
         (arr)->items = NULL;                                                   \
-        (arr)->len = 0;                                                        \
+        (arr)->count = 0;                                                        \
         (arr)->capacity = 0;                                                   \
     } while (0)
 
-#define ARRAY_EXPAND(arr, src_items, src_len)                                  \
+#define ARRAY_EXPAND(arr, src_items, src_count)                                  \
     do {                                                                       \
-        size_t need = (arr)->len + (src_len);                                  \
+        size_t need = (arr)->count + (src_count);                                  \
                                                                                \
         if (need > (arr)->capacity) {                                          \
             size_t new_cap = (arr)->capacity ? (arr)->capacity : 4;            \
@@ -59,8 +59,8 @@
             (arr)->capacity = new_cap;                                         \
         }                                                                      \
                                                                                \
-        memcpy((arr)->items + (arr)->len, (src_items),                         \
-               sizeof(*(arr)->items) * (src_len));                             \
+        memcpy((arr)->items + (arr)->count, (src_items),                         \
+               sizeof(*(arr)->items) * (src_count));                             \
                                                                                \
-        (arr)->len += (src_len);                                               \
+        (arr)->count += (src_count);                                               \
     } while (0)

@@ -12,7 +12,7 @@ AstNodeIdx ast_push(Ast *ast, AstNodeTag tag, AstNodeIdx lhs, AstNodeIdx rhs,
         .tag = tag,
     };
 
-    AstNodeIdx i = ast->nodes.len;
+    AstNodeIdx i = ast->nodes.count;
 
     ARRAY_PUSH(&ast->nodes, node);
 
@@ -30,8 +30,8 @@ AstNodeIdx ast_push(Ast *ast, AstNodeTag tag, AstNodeIdx lhs, AstNodeIdx rhs,
     return i;
 }
 
-static void print_string_escaped(const char *s, size_t len) {
-    for (size_t i = 0; i < len; i++) {
+static void print_string_escaped(const char *s, size_t count) {
+    for (size_t i = 0; i < count; i++) {
         unsigned char c = (unsigned char)s[i];
 
         switch (c) {
@@ -300,13 +300,13 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node_idx) {
 
     case NODE_ARRAY: {
         uint32_t start = node.lhs;
-        uint32_t len = node.rhs;
+        uint32_t count = node.rhs;
 
         printf("[");
 
         ast_display(ast, buffer, ast->extra.items[start]);
 
-        for (uint32_t i = 1; i < len; i++) {
+        for (uint32_t i = 1; i < count; i++) {
             printf(", ");
             ast_display(ast, buffer, ast->extra.items[start + i]);
         }
@@ -319,7 +319,7 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node_idx) {
         printf("{");
 
         if (node.lhs != INVALID_EXTRA_IDX) {
-            uint32_t len = ast->extra.items[node.lhs];
+            uint32_t count = ast->extra.items[node.lhs];
 
             uint32_t keys_start = node.lhs + 1;
             uint32_t values_start = node.rhs;
@@ -328,7 +328,7 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node_idx) {
             printf(": ");
             ast_display(ast, buffer, ast->extra.items[values_start]);
 
-            for (uint32_t i = 1; i < len; i++) {
+            for (uint32_t i = 1; i < count; i++) {
                 printf(", ");
                 ast_display(ast, buffer, ast->extra.items[keys_start + i]);
                 printf(": ");
@@ -346,11 +346,11 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node_idx) {
 
         if (node.rhs != INVALID_EXTRA_IDX) {
             uint32_t start = node.rhs + 1;
-            uint32_t len = ast->extra.items[node.rhs];
+            uint32_t count = ast->extra.items[node.rhs];
 
             ast_display(ast, buffer, ast->extra.items[start]);
 
-            for (uint32_t i = 1; i < len; i++) {
+            for (uint32_t i = 1; i < count; i++) {
                 printf(", ");
                 ast_display(ast, buffer, ast->extra.items[start + i]);
             }
@@ -364,11 +364,11 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node_idx) {
 
         if (node.lhs != INVALID_EXTRA_IDX) {
             uint32_t start = node.lhs + 1;
-            uint32_t len = ast->extra.items[node.lhs];
+            uint32_t count = ast->extra.items[node.lhs];
 
             ast_display(ast, buffer, ast->extra.items[start]);
 
-            for (uint32_t i = 1; i < len; i++) {
+            for (uint32_t i = 1; i < count; i++) {
                 printf(", ");
                 ast_display(ast, buffer, ast->extra.items[start + i]);
             }

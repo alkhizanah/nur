@@ -100,19 +100,19 @@ typedef struct {
 typedef struct {
     AstNode *items;
     uint32_t *sources;
-    size_t len;
+    size_t count;
     size_t capacity;
 } AstNodes;
 
 typedef struct {
     char *items;
-    size_t len;
+    size_t count;
     size_t capacity;
 } AstStrings;
 
 typedef struct {
     uint32_t *items;
-    size_t len;
+    size_t count;
     size_t capacity;
 } AstExtra;
 
