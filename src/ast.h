@@ -122,14 +122,7 @@ typedef struct {
     AstExtra extra;
 } Ast;
 
-typedef struct {
-    Ast ast;
-    const char *file_path;
-    Lexer lexer;
-    Token next_token;
-    Token current_token;
-} AstParser;
-
-AstNodeIdx ast_parse(AstParser *);
+AstNodeIdx ast_push(Ast *, AstNodeTag tag, AstNodeIdx lhs,
+                    AstNodeIdx rhs, uint32_t source);
 
 void ast_display(const Ast *, const char *buffer, AstNodeIdx node);

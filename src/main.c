@@ -5,6 +5,7 @@
 
 #include "array.h"
 #include "ast.h"
+#include "parser.h"
 #include "lexer.h"
 #include "platform.h"
 
@@ -71,7 +72,7 @@ int main(int argc, const char **argv) {
         AstParser parser = {.file_path = input_file_path,
                             .lexer = {.buffer = input_file_content}};
 
-        AstNodeIdx program = ast_parse(&parser);
+        AstNodeIdx program = parse(&parser);
 
         if (program == INVALID_NODE_IDX) {
             return 1;
