@@ -171,7 +171,8 @@ typedef struct {
 
 bool chunks_equal(Chunk, Chunk);
 bool objects_equal(Obj *, Obj *);
-bool values_equal(Value, Value);
+bool values_exactly_equal(Value, Value); // 4 != 4.0
+bool values_equal(Value, Value);         // 4 == 4.0
 
 void vm_init(Vm *);
 void vm_stack_reset(Vm *);

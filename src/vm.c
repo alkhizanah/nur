@@ -182,7 +182,7 @@ bool objects_equal(Obj *a, Obj *b) {
     }
 }
 
-bool values_equal(Value a, Value b) {
+bool values_exactly_equal(Value a, Value b) {
     if (a.tag != b.tag) {
         return false;
     }
@@ -205,9 +205,41 @@ bool values_equal(Value a, Value b) {
     }
 }
 
+bool values_equal(Value a, Value b) {
+    if (a.tag != b.tag && !((a.tag == VAL_INT && b.tag == VAL_FLT) ||
+                            (a.tag == VAL_FLT && b.tag == VAL_INT))) {
+        return false;
+    }
+
+    switch (a.tag) {
+    case VAL_NONE:
+        return true;
+
+    case VAL_BOOL:
+        return AS_BOOL(a) == AS_BOOL(b);
+
+    case VAL_INT:
+        if (b.tag == VAL_FLT) {
+            return (double)AS_INT(a) == AS_FLT(b);
+        } else {
+            return AS_INT(a) == AS_INT(b);
+        }
+
+    case VAL_FLT:
+        if (b.tag == VAL_INT) {
+            return AS_FLT(a) == (double)AS_INT(b);
+        } else {
+            return AS_FLT(a) == AS_FLT(b);
+        }
+
+    case VAL_OBJ:
+        return objects_equal(AS_OBJ(a), AS_OBJ(b));
+    }
+}
+
 size_t chunk_add_constant(Chunk *chunk, Value value) {
     for (size_t i = 0; i < chunk->constants.count; i++) {
-        if (values_equal(chunk->constants.items[i], value)) {
+        if (values_exactly_equal(chunk->constants.items[i], value)) {
             return i;
         }
     }
