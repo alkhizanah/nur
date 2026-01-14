@@ -177,7 +177,7 @@ bool values_equal(Value, Value);         // 4 == 4.0
 
 void vm_init(Vm *);
 void vm_stack_reset(Vm *);
-Value vm_run(Vm *);
+bool vm_run(Vm *, Value *result);
 Obj *vm_alloc(Vm *, ObjTag, size_t);
 void vm_gc(Vm *);
 void vm_push(Vm *, Value);
