@@ -60,6 +60,10 @@ Value vm_run(Vm *vm) {
             vm_push(vm, BOOL_VAL(values_equal(vm_pop(vm), vm_pop(vm))));
             break;
 
+        case OP_NEQ:
+            vm_push(vm, BOOL_VAL(!values_equal(vm_pop(vm), vm_pop(vm))));
+            break;
+
         case OP_NOT:
             vm_push(vm, BOOL_VAL(value_is_falsey(vm_pop(vm))));
             break;
