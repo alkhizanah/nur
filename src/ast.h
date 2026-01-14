@@ -62,8 +62,7 @@ typedef enum : uint8_t {
     // the function doesn't accept any parameter, and rhs is an index to a block
     // that is the body of the function
     NODE_FUNCTION,
-    // Payload: lhs is a boolean value that decides whether rhs is used or not,
-    // and rhs is the value being returend
+    // Payload: rhs is the value being returend
     NODE_RETURN,
     // No payload is needed for NODE_BREAK and NODE_CONTINUE
     NODE_BREAK,

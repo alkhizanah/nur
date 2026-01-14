@@ -197,11 +197,6 @@ retry:
         token.range.end = lexer->index;
         break;
 
-    case ';':
-        token.tag = TOK_SEMICOLON;
-        token.range.end = lexer->index;
-        break;
-
     case '"':
     case '\'': {
         token.tag = TOK_STRING;

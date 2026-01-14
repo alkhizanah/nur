@@ -798,41 +798,13 @@ static AstNodeIdx parse_conditional(AstParser *parser) {
 static AstNodeIdx parse_return(AstParser *parser) {
     Token token = parser_advance(parser);
 
-    if (parser_peek(parser).tag == TOK_CBRACE) {
-        // For example at the end of a function:
-        //
-        // fn () {
-        //     return
-        // }
-        //
-        // or at the end of an if statement;
-        //
-        // if val {
-        //     return
-        // }
-        return ast_push(&parser->ast, NODE_RETURN, false, 0, token.range.start);
-    }
-
-    if (parser_peek(parser).tag == TOK_SEMICOLON) {
-        // Maybe to skip other code:
-        //
-        // fn () {
-        //     return;
-        //
-        //     println(...);
-        // }
-        parser_advance(parser);
-
-        return ast_push(&parser->ast, NODE_RETURN, false, 0, token.range.start);
-    }
-
     AstNodeIdx value = parse_expr(parser, PR_LOWEST);
 
     if (value == INVALID_NODE_IDX) {
         return INVALID_NODE_IDX;
     }
 
-    return ast_push(&parser->ast, NODE_RETURN, true, value, token.range.start);
+    return ast_push(&parser->ast, NODE_RETURN, 0, value, token.range.start);
 }
 
 static AstNodeIdx parse_stmt(AstParser *parser) {

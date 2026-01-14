@@ -29,7 +29,6 @@ typedef enum {
     TOK_DOT,
     TOK_COMMA,
     TOK_COLON,
-    TOK_SEMICOLON,
     TOK_PLUS,
     TOK_PLUS_ASSIGN,
     TOK_MINUS,
