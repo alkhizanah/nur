@@ -1,6 +1,6 @@
 time = import("time")
 
-export({
+return {
     "run": fn (label, benchmark) {
         start = time.now_ms()
 
@@ -10,4 +10,4 @@ export({
 
         println(label + ":", (end - start), "ms")
     },
-})
+}

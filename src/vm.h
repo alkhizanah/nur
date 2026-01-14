@@ -88,6 +88,7 @@ typedef enum : uint8_t {
     OP_GT,
     OP_LTE,
     OP_GTE,
+    OP_RETURN,
 } OpCode;
 
 typedef struct {
@@ -176,7 +177,7 @@ bool values_equal(Value, Value);         // 4 == 4.0
 
 void vm_init(Vm *);
 void vm_stack_reset(Vm *);
-void vm_run(Vm *);
+Value vm_run(Vm *);
 Obj *vm_alloc(Vm *, ObjTag, size_t);
 void vm_gc(Vm *);
 void vm_push(Vm *, Value);

@@ -345,17 +345,9 @@ Gives you the list of parameter names of a function
 get_parameters(fn (foo, bar) {}) # ["foo", "bar"]
 ```
 
-- export
-
-Changes the value exported to the users of this module, by default it exports none
-
-```
-export({"hey": 5})
-```
-
 - import
 
-Evaluates a file and gives you the exported value
+Evaluates a file and gives you the exported value (the value that the module `return`ed)
 
 ```
 import("some_file.nur") # {"hey": 5}
@@ -366,7 +358,7 @@ import("some_file.nur") # {"hey": 5}
 Evaluates a string and gives you the exported value
 
 ```
-eval("export({\"hey\": 5})") # {"hey": 5}
+eval("return {\"hey\": 5}") # {"hey": 5}
 ```
 
 - hash

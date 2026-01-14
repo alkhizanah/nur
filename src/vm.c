@@ -20,7 +20,7 @@ static bool value_is_falsey(Value value) {
     return IS_NONE(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
-void vm_run(Vm *vm) {
+Value vm_run(Vm *vm) {
     CallFrame *frame = &vm->frames[vm->frame_count - 1];
 
 #define READ_BYTE() (*frame->ip++)
@@ -63,6 +63,24 @@ void vm_run(Vm *vm) {
         case OP_NOT:
             vm_push(vm, BOOL_VAL(value_is_falsey(vm_pop(vm))));
             break;
+
+        case OP_RETURN: {
+            Value result = vm_pop(vm);
+
+            vm->frame_count--;
+
+            if (vm->frame_count == 0) {
+                return result;
+            }
+
+            vm->sp = frame->slots;
+
+            vm_push(vm, result);
+
+            frame = &vm->frames[vm->frame_count - 1];
+
+            break;
+        }
 
         default:
             assert(false && "TODO");

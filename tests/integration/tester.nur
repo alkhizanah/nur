@@ -1,6 +1,6 @@
 stats = {"passed": 0, "failed": 0}
 
-export({
+return {
     "run": fn (label, test) {
         print(label + ".. ")
 
@@ -47,4 +47,4 @@ export({
             println("and", stats.failed, test_or_tests_failed, "failed")
         }
     }
-})
+}
