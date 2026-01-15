@@ -38,6 +38,7 @@ void vm_stack_reset(Vm *vm) {
 }
 
 
+[[gnu::format(printf, 2, 3)]]
 static void vm_error(Vm *vm, const char *format, ...) {
     va_list args;
 
