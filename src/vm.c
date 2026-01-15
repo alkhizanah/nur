@@ -38,30 +38,6 @@ void vm_stack_reset(Vm *vm) {
 }
 
 
-[[gnu::format(printf, 2, 3)]]
-static void vm_error(Vm *vm, const char *format, ...) {
-    va_list args;
-
-    va_start(args, format);
-
-    fprintf(stderr, "error: ");
-    vfprintf(stderr, format, args);
-
-    va_end(args);
-
-    for (ssize_t i = vm->frame_count - 1; i >= 0; i--) {
-        CallFrame *frame = &vm->frames[i];
-
-        size_t instruction = frame->ip - frame->fn->chunk.bytes - 1;
-        size_t source = frame->fn->chunk.sources[instruction];
-
-        SourceLocation loc = source_location_of(
-            frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
-
-        fprintf(stderr, "\tat %s:%u:%u", loc.file_path, loc.line, loc.column);
-    }
-}
-
 static bool vm_neg(Vm *vm) {
     Value rhs = vm_pop(vm);
 
@@ -162,6 +138,29 @@ bool vm_run(Vm *vm, Value *result) {
             assert(false && "TODO");
             break;
         }
+    }
+}
+
+void vm_error(Vm *vm, const char *format, ...) {
+    va_list args;
+
+    va_start(args, format);
+
+    fprintf(stderr, "error: ");
+    vfprintf(stderr, format, args);
+
+    va_end(args);
+
+    for (ssize_t i = vm->frame_count - 1; i >= 0; i--) {
+        CallFrame *frame = &vm->frames[i];
+
+        size_t instruction = frame->ip - frame->fn->chunk.bytes - 1;
+        size_t source = frame->fn->chunk.sources[instruction];
+
+        SourceLocation loc = source_location_of(
+            frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
+
+        fprintf(stderr, "\tat %s:%u:%u", loc.file_path, loc.line, loc.column);
     }
 }
 

@@ -178,10 +178,20 @@ bool values_exactly_equal(Value, Value); // 4 != 4.0
 bool values_equal(Value, Value);         // 4 == 4.0
 
 void vm_init(Vm *);
+
 void vm_stack_reset(Vm *);
+
 bool vm_run(Vm *, Value *result);
+
+[[gnu::format(printf, 2, 3)]]
+void vm_error(Vm *vm, const char *format, ...);
+
 Obj *vm_alloc(Vm *, ObjTag, size_t);
+
 void vm_gc(Vm *);
+
 void vm_push(Vm *, Value);
+
 Value vm_pop(Vm *);
+
 Value vm_peek(const Vm *, size_t distance);
