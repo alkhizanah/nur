@@ -1,7 +1,28 @@
 #include <assert.h>
+#include <stdarg.h>
 
 #include "array.h"
 #include "vm.h"
+#include "source_location.h"
+
+static inline bool is_falsey(Value value) {
+    return IS_NONE(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
+static inline const char *value_tag_to_string(ValueTag tag) {
+    switch (tag) {
+    case VAL_NONE:
+        return "a none";
+    case VAL_BOOL:
+        return "a boolean";
+    case VAL_INT:
+        return "an integer";
+    case VAL_FLT:
+        return "a floating point";
+    case VAL_OBJ:
+        return "an object";
+    }
+}
 
 void vm_init(Vm *vm) {
     vm_stack_reset(vm);
@@ -16,8 +37,49 @@ void vm_stack_reset(Vm *vm) {
     vm->frame_count = 0;
 }
 
-static bool value_is_falsey(Value value) {
-    return IS_NONE(value) || (IS_BOOL(value) && !AS_BOOL(value));
+
+static void vm_error(Vm *vm, const char *format, ...) {
+    va_list args;
+
+    va_start(args, format);
+
+    fprintf(stderr, "error: ");
+    vfprintf(stderr, format, args);
+
+    va_end(args);
+
+    for (ssize_t i = vm->frame_count - 1; i >= 0; i--) {
+        CallFrame *frame = &vm->frames[i];
+
+        size_t instruction = frame->ip - frame->fn->chunk.bytes - 1;
+        size_t source = frame->fn->chunk.sources[instruction];
+
+        SourceLocation loc = source_location_of(
+            frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
+
+        fprintf(stderr, "\tat %s:%u:%u", loc.file_path, loc.line, loc.column);
+    }
+}
+
+static bool vm_neg(Vm *vm) {
+    Value rhs = vm_pop(vm);
+
+    switch (rhs.tag) {
+    case VAL_INT:
+        vm_push(vm, INT_VAL(-AS_INT(rhs)));
+
+        return true;
+
+    case VAL_FLT:
+        vm_push(vm, FLT_VAL(-AS_FLT(rhs)));
+
+        return true;
+
+    default:
+        vm_error(vm, "can not negate %s value", value_tag_to_string(rhs.tag));
+
+        return false;
+    }
 }
 
 bool vm_run(Vm *vm, Value *result) {
@@ -65,7 +127,14 @@ bool vm_run(Vm *vm, Value *result) {
             break;
 
         case OP_NOT:
-            vm_push(vm, BOOL_VAL(value_is_falsey(vm_pop(vm))));
+            vm_push(vm, BOOL_VAL(is_falsey(vm_pop(vm))));
+            break;
+
+        case OP_NEG:
+            if (!vm_neg(vm)) {
+                return false;
+            }
+
             break;
 
         case OP_RETURN: {

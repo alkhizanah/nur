@@ -11,4 +11,4 @@ typedef struct {
 } SourceLocation;
 
 SourceLocation source_location_of(const char *file_path, const char *buffer,
-                                  Range);
+                                  uint32_t start);

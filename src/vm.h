@@ -28,7 +28,7 @@ typedef enum : uint8_t {
 
 typedef union {
     bool _bool;
-    uint64_t _int;
+    int64_t _int;
     double _flt;
     Obj *_obj;
 } ValuePayload;
@@ -98,6 +98,8 @@ typedef struct {
 } Constants;
 
 typedef struct {
+    const char *file_path;
+    const char *file_content;
     Constants constants;
     uint8_t *bytes;
     uint32_t *sources;
