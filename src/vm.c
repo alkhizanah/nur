@@ -545,6 +545,42 @@ static bool vm_pow(Vm *vm) {
     return true;
 }
 
+#define VM_CMP_FN(name, op)                                                    \
+    static bool name(Vm *vm) {                                                 \
+        Value rhs = vm_peek(vm, 0);                                            \
+        Value lhs = vm_peek(vm, 1);                                            \
+                                                                               \
+        if ((!IS_INT(lhs) && !IS_FLT(lhs)) ||                                  \
+            (!IS_INT(rhs) && !IS_FLT(rhs))) {                                  \
+            vm_error(vm, "can not compare %s value with %s value",             \
+                     value_tag_to_string(lhs.tag),                             \
+                     value_tag_to_string(rhs.tag));                            \
+                                                                               \
+            return false;                                                      \
+        }                                                                      \
+                                                                               \
+        vm_pop(vm);                                                            \
+                                                                               \
+        if (IS_INT(lhs)) {                                                     \
+            if (IS_INT(rhs)) {                                                 \
+                vm_poke(vm, 0, BOOL_VAL(AS_INT(lhs) op AS_INT(rhs)));          \
+            } else {                                                           \
+                vm_poke(vm, 0, BOOL_VAL(AS_INT(lhs) op AS_FLT(rhs)));          \
+            }                                                                  \
+        } else if (IS_INT(rhs)) {                                              \
+            vm_poke(vm, 0, BOOL_VAL(AS_FLT(lhs) op AS_INT(rhs)));              \
+        } else {                                                               \
+            vm_poke(vm, 0, BOOL_VAL(AS_FLT(lhs) op AS_FLT(rhs)));              \
+        }                                                                      \
+                                                                               \
+        return true;                                                           \
+    }
+
+VM_CMP_FN(vm_lt, <)
+VM_CMP_FN(vm_gt, >)
+VM_CMP_FN(vm_lte, <=)
+VM_CMP_FN(vm_gte, >=)
+
 bool vm_run(Vm *vm, Value *result) {
     CallFrame *frame = &vm->frames[vm->frame_count - 1];
 
@@ -554,7 +590,7 @@ bool vm_run(Vm *vm, Value *result) {
 #define READ_STRING() (AS_STRING(READ_CONSTANT()))
 
     for (;;) {
-        uint8_t opcode = READ_BYTE();
+        OpCode opcode = READ_BYTE();
 
         switch (opcode) {
         case OP_NULL:
@@ -571,6 +607,10 @@ bool vm_run(Vm *vm, Value *result) {
 
         case OP_CONST:
             vm_push(vm, READ_CONSTANT());
+            break;
+
+        case OP_POP:
+            vm_pop(vm);
             break;
 
         case OP_GET_LOCAL:
@@ -642,6 +682,34 @@ bool vm_run(Vm *vm, Value *result) {
 
             break;
 
+        case OP_LT:
+            if (!vm_lt(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_GT:
+            if (!vm_gt(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_LTE:
+            if (!vm_lte(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_GTE:
+            if (!vm_gte(vm)) {
+                return false;
+            }
+
+            break;
+
         case OP_RETURN: {
             Value returned = vm_pop(vm);
 
@@ -661,10 +729,6 @@ bool vm_run(Vm *vm, Value *result) {
 
             break;
         }
-
-        default:
-            assert(false && "TODO");
-            break;
         }
     }
 }
