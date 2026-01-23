@@ -599,7 +599,168 @@ void vm_poke(Vm *vm, size_t distance, Value value) {
     vm->sp[-1 - distance] = value;
 }
 
-void vm_gc(Vm *vm) { vm->next_gc = vm->bytes_allocated * VM_GC_GROW_FACTOR; }
+static void vm_mark_value(Vm *vm, Value value);
+
+static void vm_mark_object(Vm *vm, Obj *obj) {
+    obj->marked = true;
+
+    switch (obj->tag) {
+    case OBJ_ARRAY: {
+        ObjArray *arr = (ObjArray *)obj;
+
+        for (size_t i = 0; i < arr->count; i++) {
+            vm_mark_value(vm, arr->items[i]);
+        }
+
+        break;
+    }
+
+    case OBJ_MAP: {
+        ObjMap *map = (ObjMap *)obj;
+
+        for (size_t i = 0; i < map->count; i++) {
+            vm_mark_value(vm, map->keys[i]);
+            vm_mark_value(vm, map->values[i]);
+        }
+
+        break;
+    }
+
+    case OBJ_STRING:
+    case OBJ_FUNCTION:
+    case OBJ_NATIVE:
+        break;
+    }
+}
+
+static void vm_mark_value(Vm *vm, Value value) {
+    if (!IS_OBJ(value)) {
+        vm_mark_object(vm, AS_OBJ(value));
+    }
+}
+
+static void vm_mark_roots(Vm *vm) {
+    for (Value *v = vm->stack; v < vm->sp; v++) {
+        vm_mark_value(vm, *v);
+    }
+
+    for (size_t i = 0; i < vm->frame_count; i++) {
+        CallFrame frame = vm->frames[i];
+
+        for (size_t j = 0; j < frame.fn->chunk.constants.count; j++) {
+            vm_mark_value(vm, frame.fn->chunk.constants.items[j]);
+        }
+    }
+}
+
+static void vm_free_value(Vm *vm, Value value);
+
+static void vm_free_object(Vm *vm, Obj *obj) {
+    switch (obj->tag) {
+    case OBJ_STRING: {
+        ObjString *str = (ObjString *)obj;
+
+        free(str->items);
+
+        vm->bytes_allocated -= str->capacity * sizeof(char) + sizeof(ObjString);
+
+        break;
+    }
+
+    case OBJ_ARRAY: {
+        ObjArray *arr = (ObjArray *)obj;
+
+        for (size_t i = 0; i < arr->count; i++) {
+            vm_free_value(vm, arr->items[i]);
+        }
+
+        free(arr->items);
+
+        vm->bytes_allocated -= arr->capacity * sizeof(Value) + sizeof(ObjArray);
+
+        break;
+    }
+
+    case OBJ_MAP: {
+        ObjMap *map = (ObjMap *)obj;
+
+        for (size_t i = 0; i < map->count; i++) {
+            vm_free_value(vm, map->keys[i]);
+            vm_free_value(vm, map->values[i]);
+        }
+
+        free(map->keys);
+        free(map->values);
+
+        vm->bytes_allocated -=
+            map->capacity * 2 * sizeof(Value) + sizeof(ObjMap);
+
+        break;
+    }
+
+    case OBJ_FUNCTION: {
+        ObjFunction *fn = (ObjFunction *)obj;
+
+        for (size_t i = 0; i < fn->chunk.constants.count; i++) {
+            vm_free_value(vm, fn->chunk.constants.items[i]);
+        }
+
+        free(fn->chunk.constants.items);
+
+        free(fn->chunk.bytes);
+        free(fn->chunk.sources);
+
+        vm->bytes_allocated -=
+            fn->chunk.constants.capacity * sizeof(Value) + sizeof(ObjFunction);
+
+        break;
+    }
+
+    case OBJ_NATIVE:
+        break;
+    }
+
+    free(obj);
+}
+
+static void vm_free_value(Vm *vm, Value value) {
+    if (IS_OBJ(value)) {
+        vm_free_object(vm, AS_OBJ(value));
+    }
+}
+
+static void vm_sweep(Vm *vm) {
+    Obj *prev = NULL;
+    Obj *curr = vm->objects;
+
+    while (curr != NULL) {
+        if (curr->marked) {
+            curr->marked = false;
+            prev = curr;
+            curr = curr->next;
+        } else {
+            Obj *unreached = curr;
+
+            if (prev != NULL) {
+                prev->next = curr->next;
+            } else {
+                vm->objects = curr->next;
+            }
+
+            curr = curr->next;
+
+            vm_free_object(vm, unreached);
+        }
+    }
+}
+
+void vm_gc(Vm *vm) {
+    vm_mark_roots(vm);
+
+    vm_sweep(vm);
+
+    vm->next_gc = vm->bytes_allocated * VM_GC_GROW_FACTOR;
+}
 
 Obj *vm_alloc(Vm *vm, ObjTag tag, size_t size) {
     vm->bytes_allocated += size;
