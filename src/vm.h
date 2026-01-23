@@ -195,3 +195,5 @@ void vm_push(Vm *, Value);
 Value vm_pop(Vm *);
 
 Value vm_peek(const Vm *, size_t distance);
+
+void vm_poke(Vm *, size_t distance, Value);

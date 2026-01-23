@@ -2,8 +2,8 @@
 #include <stdarg.h>
 
 #include "array.h"
-#include "vm.h"
 #include "source_location.h"
+#include "vm.h"
 
 static inline bool is_falsey(Value value) {
     return IS_NONE(value) || (IS_BOOL(value) && !AS_BOOL(value));
@@ -37,18 +37,17 @@ void vm_stack_reset(Vm *vm) {
     vm->frame_count = 0;
 }
 
-
 static bool vm_neg(Vm *vm) {
-    Value rhs = vm_pop(vm);
+    Value rhs = vm_peek(vm, 0);
 
     switch (rhs.tag) {
     case VAL_INT:
-        vm_push(vm, INT_VAL(-AS_INT(rhs)));
+        vm_poke(vm, 0, INT_VAL(-AS_INT(rhs)));
 
         return true;
 
     case VAL_FLT:
-        vm_push(vm, FLT_VAL(-AS_FLT(rhs)));
+        vm_poke(vm, 0, FLT_VAL(-AS_FLT(rhs)));
 
         return true;
 
@@ -379,3 +378,7 @@ Value vm_pop(Vm *vm) {
 }
 
 Value vm_peek(const Vm *vm, size_t distance) { return vm->sp[-1 - distance]; }
+
+void vm_poke(Vm *vm, size_t distance, Value value) {
+    vm->sp[-1 - distance] = value;
+}
