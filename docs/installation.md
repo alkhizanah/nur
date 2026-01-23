@@ -10,7 +10,7 @@ simple but specific
 To build the project for development purposes (like implementing a new feature or fixing some errors), it's only one command:
 
 ```
-cc -o nur src/one.c
+cc -o nur src/one.c -lm
 ```
 
 When you change any file inside src directory, the program detects this and rebuilds itself, however be careful, the program assumes the current working directory is the same directory that README.md is in, so it will fail to rebuild itself if you changed your current working directory into something else
@@ -20,11 +20,11 @@ When you change any file inside src directory, the program detects this and rebu
 If you want to use the program outside of this directory or perhaps release it for others to use, you should disable the rebuilding capabilities:
 
 ```
-cc -o nur src/one.c -DNO_REBUILD
+cc -o nur src/one.c -lm -DNO_REBUILD
 ```
 
 You may also want to optimize it:
 
 ```
-cc -o nur src/one.c -DNO_REBUILD -O3
+cc -o nur src/one.c -lm -DNO_REBUILD -O3
 ```
