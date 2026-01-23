@@ -6,7 +6,7 @@ return {
 
         result = test()
 
-        if result == none {
+        if result == null {
             println("skipped")
         } else if result == true {
             println("passed")
@@ -19,12 +19,12 @@ return {
 
     "end": fn () {
         if stats.passed + stats.failed == 0 {
-            return none
+            return null
         }
 
         println()
 
-        test_or_tests_passed = none
+        test_or_tests_passed = null
 
         if stats.passed == 1 {
             test_or_tests_passed = "test"
@@ -32,7 +32,7 @@ return {
             test_or_tests_passed = "tests"
         }
 
-        test_or_tests_failed = none
+        test_or_tests_failed = null
 
         if stats.failed == 1 {
             test_or_tests_failed = "test"

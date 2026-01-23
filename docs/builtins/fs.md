@@ -16,7 +16,7 @@ Opens a file to read or write
 
 ```
 fs.open("some_file") # some file descriptor
-fs.open(3) # none
+fs.open(3) # null
 ```
 
 - create
@@ -25,7 +25,7 @@ Creates a file to read or write, opens the file without truncating if exists, to
 
 ```
 fs.create("some_file") # some file descriptor
-fs.create(3) # none
+fs.create(3) # null
 ```
 
 - delete
@@ -62,7 +62,7 @@ fs.read(fd) # "e"
 fs.read(fd) # "l"
 fs.read(fd) # "l"
 fs.read(fd) # "o"
-fs.read(fd) # none
+fs.read(fd) # null
 ```
 
 - read_line
@@ -71,7 +71,7 @@ Reads until new line or the end of the file stream
 
 ```
 fs.read_line(fd) # "Hello World"
-fs.read_line(fd) # none
+fs.read_line(fd) # null
 ```
 
 - read_all
@@ -109,5 +109,5 @@ Checks if file can be accessed
 ```
 fs.access("some_file") # true
 fs.access("other_non_existent_file") # false
-fs.access(02) # none
+fs.access(02) # null
 ```

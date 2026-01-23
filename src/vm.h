@@ -19,7 +19,7 @@ typedef struct Obj {
 } Obj;
 
 typedef enum : uint8_t {
-    VAL_NONE,
+    VAL_NULL,
     VAL_BOOL,
     VAL_INT,
     VAL_FLT,
@@ -38,7 +38,7 @@ typedef struct {
     ValueTag tag;
 } Value;
 
-#define IS_NONE(v) ((v).tag == VAL_NONE)
+#define IS_NULL(v) ((v).tag == VAL_NULL)
 #define IS_BOOL(v) ((v).tag == VAL_BOOL)
 #define IS_INT(v) ((v).tag == VAL_INT)
 #define IS_FLT(v) ((v).tag == VAL_FLT)
@@ -59,13 +59,13 @@ static inline bool is_obj_tag(Value v, ObjTag tag) {
 #define IS_MAP(v) is_obj_tag(v, OBJ_MAP)
 #define IS_STRING(v) is_obj_tag(v, OBJ_STRING)
 
-#define NONE_VAL ((Value){.tag = VAL_NONE})
+#define NULL_VAL ((Value){.tag = VAL_NULL})
 #define BOOL_VAL(v) ((Value){.tag = VAL_BOOL, .payload = {._bool = (v)}})
 #define INT_VAL(v) ((Value){.tag = VAL_INT, .payload = {._int = (v)}})
 #define FLT_VAL(v) ((Value){.tag = VAL_FLT, .payload = {._flt = (v)}})
 
 typedef enum : uint8_t {
-    OP_NONE,
+    OP_NULL,
     OP_TRUE,
     OP_FALSE,
     OP_CONST,

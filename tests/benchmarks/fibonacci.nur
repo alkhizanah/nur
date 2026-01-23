@@ -4,7 +4,7 @@ benchmarker.run("fibonacci linear function", fn () {
     fib = fn (n) {
         a = 0
         b = 1
-        c = none
+        c = null
 
         if n == 0 {
             return a

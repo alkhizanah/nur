@@ -16,7 +16,7 @@ Encode the UTF-8 representation to a string
 
 ```
 unicode.utf8_encode(63) # "?"
-unicode.utf8_encode("jdlf") # none
+unicode.utf8_encode("jdlf") # null
 ```
 
 
@@ -26,6 +26,6 @@ Decode the UTF-8 representation to an int
 
 ```
 unicode.utf8_decode("?") # 63
-unicode.utf8_decode(2) # none
+unicode.utf8_decode(2) # null
 ```
 

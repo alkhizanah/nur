@@ -3,7 +3,7 @@ io = import("io")
 process = import("process")
 
 duplicate_stdin = fn () {
-    while (input = fs.read_line(io.stdin)) != none {
+    while (input = fs.read_line(io.stdin)) != null {
         println(input)
     }
 }
@@ -16,12 +16,12 @@ concatenate_files = fn () {
 
         file = fs.open(file_path)
 
-        if file == none {
+        if file == null {
             println(file_path + ": could not open file")
             exit(1)
         }
 
-        while (line = fs.read_line(file)) != none {
+        while (line = fs.read_line(file)) != null {
             println(line)
         }
 

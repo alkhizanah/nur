@@ -9,11 +9,11 @@ while true {
 
     print("Guess a number between 0 and 10: ")
 
-    if (raw_input = fs.read_line(io.stdin)) == none {
+    if (raw_input = fs.read_line(io.stdin)) == null {
         break
     }
 
-    if (parsed_input = to_int(raw_input)) == none {
+    if (parsed_input = to_int(raw_input)) == null {
         println("Try again with a number")
 
         continue

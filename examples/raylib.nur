@@ -34,7 +34,7 @@ raylib = ffi.dll.open(raylib_dll_path, {
     },
 })
 
-if raylib == none {
+if raylib == null {
     println(raylib_dll_path + ": failed to open dynamic link library")
     exit(1)
 }

@@ -6,13 +6,13 @@
 #include "vm.h"
 
 static inline bool is_falsey(Value value) {
-    return IS_NONE(value) || (IS_BOOL(value) && !AS_BOOL(value));
+    return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
 static inline const char *value_tag_to_string(ValueTag tag) {
     switch (tag) {
-    case VAL_NONE:
-        return "a none";
+    case VAL_NULL:
+        return "a null";
     case VAL_BOOL:
         return "a boolean";
     case VAL_INT:
@@ -70,8 +70,8 @@ bool vm_run(Vm *vm, Value *result) {
         uint8_t opcode = READ_BYTE();
 
         switch (opcode) {
-        case OP_NONE:
-            vm_push(vm, NONE_VAL);
+        case OP_NULL:
+            vm_push(vm, NULL_VAL);
             break;
 
         case OP_TRUE:
@@ -280,7 +280,7 @@ bool values_exactly_equal(Value a, Value b) {
     }
 
     switch (a.tag) {
-    case VAL_NONE:
+    case VAL_NULL:
         return true;
 
     case VAL_BOOL:
@@ -304,7 +304,7 @@ bool values_equal(Value a, Value b) {
     }
 
     switch (a.tag) {
-    case VAL_NONE:
+    case VAL_NULL:
         return true;
 
     case VAL_BOOL:

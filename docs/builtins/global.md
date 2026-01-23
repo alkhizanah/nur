@@ -46,7 +46,7 @@ random(5, 10) # 7.268858764248719
 random(10, 5) # same as above
 random(0.1, 0.2) # 0.1783036218123609
 random(0, 0) # 0.0
-random("", "") # none
+random("", "") # null
 ```
 
 - exit
@@ -68,7 +68,7 @@ Gives you the type of provided value
 Usage:
 
 ```
-typeof(none) # "none"
+typeof(null) # "null"
 typeof("") # "string"
 typeof(1) # "int"
 typeof(1.5) # "float"
@@ -87,7 +87,7 @@ to_int(5) # 5
 to_int(5.5) # 5
 to_int(true) # 1
 to_int("5") # 5
-to_int("hey") # none
+to_int("hey") # null
 ```
 
 - to_float
@@ -99,7 +99,7 @@ to_float(5.5) # 5.5
 to_float(5) # 5.0
 to_float(true) # 1.0
 to_float("5.5") # 5.5
-to_float("hey") # none
+to_float("hey") # null
 ```
 
 - to_string
@@ -111,7 +111,7 @@ to_string(5) # "5"
 to_string(5.5) # "5.5"
 to_string(true) # "true"
 to_string("hey") # "hey"
-to_string(none) # "none"
+to_string(null) # "null"
 to_string([1, 2, 3]) # "[1, 2, 3]"
 to_string({2: 4}) # "{2: 4}"
 ```
@@ -135,8 +135,8 @@ Pops the last value in the array
 arr = [5]
 
 array_pop(arr) # 5
-array_pop(arr) # none
-array_pop(2) # none
+array_pop(arr) # null
+array_pop(2) # null
 ```
 
 - foreach
@@ -274,7 +274,7 @@ map = {1: 2, 3: 4, 4: 5}
 length(str) # 3
 length(arr) # 3
 length(map) # 3
-length(89) # none
+length(89) # null
 ```
 
 - contains
@@ -297,7 +297,7 @@ contains(map, "c") # true
 contains(str, "cd") # false
 contains(str, "ab") # true
 
-contains(4, "ab") # none
+contains(4, "ab") # null
 ```
 
 - string_split
@@ -368,7 +368,7 @@ Gives you the number representation of the hashable value
 ```
 hash(5) # 5
 hash("string") # 5389953989438782544
-hash([1, 2]) # none
+hash([1, 2]) # null
 ```
 
 - map_keys
@@ -383,12 +383,12 @@ println(map_keys(map)) # [1, 3]
 
 - map_from_keys
 
-Gives you the map with keys you provided and all values are none
+Gives you the map with keys you provided and all values are null
 
 ```
 map = map_from_keys([1, 3])
 
-println(map) # {1: none, 3: none}
+println(map) # {1: null, 3: null}
 ```
 
 - map_values

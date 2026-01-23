@@ -1,11 +1,11 @@
 # Nur's Data Types
 
-## None
+## Null
 
-A value represents nothing
+A value represents emptiness
 
 ```
-none
+null
 ```
 
 ## Number

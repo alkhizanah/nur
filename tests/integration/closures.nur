@@ -67,8 +67,8 @@ tester.run("while loop closure", fn () {
 })
 
 tester.run("multiple closures capture the same value", fn () {
-    first = none
-    second = none
+    first = null
+    second = null
 
     fn () {
         x = 5
