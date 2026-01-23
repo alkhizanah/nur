@@ -331,7 +331,7 @@ static void vm_div_int(Vm *vm, Value lhs, Value rhs) {
     if (rem_euclid(ilhs, irhs) == 0) {
         vm_poke(vm, 0, INT_VAL(ilhs / irhs));
     } else {
-        vm_poke(vm, 0, FLT_VAL(ilhs / irhs));
+        vm_poke(vm, 0, FLT_VAL((double)ilhs / (double)irhs));
     }
 }
 
