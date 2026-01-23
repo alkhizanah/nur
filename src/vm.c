@@ -95,15 +95,15 @@ bool vm_run(Vm *vm, Value *result) {
             break;
 
         case OP_EQL:
-            vm_push(vm, BOOL_VAL(values_equal(vm_pop(vm), vm_pop(vm))));
+            vm_poke(vm, 0, BOOL_VAL(values_equal(vm_pop(vm), vm_peek(vm, 0))));
             break;
 
         case OP_NEQ:
-            vm_push(vm, BOOL_VAL(!values_equal(vm_pop(vm), vm_pop(vm))));
+            vm_poke(vm, 0, BOOL_VAL(!values_equal(vm_pop(vm), vm_peek(vm, 0))));
             break;
 
         case OP_NOT:
-            vm_push(vm, BOOL_VAL(is_falsey(vm_pop(vm))));
+            vm_poke(vm, 0, BOOL_VAL(is_falsey(vm_peek(vm, 0))));
             break;
 
         case OP_NEG:
