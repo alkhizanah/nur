@@ -140,14 +140,9 @@ static bool vm_add(Vm *vm) {
         return true;
     }
 
-    if (!IS_INT(lhs) && !IS_FLT(lhs)) {
-        vm_error(vm, "can not add to a %s value", value_tag_to_string(lhs.tag));
-
-        return false;
-    }
-
-    if (!IS_INT(rhs) && !IS_FLT(rhs)) {
-        vm_error(vm, "can not add to a %s value", value_tag_to_string(rhs.tag));
+    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+        vm_error(vm, "can not add %s value to %s value",
+                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
 
         return false;
     }
@@ -215,16 +210,9 @@ static bool vm_sub(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if (!IS_INT(lhs) && !IS_FLT(lhs)) {
-        vm_error(vm, "can not subtract from a %s value",
-                 value_tag_to_string(lhs.tag));
-
-        return false;
-    }
-
-    if (!IS_INT(rhs) && !IS_FLT(rhs)) {
-        vm_error(vm, "can not subtract a %s value",
-                 value_tag_to_string(rhs.tag));
+    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+        vm_error(vm, "can not subtract %s value from %s value",
+                 value_tag_to_string(rhs.tag), value_tag_to_string(lhs.tag));
 
         return false;
     }
@@ -250,6 +238,150 @@ static bool vm_sub(Vm *vm) {
 
         case VAL_FLT:
             vm_sub_flt_int(vm, lhs, rhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    }
+
+    return true;
+}
+
+static void vm_mul_int(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, INT_VAL(ilhs * irhs));
+}
+
+static void vm_mul_flt(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(flhs * frhs));
+}
+
+static void vm_mul_int_flt(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(ilhs * frhs));
+}
+
+static bool vm_mul(Vm *vm) {
+    Value rhs = vm_peek(vm, 0);
+    Value lhs = vm_peek(vm, 1);
+
+    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+        vm_error(vm, "can not multiply %s value with %s value",
+                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+
+        return false;
+    }
+
+    if (lhs.tag == rhs.tag) {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_mul_int(vm, rhs, lhs);
+            break;
+
+        case VAL_FLT:
+            vm_mul_flt(vm, rhs, lhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    } else {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_mul_int_flt(vm, lhs, rhs);
+            break;
+
+        case VAL_FLT:
+            vm_mul_int_flt(vm, rhs, lhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    }
+
+    return true;
+}
+
+static int64_t rem_euclid(int64_t a, int64_t b) {
+    int64_t r = a % b;
+    return r < 0 ? r + (b < 0 ? -b : b) : r;
+}
+
+static void vm_div_int(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    int64_t irhs = AS_INT(rhs);
+
+    vm_pop(vm);
+
+    if (rem_euclid(ilhs, irhs) == 0) {
+        vm_poke(vm, 0, INT_VAL(ilhs / irhs));
+    } else {
+        vm_poke(vm, 0, FLT_VAL((double)ilhs / (double)irhs));
+    }
+}
+
+static void vm_div_flt(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(flhs / frhs));
+}
+
+static void vm_div_int_flt(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(ilhs / frhs));
+}
+
+static void vm_div_flt_int(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(flhs / irhs));
+}
+
+static bool vm_div(Vm *vm) {
+    Value rhs = vm_peek(vm, 0);
+    Value lhs = vm_peek(vm, 1);
+
+    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+        vm_error(vm, "can not divide %s value by %s value",
+                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+
+        return false;
+    }
+
+    if (lhs.tag == rhs.tag) {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_div_int(vm, rhs, lhs);
+            break;
+
+        case VAL_FLT:
+            vm_div_flt(vm, rhs, lhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    } else {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_div_int_flt(vm, lhs, rhs);
+            break;
+
+        case VAL_FLT:
+            vm_div_flt_int(vm, lhs, rhs);
             break;
 
         default:
@@ -324,6 +456,20 @@ bool vm_run(Vm *vm, Value *result) {
 
         case OP_SUB:
             if (!vm_sub(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_MUL:
+            if (!vm_mul(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_DIV:
+            if (!vm_div(vm)) {
                 return false;
             }
 
