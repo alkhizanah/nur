@@ -629,11 +629,11 @@ bool vm_run(Vm *vm, Value *result) {
             break;
 
         case OP_EQL:
-            vm_poke(vm, 0, BOOL_VAL(values_equal(vm_pop(vm), vm_peek(vm, 0))));
+            vm_push(vm, BOOL_VAL(values_equal(vm_pop(vm), vm_pop(vm))));
             break;
 
         case OP_NEQ:
-            vm_poke(vm, 0, BOOL_VAL(!values_equal(vm_pop(vm), vm_peek(vm, 0))));
+            vm_push(vm, BOOL_VAL(!values_equal(vm_pop(vm), vm_pop(vm))));
             break;
 
         case OP_NOT:
@@ -928,6 +928,142 @@ bool values_equal(Value a, Value b) {
     }
 }
 
+void object_display(Obj *obj) {
+    switch (obj->tag) {
+    case OBJ_STRING: {
+        ObjString *str = (ObjString *)obj;
+        printf("%.*s", (int)str->count, str->items);
+        break;
+    }
+
+    case OBJ_ARRAY: {
+        ObjArray *arr = (ObjArray *)obj;
+
+        printf("[");
+
+        if (arr->count > 0) {
+            if (IS_STRING(arr->items[0])) {
+                printf("\"");
+            }
+
+            value_display(arr->items[0]);
+
+            if (IS_STRING(arr->items[0])) {
+                printf("\"");
+            }
+
+            for (size_t i = 1; i < arr->count; i++) {
+                printf(", ");
+
+                if (IS_STRING(arr->items[i])) {
+                    printf("\"");
+                }
+
+                value_display(arr->items[i]);
+
+                if (IS_STRING(arr->items[i])) {
+                    printf("\"");
+                }
+            }
+        }
+
+        printf("]");
+
+        break;
+    }
+
+    case OBJ_MAP: {
+        ObjMap *map = (ObjMap *)obj;
+
+        printf("{");
+
+        if (map->count > 0) {
+            if (IS_STRING(map->keys[0])) {
+                printf("\"");
+            }
+
+            value_display(map->keys[0]);
+
+            if (IS_STRING(map->keys[0])) {
+                printf("\"");
+            }
+
+            printf(": ");
+
+            if (IS_STRING(map->values[0])) {
+                printf("\"");
+            }
+
+            value_display(map->values[0]);
+
+            if (IS_STRING(map->values[0])) {
+                printf("\"");
+            }
+
+            for (size_t i = 1; i < map->count; i++) {
+                printf(", ");
+
+                if (IS_STRING(map->keys[i])) {
+                    printf("\"");
+                }
+
+                value_display(map->keys[i]);
+
+                if (IS_STRING(map->keys[i])) {
+                    printf("\"");
+                }
+
+                printf(": ");
+
+                if (IS_STRING(map->values[i])) {
+                    printf("\"");
+                }
+
+                value_display(map->values[i]);
+
+                if (IS_STRING(map->values[i])) {
+                    printf("\"");
+                }
+            }
+        }
+
+        printf("}");
+
+        break;
+    }
+
+    case OBJ_FUNCTION:
+    case OBJ_NATIVE:
+        printf("<function>");
+
+        break;
+    }
+}
+
+void value_display(Value value) {
+    switch (value.tag) {
+    case VAL_NULL:
+        printf("null");
+        break;
+
+    case VAL_BOOL:
+        printf(AS_BOOL(value) ? "true" : "false");
+        break;
+
+    case VAL_INT:
+        printf("%ld", AS_INT(value));
+        break;
+
+    case VAL_FLT:
+        printf("%g", AS_FLT(value));
+        break;
+
+    case VAL_OBJ:
+        object_display(AS_OBJ(value));
+        break;
+    }
+}
+
 size_t chunk_add_constant(Chunk *chunk, Value value) {
     for (size_t i = 0; i < chunk->constants.count; i++) {
         if (values_exactly_equal(chunk->constants.items[i], value)) {
@@ -1010,8 +1146,15 @@ static void vm_mark_object(Vm *vm, Obj *obj) {
         break;
     }
 
+    case OBJ_FUNCTION: {
+        ObjFunction *fn = (ObjFunction *)obj;
+
+        for (size_t j = 0; j < fn->chunk.constants.count; j++) {
+            vm_mark_value(vm, fn->chunk.constants.items[j]);
+        }
+    }
+
     case OBJ_STRING:
-    case OBJ_FUNCTION:
     case OBJ_NATIVE:
         break;
     }
@@ -1031,9 +1174,7 @@ static void vm_mark_roots(Vm *vm) {
     for (size_t i = 0; i < vm->frame_count; i++) {
         CallFrame frame = vm->frames[i];
 
-        for (size_t j = 0; j < frame.fn->chunk.constants.count; j++) {
-            vm_mark_value(vm, frame.fn->chunk.constants.items[j]);
-        }
+        vm_mark_object(vm, &frame.fn->obj);
     }
 }
 

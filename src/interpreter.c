@@ -124,5 +124,7 @@ bool interpret(const char *file_path, const char *file_buffer) {
         return false;
     }
 
+    vm_gc(&vm);
+
     return true;
 }

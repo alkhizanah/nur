@@ -178,6 +178,8 @@ bool objects_equal(Obj *, Obj *);
 bool values_exactly_equal(Value, Value); // 4 != 4.0
 bool values_equal(Value, Value);         // 4 == 4.0
 
+void value_display(Value);
+
 void vm_init(Vm *);
 
 void vm_stack_reset(Vm *);
