@@ -34,7 +34,7 @@ int main(int argc, const char **argv) {
 
     if (should_rebuild) {
         if (!platform_execute_command(
-                (const char *[]){"cc", "-o", argv[0], "src/one.c", NULL})) {
+                (const char *[]){"cc", "-o", argv[0], "src/one.c", "-lm", NULL})) {
             fprintf(stderr, "error: could not rebuild the executable\n");
 
             return 1;

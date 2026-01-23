@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <math.h>
 #include <stdarg.h>
 
 #include "array.h"
@@ -316,6 +317,11 @@ static int64_t rem_euclid(int64_t a, int64_t b) {
     return r < 0 ? r + (b < 0 ? -b : b) : r;
 }
 
+static double frem_euclid(double a, double b) {
+    double r = fmod(a, b);
+    return r < 0 ? r + (b < 0 ? -b : b) : r;
+}
+
 static void vm_div_int(Vm *vm, Value lhs, Value rhs) {
     int64_t ilhs = AS_INT(lhs);
     int64_t irhs = AS_INT(rhs);
@@ -325,7 +331,7 @@ static void vm_div_int(Vm *vm, Value lhs, Value rhs) {
     if (rem_euclid(ilhs, irhs) == 0) {
         vm_poke(vm, 0, INT_VAL(ilhs / irhs));
     } else {
-        vm_poke(vm, 0, FLT_VAL((double)ilhs / (double)irhs));
+        vm_poke(vm, 0, FLT_VAL(ilhs / irhs));
     }
 }
 
@@ -382,6 +388,153 @@ static bool vm_div(Vm *vm) {
 
         case VAL_FLT:
             vm_div_flt_int(vm, lhs, rhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    }
+
+    return true;
+}
+
+static void vm_mod_int(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, INT_VAL(rem_euclid(ilhs, irhs)));
+}
+
+static void vm_mod_flt(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(frem_euclid(flhs, frhs)));
+}
+
+static void vm_mod_int_flt(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(frem_euclid(ilhs, frhs)));
+}
+
+static void vm_mod_flt_int(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(frem_euclid(flhs, irhs)));
+}
+
+static bool vm_mod(Vm *vm) {
+    Value rhs = vm_peek(vm, 0);
+    Value lhs = vm_peek(vm, 1);
+
+    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+        vm_error(vm, "can not get %s value modulo %s value",
+                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+
+        return false;
+    }
+
+    if (lhs.tag == rhs.tag) {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_mod_int(vm, rhs, lhs);
+            break;
+
+        case VAL_FLT:
+            vm_mod_flt(vm, rhs, lhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    } else {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_mod_int_flt(vm, lhs, rhs);
+            break;
+
+        case VAL_FLT:
+            vm_mod_flt_int(vm, lhs, rhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    }
+
+    return true;
+}
+
+static void vm_pow_int(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+
+    double result = pow(ilhs, irhs);
+
+    if (floor(result) == result) {
+        vm_poke(vm, 0, INT_VAL(result));
+    } else {
+        vm_poke(vm, 0, FLT_VAL(result));
+    }
+}
+
+static void vm_pow_flt(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(pow(flhs, frhs)));
+}
+
+static void vm_pow_int_flt(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(pow(ilhs, frhs)));
+}
+
+static void vm_pow_flt_int(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(pow(flhs, irhs)));
+}
+
+static bool vm_pow(Vm *vm) {
+    Value rhs = vm_peek(vm, 0);
+    Value lhs = vm_peek(vm, 1);
+
+    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+        vm_error(vm, "can not get %s value to the power of %s value",
+                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+
+        return false;
+    }
+
+    if (lhs.tag == rhs.tag) {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_pow_int(vm, rhs, lhs);
+            break;
+
+        case VAL_FLT:
+            vm_pow_flt(vm, rhs, lhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    } else {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_pow_int_flt(vm, lhs, rhs);
+            break;
+
+        case VAL_FLT:
+            vm_pow_flt_int(vm, lhs, rhs);
             break;
 
         default:
@@ -470,6 +623,20 @@ bool vm_run(Vm *vm, Value *result) {
 
         case OP_DIV:
             if (!vm_div(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_MOD:
+            if (!vm_mod(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_POW:
+            if (!vm_pow(vm)) {
                 return false;
             }
 
@@ -673,14 +840,14 @@ bool values_equal(Value a, Value b) {
 
     case VAL_INT:
         if (b.tag == VAL_FLT) {
-            return (double)AS_INT(a) == AS_FLT(b);
+            return AS_INT(a) == AS_FLT(b);
         } else {
             return AS_INT(a) == AS_INT(b);
         }
 
     case VAL_FLT:
         if (b.tag == VAL_INT) {
-            return AS_FLT(a) == (double)AS_INT(b);
+            return AS_FLT(a) == AS_INT(b);
         } else {
             return AS_FLT(a) == AS_FLT(b);
         }
