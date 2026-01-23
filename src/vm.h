@@ -63,6 +63,7 @@ static inline bool is_obj_tag(Value v, ObjTag tag) {
 #define BOOL_VAL(v) ((Value){.tag = VAL_BOOL, .payload = {._bool = (v)}})
 #define INT_VAL(v) ((Value){.tag = VAL_INT, .payload = {._int = (v)}})
 #define FLT_VAL(v) ((Value){.tag = VAL_FLT, .payload = {._flt = (v)}})
+#define OBJ_VAL(v) ((Value){.tag = VAL_OBJ, .payload = {._obj = (Obj *)(v)}})
 
 typedef enum : uint8_t {
     OP_NULL,
@@ -112,8 +113,9 @@ size_t chunk_add_byte(Chunk *, uint8_t byte, uint32_t source);
 
 typedef struct {
     Obj obj;
-    char *characters;
+    char *items;
     uint32_t count;
+    uint32_t capacity;
 } ObjString;
 
 typedef struct {
@@ -142,8 +144,9 @@ typedef struct {
 #define AS_ARRAY(v) ((ObjArray *)AS_OBJ(v))
 #define AS_MAP(v) ((ObjMap *)AS_OBJ(v))
 
-#define FRAMES_MAX 64
-#define STACK_MAX (FRAMES_MAX * 255)
+#define VM_FRAMES_MAX 64
+#define VM_STACK_MAX (VM_FRAMES_MAX * 255)
+#define VM_GC_GROW_FACTOR 2
 
 typedef struct {
     ObjFunction *fn;
@@ -152,10 +155,10 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
-    CallFrame frames[FRAMES_MAX];
+    CallFrame frames[VM_FRAMES_MAX];
     size_t frame_count;
 
-    Value stack[STACK_MAX];
+    Value stack[VM_STACK_MAX];
     Value *sp;
 
     Obj *objects;

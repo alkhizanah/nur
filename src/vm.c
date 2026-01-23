@@ -58,6 +58,208 @@ static bool vm_neg(Vm *vm) {
     }
 }
 
+#define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(tag))
+
+static ObjString *vm_new_string(Vm *vm, size_t reserved) {
+    vm->bytes_allocated += sizeof(char) * reserved;
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    char *items = malloc(sizeof(char) * reserved);
+
+    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
+
+    string->items = items;
+    string->count = 0;
+    string->capacity = reserved;
+
+    return string;
+}
+
+static ObjString *vm_to_string(Vm *vm, Value value) {
+    if (IS_STRING(value)) {
+        return AS_STRING(value);
+    }
+
+    vm_error(vm, "todo: convert other values to a string");
+
+    exit(1);
+
+    return NULL;
+}
+
+static ObjString *vm_string_concat(Vm *vm, ObjString *lhs, ObjString *rhs) {
+    ObjString *result = vm_new_string(vm, lhs->count + rhs->count);
+
+    ARRAY_EXPAND(result, lhs->items, lhs->count);
+    ARRAY_EXPAND(result, rhs->items, rhs->count);
+
+    return result;
+}
+
+static void vm_add_int(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, INT_VAL(ilhs + irhs));
+}
+
+static void vm_add_flt(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(flhs + frhs));
+}
+
+static void vm_add_int_flt(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(ilhs + frhs));
+}
+
+static bool vm_add(Vm *vm) {
+    Value rhs = vm_peek(vm, 0);
+    Value lhs = vm_peek(vm, 1);
+
+    if (IS_STRING(lhs)) {
+        ObjString *slhs = AS_STRING(lhs);
+        ObjString *srhs = vm_to_string(vm, rhs);
+        ObjString *result = vm_string_concat(vm, slhs, srhs);
+        vm_pop(vm);
+        vm_poke(vm, 0, OBJ_VAL(result));
+        return true;
+    } else if (IS_STRING(rhs)) {
+        ObjString *slhs = vm_to_string(vm, lhs);
+        ObjString *srhs = AS_STRING(rhs);
+        ObjString *result = vm_string_concat(vm, slhs, srhs);
+        vm_pop(vm);
+        vm_poke(vm, 0, OBJ_VAL(result));
+        return true;
+    }
+
+    if (!IS_INT(lhs) && !IS_FLT(lhs)) {
+        vm_error(vm, "can not add to a %s value", value_tag_to_string(lhs.tag));
+
+        return false;
+    }
+
+    if (!IS_INT(rhs) && !IS_FLT(rhs)) {
+        vm_error(vm, "can not add to a %s value", value_tag_to_string(rhs.tag));
+
+        return false;
+    }
+
+    if (lhs.tag == rhs.tag) {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_add_int(vm, rhs, lhs);
+            break;
+
+        case VAL_FLT:
+            vm_add_flt(vm, rhs, lhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    } else {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_add_int_flt(vm, lhs, rhs);
+            break;
+
+        case VAL_FLT:
+            vm_add_int_flt(vm, rhs, lhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    }
+
+    return true;
+}
+
+static void vm_sub_int(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, INT_VAL(ilhs - irhs));
+}
+
+static void vm_sub_flt(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(flhs - frhs));
+}
+
+static void vm_sub_int_flt(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(ilhs - frhs));
+}
+
+static void vm_sub_flt_int(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(flhs - irhs));
+}
+
+static bool vm_sub(Vm *vm) {
+    Value rhs = vm_peek(vm, 0);
+    Value lhs = vm_peek(vm, 1);
+
+    if (!IS_INT(lhs) && !IS_FLT(lhs)) {
+        vm_error(vm, "can not subtract from a %s value",
+                 value_tag_to_string(lhs.tag));
+
+        return false;
+    }
+
+    if (!IS_INT(rhs) && !IS_FLT(rhs)) {
+        vm_error(vm, "can not subtract a %s value",
+                 value_tag_to_string(rhs.tag));
+
+        return false;
+    }
+
+    if (lhs.tag == rhs.tag) {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_sub_int(vm, rhs, lhs);
+            break;
+
+        case VAL_FLT:
+            vm_sub_flt(vm, rhs, lhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    } else {
+        switch (lhs.tag) {
+        case VAL_INT:
+            vm_sub_int_flt(vm, lhs, rhs);
+            break;
+
+        case VAL_FLT:
+            vm_sub_flt_int(vm, lhs, rhs);
+            break;
+
+        default:
+            assert(false && "UNREACHABLE");
+        }
+    }
+
+    return true;
+}
+
 bool vm_run(Vm *vm, Value *result) {
     CallFrame *frame = &vm->frames[vm->frame_count - 1];
 
@@ -108,6 +310,20 @@ bool vm_run(Vm *vm, Value *result) {
 
         case OP_NEG:
             if (!vm_neg(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_ADD:
+            if (!vm_add(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_SUB:
+            if (!vm_sub(vm)) {
                 return false;
             }
 
@@ -198,13 +414,12 @@ bool objects_equal(Obj *a, Obj *b) {
             return false;
         }
 
-        if (((ObjString *)a)->characters == ((ObjString *)b)->characters) {
+        if (((ObjString *)a)->items == ((ObjString *)b)->items) {
             return true;
         }
 
         for (uint32_t i = 0; i < ((ObjString *)a)->count; i++) {
-            if (((ObjString *)a)->characters[i] !=
-                ((ObjString *)b)->characters[i]) {
+            if (((ObjString *)a)->items[i] != ((ObjString *)b)->items[i]) {
                 return false;
             }
         }
@@ -349,6 +564,7 @@ size_t chunk_add_byte(Chunk *chunk, uint8_t byte, uint32_t source) {
             chunk->capacity ? chunk->capacity * 2 : ARRAY_INIT_CAPACITY;
 
         chunk->bytes = realloc(chunk->bytes, sizeof(*chunk->bytes) * new_cap);
+
         chunk->sources =
             realloc(chunk->sources, sizeof(*chunk->sources) * new_cap);
 
@@ -381,4 +597,30 @@ Value vm_peek(const Vm *vm, size_t distance) { return vm->sp[-1 - distance]; }
 
 void vm_poke(Vm *vm, size_t distance, Value value) {
     vm->sp[-1 - distance] = value;
+}
+
+void vm_gc(Vm *vm) { vm->next_gc = vm->bytes_allocated * VM_GC_GROW_FACTOR; }
+
+Obj *vm_alloc(Vm *vm, ObjTag tag, size_t size) {
+    vm->bytes_allocated += size;
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    Obj *object = malloc(size);
+
+    if (object == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    object->tag = tag;
+    object->marked = false;
+    object->next = vm->objects;
+
+    vm->objects = object;
+
+    return object;
 }
