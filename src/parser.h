@@ -9,6 +9,6 @@ typedef struct {
     Lexer lexer;
     Token next_token;
     Token current_token;
-} AstParser;
+} Parser;
 
-AstNodeIdx parse(AstParser *);
+AstNodeIdx parse(Parser *);

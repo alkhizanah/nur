@@ -1,4 +1,5 @@
 #include "ast.c"
+#include "interpreter.c"
 #include "lexer.c"
 #include "main.c"
 #include "parser.c"

@@ -4,9 +4,7 @@
 #include <string.h>
 
 #include "array.h"
-#include "ast.h"
-#include "parser.h"
-#include "lexer.h"
+#include "interpreter.h"
 #include "platform.h"
 
 static void usage(const char *program) {
@@ -23,8 +21,8 @@ int main(int argc, const char **argv) {
 
     char **input_paths = platform_traverse_directory("src", &input_paths_len);
 
-    bool should_rebuild =
-        platform_is_rebuild_needed(argv[0], (const char **)input_paths, input_paths_len);
+    bool should_rebuild = platform_is_rebuild_needed(
+        argv[0], (const char **)input_paths, input_paths_len);
 
     for (size_t i = 0; i < input_paths_len; i++) {
         free(input_paths[i]);
@@ -33,8 +31,8 @@ int main(int argc, const char **argv) {
     free(input_paths);
 
     if (should_rebuild) {
-        if (!platform_execute_command(
-                (const char *[]){"cc", "-o", argv[0], "src/one.c", "-lm", NULL})) {
+        if (!platform_execute_command((const char *[]){
+                "cc", "-o", argv[0], "src/one.c", "-lm", NULL})) {
             fprintf(stderr, "error: could not rebuild the executable\n");
 
             return 1;
@@ -69,16 +67,9 @@ int main(int argc, const char **argv) {
 
         char *input_file_content = platform_read_entire_file(input_file_path);
 
-        AstParser parser = {.file_path = input_file_path,
-                            .lexer = {.buffer = input_file_content}};
-
-        AstNodeIdx program = parse(&parser);
-
-        if (program == INVALID_NODE_IDX) {
+        if (!interpret(input_file_path, input_file_content)) {
             return 1;
         }
-
-        // ast_display(&parser.ast, parser.lexer.buffer, program);
 
         free(input_file_content);
     } else {

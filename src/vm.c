@@ -25,17 +25,17 @@ static inline const char *value_tag_to_string(ValueTag tag) {
     }
 }
 
+void vm_stack_reset(Vm *vm) {
+    vm->sp = vm->stack;
+    vm->frame_count = 0;
+}
+
 void vm_init(Vm *vm) {
     vm_stack_reset(vm);
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
-}
-
-void vm_stack_reset(Vm *vm) {
-    vm->sp = vm->stack;
-    vm->frame_count = 0;
 }
 
 static bool vm_neg(Vm *vm) {
@@ -59,22 +59,29 @@ static bool vm_neg(Vm *vm) {
     }
 }
 
-#define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(tag))
+ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity) {
+    ObjFunction *function = OBJ_ALLOC(vm, OBJ_FUNCTION, ObjFunction);
 
-static ObjString *vm_new_string(Vm *vm, size_t reserved) {
-    vm->bytes_allocated += sizeof(char) * reserved;
+    function->chunk = chunk;
+    function->arity = arity;
+
+    return function;
+}
+
+ObjString *vm_new_string(Vm *vm, size_t reserved_characters) {
+    vm->bytes_allocated += sizeof(char) * reserved_characters;
 
     if (vm->bytes_allocated > vm->next_gc) {
         vm_gc(vm);
     }
 
-    char *items = malloc(sizeof(char) * reserved);
+    char *items = malloc(sizeof(char) * reserved_characters);
 
     ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
 
     string->items = items;
     string->count = 0;
-    string->capacity = reserved;
+    string->capacity = reserved_characters;
 
     return string;
 }

@@ -63,22 +63,22 @@ static Precedence precedence_of(TokenTag token) {
     }
 }
 
-static inline Token parser_advance(AstParser *parser) {
+static inline Token parser_advance(Parser *parser) {
     parser->current_token = parser->next_token;
     parser->next_token = lexer_next(&parser->lexer);
     return parser->current_token;
 }
 
-static inline Token parser_peek(const AstParser *parser) {
+static inline Token parser_peek(const Parser *parser) {
     return parser->next_token;
 }
 
-static AstNodeIdx parse_stmt(AstParser *parser);
+static AstNodeIdx parse_stmt(Parser *parser);
 
-static AstNodeIdx parse_expr(AstParser *parser, Precedence precedence);
+static AstNodeIdx parse_expr(Parser *parser, Precedence precedence);
 
 [[gnu::format(printf, 3, 4)]]
-static void parser_error(const AstParser *parser, uint32_t start,
+static void parser_error(const Parser *parser, uint32_t start,
                          const char *format, ...) {
     va_list args;
 
@@ -93,7 +93,7 @@ static void parser_error(const AstParser *parser, uint32_t start,
     va_end(args);
 }
 
-static AstNodeIdx parse_block(AstParser *parser) {
+static AstNodeIdx parse_block(Parser *parser) {
     Token token = parser_advance(parser);
 
     AstExtra stmts = {0};
@@ -128,7 +128,7 @@ static AstNodeIdx parse_block(AstParser *parser) {
     return block;
 }
 
-static AstNodeIdx parse_assign(AstParser *parser, AstNodeIdx target,
+static AstNodeIdx parse_assign(Parser *parser, AstNodeIdx target,
                                AstNodeTag tag) {
     Token token = parser_advance(parser);
 
@@ -141,7 +141,7 @@ static AstNodeIdx parse_assign(AstParser *parser, AstNodeIdx target,
     return ast_push(&parser->ast, tag, target, value, token.range.start);
 }
 
-static AstNodeIdx parse_call(AstParser *parser, AstNodeIdx callee) {
+static AstNodeIdx parse_call(Parser *parser, AstNodeIdx callee) {
     Token token = parser_advance(parser);
 
     AstExtra arguments = {0};
@@ -185,14 +185,14 @@ static AstNodeIdx parse_call(AstParser *parser, AstNodeIdx callee) {
     }
 }
 
-static AstNodeIdx parse_identifier(AstParser *parser) {
+static AstNodeIdx parse_identifier(Parser *parser) {
     Token token = parser_advance(parser);
 
     return ast_push(&parser->ast, NODE_IDENTIFIER, token.range.start,
                     token.range.end, token.range.start);
 }
 
-static AstNodeIdx parse_member_access(AstParser *parser, AstNodeIdx target) {
+static AstNodeIdx parse_member_access(Parser *parser, AstNodeIdx target) {
     Token token = parser_advance(parser);
 
     if (parser_peek(parser).tag != TOK_IDENTIFIER) {
@@ -208,7 +208,7 @@ static AstNodeIdx parse_member_access(AstParser *parser, AstNodeIdx target) {
                     token.range.start);
 }
 
-static AstNodeIdx parse_subscript_access(AstParser *parser, AstNodeIdx target) {
+static AstNodeIdx parse_subscript_access(Parser *parser, AstNodeIdx target) {
     Token token = parser_advance(parser);
 
     AstNodeIdx start = parse_expr(parser, PR_LOWEST);
@@ -225,7 +225,7 @@ static AstNodeIdx parse_subscript_access(AstParser *parser, AstNodeIdx target) {
                     token.range.start);
 }
 
-static AstNodeIdx parse_binary_op(AstParser *parser, AstNodeIdx lhs,
+static AstNodeIdx parse_binary_op(Parser *parser, AstNodeIdx lhs,
                                   AstNodeTag tag, Precedence precedence) {
     Token token = parser_advance(parser);
 
@@ -238,7 +238,7 @@ static AstNodeIdx parse_binary_op(AstParser *parser, AstNodeIdx lhs,
     return ast_push(&parser->ast, tag, lhs, rhs, token.range.start);
 }
 
-static AstNodeIdx parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
+static AstNodeIdx parse_binary_expr(Parser *parser, AstNodeIdx lhs) {
     switch (parser_peek(parser).tag) {
     case TOK_ASSIGN:
         return parse_assign(parser, lhs, NODE_ASSIGN);
@@ -292,7 +292,7 @@ static AstNodeIdx parse_binary_expr(AstParser *parser, AstNodeIdx lhs) {
     }
 }
 
-static AstNodeIdx parse_string(AstParser *parser) {
+static AstNodeIdx parse_string(Parser *parser) {
     Token token = parser_advance(parser);
 
     bool unescaping = false;
@@ -336,8 +336,9 @@ static AstNodeIdx parse_string(AstParser *parser) {
                 unescaped = '"';
                 break;
             default:
-                parser_error(parser, token.range.start + i, 
-                    "invalid string escape character: '%c'\n", escaped);
+                parser_error(parser, token.range.start + i,
+                             "invalid string escape character: '%c'\n",
+                             escaped);
 
                 return INVALID_NODE_IDX;
             }
@@ -360,7 +361,7 @@ static AstNodeIdx parse_string(AstParser *parser) {
                     token.range.start);
 }
 
-static AstNodeIdx parse_int(AstParser *parser) {
+static AstNodeIdx parse_int(Parser *parser) {
     Token token = parser_advance(parser);
 
     char *endptr;
@@ -386,7 +387,7 @@ static AstNodeIdx parse_int(AstParser *parser) {
     return ast_push(&parser->ast, NODE_INT, v >> 32, v, token.range.start);
 }
 
-static AstNodeIdx parse_float(AstParser *parser) {
+static AstNodeIdx parse_float(Parser *parser) {
     Token token = parser_advance(parser);
 
     char *endptr;
@@ -416,7 +417,7 @@ static AstNodeIdx parse_float(AstParser *parser) {
     return ast_push(&parser->ast, NODE_FLOAT, vi >> 32, vi, token.range.start);
 }
 
-static AstNodeIdx parse_parentheses_expr(AstParser *parser) {
+static AstNodeIdx parse_parentheses_expr(Parser *parser) {
     Token token = parser_advance(parser);
 
     AstNodeIdx value = parse_expr(parser, PR_LOWEST);
@@ -436,7 +437,7 @@ static AstNodeIdx parse_parentheses_expr(AstParser *parser) {
     return value;
 }
 
-static AstNodeIdx parse_function(AstParser *parser) {
+static AstNodeIdx parse_function(Parser *parser) {
     Token fn_token = parser_advance(parser);
 
     if (parser_peek(parser).tag != TOK_OPAREN) {
@@ -468,7 +469,8 @@ static AstNodeIdx parse_function(AstParser *parser) {
         }
 
         if (parser_peek(parser).tag == TOK_EOF) {
-            parser_error(parser, oparen_token.range.start, "'(' did not get closed\n");
+            parser_error(parser, oparen_token.range.start,
+                         "'(' did not get closed\n");
 
             return INVALID_NODE_IDX;
         }
@@ -507,7 +509,7 @@ static AstNodeIdx parse_function(AstParser *parser) {
     }
 }
 
-static AstNodeIdx parse_array(AstParser *parser) {
+static AstNodeIdx parse_array(Parser *parser) {
     Token token = parser_advance(parser);
 
     AstExtra values = {0};
@@ -545,7 +547,7 @@ static AstNodeIdx parse_array(AstParser *parser) {
     return ast_push(&parser->ast, NODE_ARRAY, start, count, token.range.start);
 }
 
-static AstNodeIdx parse_map(AstParser *parser) {
+static AstNodeIdx parse_map(Parser *parser) {
     Token token = parser_advance(parser);
 
     AstExtra keys = {0};
@@ -612,7 +614,7 @@ static AstNodeIdx parse_map(AstParser *parser) {
     }
 }
 
-static AstNodeIdx parse_unary_op(AstParser *parser, AstNodeTag tag) {
+static AstNodeIdx parse_unary_op(Parser *parser, AstNodeTag tag) {
     Token token = parser_advance(parser);
 
     AstNodeIdx value = parse_expr(parser, PR_PREFIX);
@@ -624,7 +626,7 @@ static AstNodeIdx parse_unary_op(AstParser *parser, AstNodeTag tag) {
     return ast_push(&parser->ast, tag, 0, value, token.range.start);
 }
 
-static AstNodeIdx parse_unary_expr(AstParser *parser) {
+static AstNodeIdx parse_unary_expr(Parser *parser) {
     switch (parser_peek(parser).tag) {
     case TOK_IDENTIFIER:
         return parse_identifier(parser);
@@ -654,7 +656,7 @@ static AstNodeIdx parse_unary_expr(AstParser *parser) {
     }
 }
 
-static AstNodeIdx parse_expr(AstParser *parser, Precedence precedence) {
+static AstNodeIdx parse_expr(Parser *parser, Precedence precedence) {
     AstNodeIdx lhs = parse_unary_expr(parser);
 
     while (precedence_of(parser_peek(parser).tag) > precedence) {
@@ -668,7 +670,7 @@ static AstNodeIdx parse_expr(AstParser *parser, Precedence precedence) {
     return lhs;
 }
 
-static AstNodeIdx parse_while_loop(AstParser *parser) {
+static AstNodeIdx parse_while_loop(Parser *parser) {
     Token token = parser_advance(parser);
 
     AstNodeIdx condition = parse_expr(parser, PR_LOWEST);
@@ -694,7 +696,7 @@ static AstNodeIdx parse_while_loop(AstParser *parser) {
                     condition, block, token.range.start);
 }
 
-static AstNodeIdx parse_conditional(AstParser *parser) {
+static AstNodeIdx parse_conditional(Parser *parser) {
     Token token = parser_advance(parser);
 
     AstNodeIdx condition = parse_expr(parser, PR_LOWEST);
@@ -756,7 +758,7 @@ static AstNodeIdx parse_conditional(AstParser *parser) {
     return ast_push(&parser->ast, NODE_IF, condition, rhs, token.range.start);
 }
 
-static AstNodeIdx parse_return(AstParser *parser) {
+static AstNodeIdx parse_return(Parser *parser) {
     Token token = parser_advance(parser);
 
     AstNodeIdx value = parse_expr(parser, PR_LOWEST);
@@ -768,7 +770,7 @@ static AstNodeIdx parse_return(AstParser *parser) {
     return ast_push(&parser->ast, NODE_RETURN, 0, value, token.range.start);
 }
 
-static AstNodeIdx parse_stmt(AstParser *parser) {
+static AstNodeIdx parse_stmt(Parser *parser) {
     switch (parser_peek(parser).tag) {
     case TOK_OBRACE:
         return parse_block(parser);
@@ -789,7 +791,7 @@ static AstNodeIdx parse_stmt(AstParser *parser) {
     }
 }
 
-AstNodeIdx parse(AstParser *parser) {
+AstNodeIdx parse(Parser *parser) {
     AstExtra stmts = {0};
 
     parser_advance(parser);
