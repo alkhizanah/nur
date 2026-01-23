@@ -189,7 +189,7 @@ void vm_error(Vm *vm, const char *format, ...);
 
 Obj *vm_alloc(Vm *, ObjTag, size_t);
 
-#define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(tag))
+#define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(type))
 
 ObjString *vm_new_string(Vm *vm, size_t reserved_characters);
 ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity);
