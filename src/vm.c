@@ -129,8 +129,8 @@ static void vm_add_int_flt(Vm *vm, Value lhs, Value rhs) {
 }
 
 static bool vm_add(Vm *vm) {
-    Value rhs = vm_peek(vm, 0);
-    Value lhs = vm_peek(vm, 1);
+    Value lhs = vm_peek(vm, 0);
+    Value rhs = vm_peek(vm, 1);
 
     if (IS_STRING(lhs)) {
         ObjString *slhs = AS_STRING(lhs);
@@ -215,8 +215,8 @@ static void vm_sub_flt_int(Vm *vm, Value lhs, Value rhs) {
 }
 
 static bool vm_sub(Vm *vm) {
-    Value rhs = vm_peek(vm, 0);
-    Value lhs = vm_peek(vm, 1);
+    Value lhs = vm_peek(vm, 0);
+    Value rhs = vm_peek(vm, 1);
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not subtract %s value from %s value",
@@ -278,8 +278,8 @@ static void vm_mul_int_flt(Vm *vm, Value lhs, Value rhs) {
 }
 
 static bool vm_mul(Vm *vm) {
-    Value rhs = vm_peek(vm, 0);
-    Value lhs = vm_peek(vm, 1);
+    Value lhs = vm_peek(vm, 0);
+    Value rhs = vm_peek(vm, 1);
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not multiply %s value with %s value",
@@ -364,8 +364,8 @@ static void vm_div_flt_int(Vm *vm, Value lhs, Value rhs) {
 }
 
 static bool vm_div(Vm *vm) {
-    Value rhs = vm_peek(vm, 0);
-    Value lhs = vm_peek(vm, 1);
+    Value lhs = vm_peek(vm, 0);
+    Value rhs = vm_peek(vm, 1);
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not divide %s value by %s value",
@@ -434,8 +434,8 @@ static void vm_mod_flt_int(Vm *vm, Value lhs, Value rhs) {
 }
 
 static bool vm_mod(Vm *vm) {
-    Value rhs = vm_peek(vm, 0);
-    Value lhs = vm_peek(vm, 1);
+    Value lhs = vm_peek(vm, 0);
+    Value rhs = vm_peek(vm, 1);
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not get %s value modulo %s value",
@@ -511,8 +511,8 @@ static void vm_pow_flt_int(Vm *vm, Value lhs, Value rhs) {
 }
 
 static bool vm_pow(Vm *vm) {
-    Value rhs = vm_peek(vm, 0);
-    Value lhs = vm_peek(vm, 1);
+    Value lhs = vm_peek(vm, 0);
+    Value rhs = vm_peek(vm, 1);
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not get %s value to the power of %s value",
@@ -554,8 +554,8 @@ static bool vm_pow(Vm *vm) {
 
 #define VM_CMP_FN(name, op)                                                    \
     static bool name(Vm *vm) {                                                 \
-        Value rhs = vm_peek(vm, 0);                                            \
-        Value lhs = vm_peek(vm, 1);                                            \
+        Value lhs = vm_peek(vm, 0);                                            \
+        Value rhs = vm_peek(vm, 1);                                            \
                                                                                \
         if ((!IS_INT(lhs) && !IS_FLT(lhs)) ||                                  \
             (!IS_INT(rhs) && !IS_FLT(rhs))) {                                  \

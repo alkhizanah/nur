@@ -58,6 +58,50 @@ static bool compile_return(Compiler *compiler, AstNode node, uint32_t source) {
     return true;
 }
 
+static bool compile_int(Compiler *compiler, AstNode node, uint32_t source) {
+    uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
+    uint16_t c = chunk_add_constant(compiler->chunk, INT_VAL(v));
+    chunk_add_byte(compiler->chunk, OP_CONST, source);
+    chunk_add_byte(compiler->chunk, c >> 8, source);
+    chunk_add_byte(compiler->chunk, c, source);
+    return true;
+}
+
+#define COMPILER_UNOP_FN(name, opcode)                                         \
+    static bool name(Compiler *compiler, AstNode node, uint32_t source) {      \
+        if (!compile_node(compiler, node.rhs)) {                               \
+            return false;                                                      \
+        }                                                                      \
+                                                                               \
+        chunk_add_byte(compiler->chunk, opcode, source);                       \
+                                                                               \
+        return true;                                                           \
+    }
+
+COMPILER_UNOP_FN(compile_not, OP_NOT)
+COMPILER_UNOP_FN(compile_neg, OP_NEG)
+
+#define COMPILER_BINOP_FN(name, opcode)                                        \
+    static bool name(Compiler *compiler, AstNode node, uint32_t source) {      \
+        if (!compile_node(compiler, node.lhs)) {                               \
+            return false;                                                      \
+        }                                                                      \
+                                                                               \
+        if (!compile_node(compiler, node.rhs)) {                               \
+            return false;                                                      \
+        }                                                                      \
+                                                                               \
+        chunk_add_byte(compiler->chunk, opcode, source);                       \
+                                                                               \
+        return true;                                                           \
+    }
+
+COMPILER_BINOP_FN(compile_add, OP_ADD)
+COMPILER_BINOP_FN(compile_sub, OP_SUB)
+COMPILER_BINOP_FN(compile_mul, OP_MUL)
+COMPILER_BINOP_FN(compile_div, OP_DIV)
+COMPILER_BINOP_FN(compile_pow, OP_POW)
+
 static bool compile_node(Compiler *compiler, AstNodeIdx node_idx) {
     AstNode node = compiler->ast.nodes.items[node_idx];
     uint32_t source = compiler->ast.nodes.sources[node_idx];
@@ -68,6 +112,30 @@ static bool compile_node(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_RETURN:
         return compile_return(compiler, node, source);
+
+    case NODE_INT:
+        return compile_int(compiler, node, source);
+
+    case NODE_NOT:
+        return compile_not(compiler, node, source);
+
+    case NODE_NEG:
+        return compile_neg(compiler, node, source);
+
+    case NODE_ADD:
+        return compile_add(compiler, node, source);
+
+    case NODE_SUB:
+        return compile_sub(compiler, node, source);
+
+    case NODE_MUL:
+        return compile_mul(compiler, node, source);
+
+    case NODE_DIV:
+        return compile_div(compiler, node, source);
+
+    case NODE_POW:
+        return compile_pow(compiler, node, source);
 
     default:
         compiler_error(compiler, source, "todo: compile this\n");
