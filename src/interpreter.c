@@ -67,40 +67,31 @@ static bool compile_int(Compiler *compiler, AstNode node, uint32_t source) {
     return true;
 }
 
-#define COMPILER_UNOP_FN(name, opcode)                                         \
-    static bool name(Compiler *compiler, AstNode node, uint32_t source) {      \
-        if (!compile_node(compiler, node.rhs)) {                               \
-            return false;                                                      \
-        }                                                                      \
-                                                                               \
-        chunk_add_byte(compiler->chunk, opcode, source);                       \
-                                                                               \
-        return true;                                                           \
+static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
+                          OpCode opcode) {
+    if (!compile_node(compiler, node.rhs)) {
+        return false;
     }
 
-COMPILER_UNOP_FN(compile_not, OP_NOT)
-COMPILER_UNOP_FN(compile_neg, OP_NEG)
+    chunk_add_byte(compiler->chunk, opcode, source);
 
-#define COMPILER_BINOP_FN(name, opcode)                                        \
-    static bool name(Compiler *compiler, AstNode node, uint32_t source) {      \
-        if (!compile_node(compiler, node.lhs)) {                               \
-            return false;                                                      \
-        }                                                                      \
-                                                                               \
-        if (!compile_node(compiler, node.rhs)) {                               \
-            return false;                                                      \
-        }                                                                      \
-                                                                               \
-        chunk_add_byte(compiler->chunk, opcode, source);                       \
-                                                                               \
-        return true;                                                           \
+    return true;
+}
+
+static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
+                           OpCode opcode) {
+    if (!compile_node(compiler, node.lhs)) {
+        return false;
     }
 
-COMPILER_BINOP_FN(compile_add, OP_ADD)
-COMPILER_BINOP_FN(compile_sub, OP_SUB)
-COMPILER_BINOP_FN(compile_mul, OP_MUL)
-COMPILER_BINOP_FN(compile_div, OP_DIV)
-COMPILER_BINOP_FN(compile_pow, OP_POW)
+    if (!compile_node(compiler, node.rhs)) {
+        return false;
+    }
+
+    chunk_add_byte(compiler->chunk, opcode, source);
+
+    return true;
+}
 
 static bool compile_node(Compiler *compiler, AstNodeIdx node_idx) {
     AstNode node = compiler->ast.nodes.items[node_idx];
@@ -117,25 +108,46 @@ static bool compile_node(Compiler *compiler, AstNodeIdx node_idx) {
         return compile_int(compiler, node, source);
 
     case NODE_NOT:
-        return compile_not(compiler, node, source);
+        return compile_unary(compiler, node, source, OP_NOT);
 
     case NODE_NEG:
-        return compile_neg(compiler, node, source);
+        return compile_unary(compiler, node, source, OP_NEG);
 
     case NODE_ADD:
-        return compile_add(compiler, node, source);
+        return compile_binary(compiler, node, source, OP_ADD);
 
     case NODE_SUB:
-        return compile_sub(compiler, node, source);
+        return compile_binary(compiler, node, source, OP_SUB);
 
     case NODE_MUL:
-        return compile_mul(compiler, node, source);
+        return compile_binary(compiler, node, source, OP_MUL);
 
     case NODE_DIV:
-        return compile_div(compiler, node, source);
+        return compile_binary(compiler, node, source, OP_DIV);
 
     case NODE_POW:
-        return compile_pow(compiler, node, source);
+        return compile_binary(compiler, node, source, OP_POW);
+
+    case NODE_MOD:
+        return compile_binary(compiler, node, source, OP_MOD);
+
+    case NODE_EQL:
+        return compile_binary(compiler, node, source, OP_EQL);
+
+    case NODE_NEQ:
+        return compile_binary(compiler, node, source, OP_NEQ);
+
+    case NODE_LT:
+        return compile_binary(compiler, node, source, OP_LT);
+
+    case NODE_GT:
+        return compile_binary(compiler, node, source, OP_GT);
+
+    case NODE_LTE:
+        return compile_binary(compiler, node, source, OP_LTE);
+
+    case NODE_GTE:
+        return compile_binary(compiler, node, source, OP_GTE);
 
     default:
         compiler_error(compiler, source, "todo: compile this\n");
