@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "ast.h"
 #include "parser.h"
@@ -59,13 +60,24 @@ static bool compile_return(Compiler *compiler, AstNode node, uint32_t source) {
     return true;
 }
 
-static bool compile_int(Compiler *compiler, AstNode node, uint32_t source) {
-    uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
-    uint16_t c = chunk_add_constant(compiler->chunk, INT_VAL(v));
+static void compiler_push_constant(Compiler *compiler, Value value,
+                                   uint32_t source) {
+    uint16_t c = chunk_add_constant(compiler->chunk, value);
     chunk_add_byte(compiler->chunk, OP_CONST, source);
     chunk_add_byte(compiler->chunk, c >> 8, source);
     chunk_add_byte(compiler->chunk, c, source);
-    return true;
+}
+
+static void compile_int(Compiler *compiler, AstNode node, uint32_t source) {
+    uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
+    compiler_push_constant(compiler, INT_VAL(v), source);
+}
+
+static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
+    uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
+    double fv;
+    memcpy(&fv, &v, sizeof(double));
+    compiler_push_constant(compiler, FLT_VAL(fv), source);
 }
 
 static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
@@ -122,7 +134,12 @@ static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
     switch (node.tag) {
     case NODE_INT:
-        return compile_int(compiler, node, source);
+        compile_int(compiler, node, source);
+        return true;
+
+    case NODE_FLOAT:
+        compile_float(compiler, node, source);
+        return true;
 
     case NODE_NOT:
         return compile_unary(compiler, node, source, OP_NOT);
