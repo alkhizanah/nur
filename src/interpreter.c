@@ -88,6 +88,15 @@ static bool compile_identifier(Compiler *compiler, AstNode node,
     return true;
 }
 
+static void compile_string(Compiler *compiler, AstNode node, uint32_t source) {
+    const char *sv = compiler->ast.strings.items + node.lhs;
+    size_t len = node.rhs;
+    ObjString *s = vm_new_string(compiler->vm, node.rhs);
+    memcpy(s->items, sv, len * sizeof(char));
+    s->count = len;
+    compiler_push_constant(compiler, OBJ_VAL(s), source);
+}
+
 static void compile_int(Compiler *compiler, AstNode node, uint32_t source) {
     uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
     compiler_push_constant(compiler, INT_VAL(v), source);
@@ -95,9 +104,9 @@ static void compile_int(Compiler *compiler, AstNode node, uint32_t source) {
 
 static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
     uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
-    double fv;
-    memcpy(&fv, &v, sizeof(double));
-    compiler_push_constant(compiler, FLT_VAL(fv), source);
+    double f;
+    memcpy(&f, &v, sizeof(double));
+    compiler_push_constant(compiler, FLT_VAL(f), source);
 }
 
 static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
@@ -156,6 +165,10 @@ static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     case NODE_IDENTIFIER:
         return compile_identifier(compiler, node, source);
 
+    case NODE_STRING:
+        compile_string(compiler, node, source);
+        return true;
+
     case NODE_INT:
         compile_int(compiler, node, source);
         return true;
@@ -212,6 +225,7 @@ static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
         return false;
     }
 }
+
 bool interpret(const char *file_path, const char *file_buffer) {
     Parser parser = {.file_path = file_path, .lexer = {.buffer = file_buffer}};
 
@@ -242,6 +256,7 @@ bool interpret(const char *file_path, const char *file_buffer) {
         .file_path = file_path,
         .file_buffer = file_buffer,
         .ast = parser.ast,
+        .vm = &vm,
         .chunk = &frame->fn->chunk,
     };
 
@@ -266,8 +281,6 @@ bool interpret(const char *file_path, const char *file_buffer) {
     if (!vm_run(&vm, &result)) {
         return false;
     }
-
-    vm_gc(&vm);
 
     return true;
 }
