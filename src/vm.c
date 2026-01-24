@@ -10,8 +10,8 @@ static inline bool is_falsey(Value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
-static inline const char *value_tag_to_string(ValueTag tag) {
-    switch (tag) {
+static inline const char *value_description(Value value) {
+    switch (value.tag) {
     case VAL_NULL:
         return "a null";
     case VAL_BOOL:
@@ -21,7 +21,20 @@ static inline const char *value_tag_to_string(ValueTag tag) {
     case VAL_FLT:
         return "a floating point";
     case VAL_OBJ:
-        return "an object";
+        switch (AS_OBJ(value)->tag) {
+        case OBJ_STRING:
+            return "a string";
+
+        case OBJ_ARRAY:
+            return "an array";
+
+        case OBJ_MAP:
+            return "a map";
+
+        case OBJ_FUNCTION:
+        case OBJ_NATIVE:
+            return "a function";
+        }
     }
 }
 
@@ -53,7 +66,7 @@ static bool vm_neg(Vm *vm) {
         return true;
 
     default:
-        vm_error(vm, "can not negate %s value", value_tag_to_string(rhs.tag));
+        vm_error(vm, "can not negate %s value", value_description(rhs));
 
         return false;
     }
@@ -149,8 +162,8 @@ static bool vm_add(Vm *vm) {
     }
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
-        vm_error(vm, "can not add %s value to %s value",
-                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+        vm_error(vm, "can not add %s value to %s value", value_description(lhs),
+                 value_description(rhs));
 
         return false;
     }
@@ -220,7 +233,7 @@ static bool vm_sub(Vm *vm) {
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not subtract %s value from %s value",
-                 value_tag_to_string(rhs.tag), value_tag_to_string(lhs.tag));
+                 value_description(rhs), value_description(lhs));
 
         return false;
     }
@@ -283,7 +296,7 @@ static bool vm_mul(Vm *vm) {
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not multiply %s value with %s value",
-                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+                 value_description(lhs), value_description(rhs));
 
         return false;
     }
@@ -369,7 +382,7 @@ static bool vm_div(Vm *vm) {
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not divide %s value by %s value",
-                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+                 value_description(lhs), value_description(rhs));
 
         return false;
     }
@@ -439,7 +452,7 @@ static bool vm_mod(Vm *vm) {
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not get %s value modulo %s value",
-                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+                 value_description(lhs), value_description(rhs));
 
         return false;
     }
@@ -516,7 +529,7 @@ static bool vm_pow(Vm *vm) {
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
         vm_error(vm, "can not get %s value to the power of %s value",
-                 value_tag_to_string(lhs.tag), value_tag_to_string(rhs.tag));
+                 value_description(lhs), value_description(rhs));
 
         return false;
     }
@@ -560,8 +573,7 @@ static bool vm_pow(Vm *vm) {
         if ((!IS_INT(lhs) && !IS_FLT(lhs)) ||                                  \
             (!IS_INT(rhs) && !IS_FLT(rhs))) {                                  \
             vm_error(vm, "can not compare %s value with %s value",             \
-                     value_tag_to_string(lhs.tag),                             \
-                     value_tag_to_string(rhs.tag));                            \
+                     value_description(lhs), value_description(rhs));          \
                                                                                \
             return false;                                                      \
         }                                                                      \
@@ -759,7 +771,8 @@ void vm_error(Vm *vm, const char *format, ...) {
         SourceLocation loc = source_location_of(
             frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
 
-        fprintf(stderr, "\n\tat %s:%u:%u\n", loc.file_path, loc.line, loc.column);
+        fprintf(stderr, "\n\tat %s:%u:%u\n", loc.file_path, loc.line,
+                loc.column);
     }
 }
 
