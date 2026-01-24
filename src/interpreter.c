@@ -13,9 +13,9 @@
 typedef struct {
     const char *file_path;
     const char *file_buffer;
+    Ast ast;
     Vm *vm;
     Chunk *chunk;
-    Ast ast;
     bool returned;
 } Compiler;
 
@@ -110,6 +110,61 @@ static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
     compiler_push_constant(compiler, FLT_VAL(f), source);
 }
 
+static bool compile_function(Compiler *compiler, AstNode node,
+                             uint32_t source) {
+    uint32_t arity = 0;
+
+    if (node.lhs != INVALID_EXTRA_IDX) {
+        arity = compiler->ast.extra.items[node.lhs];
+
+        if (arity > UINT8_MAX) {
+            compiler_error(compiler, source,
+                           "accepting %d paramters exceeds the limit of %d\n",
+                           (int)arity, UINT8_MAX);
+
+            return false;
+        }
+
+        // TODO: if local variables are supported this should read the parameter
+        // names and do something with them, however we ignore them for now
+    }
+
+    Chunk *prev_chunk = compiler->chunk;
+    bool prev_returned = compiler->returned;
+
+    CallFrame *frame = &compiler->vm->frames[compiler->vm->frame_count++];
+
+    frame->fn = vm_new_function(compiler->vm,
+                                (Chunk){
+                                    .file_path = compiler->file_path,
+                                    .file_content = compiler->file_buffer,
+                                },
+                                arity);
+
+    frame->slots = compiler->vm->stack;
+
+    compiler->chunk = &frame->fn->chunk;
+
+    if (!compile_block(compiler, compiler->ast.nodes.items[node.rhs])) {
+        return false;
+    }
+
+    if (!compiler->returned) {
+        chunk_add_byte(compiler->chunk, OP_NULL, 0);
+        chunk_add_byte(compiler->chunk, OP_RETURN, 0);
+    }
+
+    compiler->returned = prev_returned;
+
+    compiler->chunk = prev_chunk;
+
+    compiler_push_constant(compiler, OBJ_VAL(frame->fn), source);
+
+    compiler->vm->frame_count--;
+
+    return true;
+};
+
 static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
                           OpCode opcode) {
     if (!compile_expr(compiler, node.rhs)) {
@@ -145,7 +200,9 @@ static bool compile_call(Compiler *compiler, AstNode node, uint32_t source) {
         argc = compiler->ast.extra.items[node.rhs];
 
         if (argc > UINT8_MAX) {
-            compiler_error(compiler, source, "passing %d arguments exceeds the limit of %d\n", (int)argc, UINT8_MAX);
+            compiler_error(compiler, source,
+                           "passing %d arguments exceeds the limit of %d\n",
+                           (int)argc, UINT8_MAX);
 
             return false;
         }
@@ -208,6 +265,9 @@ static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     case NODE_FLOAT:
         compile_float(compiler, node, source);
         return true;
+
+    case NODE_FUNCTION:
+        return compile_function(compiler, node, source);
 
     case NODE_NOT:
         return compile_unary(compiler, node, source, OP_NOT);

@@ -538,11 +538,11 @@ static bool vm_call(Vm *vm, ObjFunction *fn, uint8_t argc) {
         return false;
     }
 
-    CallFrame *new_frame = &vm->frames[vm->frame_count++];
+    CallFrame *frame = &vm->frames[vm->frame_count++];
 
-    new_frame->fn = fn;
-    new_frame->ip = fn->chunk.bytes;
-    new_frame->slots = vm->sp - argc;
+    frame->fn = fn;
+    frame->ip = fn->chunk.bytes;
+    frame->slots = vm->sp - argc;
 
     return true;
 }
