@@ -13,7 +13,7 @@ typedef struct {
     const char *file_path;
     const char *file_buffer;
     Vm *vm;
-    Chunk chunk;
+    Chunk *chunk;
     Ast ast;
     bool returned;
 } Compiler;
@@ -51,7 +51,7 @@ static bool compile_return(Compiler *compiler, AstNode node, uint32_t source) {
         return false;
     }
 
-    chunk_add_byte(&compiler->chunk, OP_RETURN, source);
+    chunk_add_byte(compiler->chunk, OP_RETURN, source);
 
     compiler->returned = true;
 
@@ -91,11 +91,22 @@ bool interpret(const char *file_path, const char *file_buffer) {
 
     vm_init(&vm);
 
+    CallFrame *frame = &vm.frames[vm.frame_count++];
+
+    frame->fn = vm_new_function(&vm,
+                                (Chunk){
+                                    .file_path = file_path,
+                                    .file_content = file_buffer,
+                                },
+                                0);
+
+    frame->slots = vm.stack;
+
     Compiler compiler = {
         .file_path = file_path,
         .file_buffer = file_buffer,
         .ast = parser.ast,
-        .chunk = {0},
+        .chunk = &frame->fn->chunk,
     };
 
     if (!compile_block(&compiler, block)) {
@@ -108,15 +119,11 @@ bool interpret(const char *file_path, const char *file_buffer) {
     free(parser.ast.strings.items);
 
     if (!compiler.returned) {
-        chunk_add_byte(&compiler.chunk, OP_NULL, 0);
-        chunk_add_byte(&compiler.chunk, OP_RETURN, 0);
+        chunk_add_byte(compiler.chunk, OP_NULL, 0);
+        chunk_add_byte(compiler.chunk, OP_RETURN, 0);
     }
 
-    vm.frames[vm.frame_count++] = (CallFrame){
-        .fn = vm_new_function(&vm, compiler.chunk, 0),
-        .ip = compiler.chunk.bytes,
-        .slots = vm.stack,
-    };
+    frame->ip = frame->fn->chunk.bytes;
 
     Value result;
 
