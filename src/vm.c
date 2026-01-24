@@ -1161,7 +1161,7 @@ static void vm_mark_object(Vm *vm, Obj *obj) {
 }
 
 static void vm_mark_value(Vm *vm, Value value) {
-    if (!IS_OBJ(value)) {
+    if (IS_OBJ(value)) {
         vm_mark_object(vm, AS_OBJ(value));
     }
 }
