@@ -759,7 +759,7 @@ void vm_error(Vm *vm, const char *format, ...) {
         SourceLocation loc = source_location_of(
             frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
 
-        fprintf(stderr, "\tat %s:%u:%u", loc.file_path, loc.line, loc.column);
+        fprintf(stderr, "\n\tat %s:%u:%u\n", loc.file_path, loc.line, loc.column);
     }
 }
 
