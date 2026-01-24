@@ -68,6 +68,26 @@ static void compiler_push_constant(Compiler *compiler, Value value,
     chunk_add_byte(compiler->chunk, c, source);
 }
 
+static bool compile_identifier(Compiler *compiler, AstNode node,
+                               uint32_t source) {
+    const char *identifier = compiler->file_buffer + node.lhs;
+    size_t len = node.rhs - node.lhs;
+
+    if (strncmp(identifier, "null", len) == 0) {
+        chunk_add_byte(compiler->chunk, OP_NULL, source);
+    } else if (strncmp(identifier, "true", len) == 0) {
+        chunk_add_byte(compiler->chunk, OP_TRUE, source);
+    } else if (strncmp(identifier, "false", len) == 0) {
+        chunk_add_byte(compiler->chunk, OP_FALSE, source);
+    } else {
+        compiler_error(compiler, source, "todo: compile global/local variables\n");
+
+        return false;
+    }
+
+    return true;
+}
+
 static void compile_int(Compiler *compiler, AstNode node, uint32_t source) {
     uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
     compiler_push_constant(compiler, INT_VAL(v), source);
@@ -133,6 +153,9 @@ static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     uint32_t source = compiler->ast.nodes.sources[node_idx];
 
     switch (node.tag) {
+    case NODE_IDENTIFIER:
+        return compile_identifier(compiler, node, source);
+
     case NODE_INT:
         compile_int(compiler, node, source);
         return true;
