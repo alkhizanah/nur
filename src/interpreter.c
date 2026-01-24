@@ -34,11 +34,12 @@ static void compiler_error(const Compiler *compiler, uint32_t start,
     va_end(args);
 }
 
-static bool compile_node(Compiler *compiler, AstNodeIdx node_idx);
+static bool compile_stmt(Compiler *compiler, AstNodeIdx node_idx);
+static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx);
 
 static bool compile_block(Compiler *compiler, AstNode block) {
     for (uint32_t i = 0; i < block.rhs; i++) {
-        if (!compile_node(compiler, compiler->ast.extra.items[block.lhs + i])) {
+        if (!compile_stmt(compiler, compiler->ast.extra.items[block.lhs + i])) {
             return false;
         }
     }
@@ -47,7 +48,7 @@ static bool compile_block(Compiler *compiler, AstNode block) {
 }
 
 static bool compile_return(Compiler *compiler, AstNode node, uint32_t source) {
-    if (!compile_node(compiler, node.rhs)) {
+    if (!compile_expr(compiler, node.rhs)) {
         return false;
     }
 
@@ -69,7 +70,7 @@ static bool compile_int(Compiler *compiler, AstNode node, uint32_t source) {
 
 static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
                           OpCode opcode) {
-    if (!compile_node(compiler, node.rhs)) {
+    if (!compile_expr(compiler, node.rhs)) {
         return false;
     }
 
@@ -80,11 +81,11 @@ static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
 
 static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
                            OpCode opcode) {
-    if (!compile_node(compiler, node.lhs)) {
+    if (!compile_expr(compiler, node.lhs)) {
         return false;
     }
 
-    if (!compile_node(compiler, node.rhs)) {
+    if (!compile_expr(compiler, node.rhs)) {
         return false;
     }
 
@@ -93,7 +94,7 @@ static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
     return true;
 }
 
-static bool compile_node(Compiler *compiler, AstNodeIdx node_idx) {
+static bool compile_stmt(Compiler *compiler, AstNodeIdx node_idx) {
     AstNode node = compiler->ast.nodes.items[node_idx];
     uint32_t source = compiler->ast.nodes.sources[node_idx];
 
@@ -104,6 +105,22 @@ static bool compile_node(Compiler *compiler, AstNodeIdx node_idx) {
     case NODE_RETURN:
         return compile_return(compiler, node, source);
 
+    default:
+        if (!compile_expr(compiler, node_idx)) {
+            return false;
+        }
+
+        chunk_add_byte(compiler->chunk, OP_POP, source);
+
+        return true;
+    }
+}
+
+static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
+    AstNode node = compiler->ast.nodes.items[node_idx];
+    uint32_t source = compiler->ast.nodes.sources[node_idx];
+
+    switch (node.tag) {
     case NODE_INT:
         return compile_int(compiler, node, source);
 
@@ -155,7 +172,6 @@ static bool compile_node(Compiler *compiler, AstNodeIdx node_idx) {
         return false;
     }
 }
-
 bool interpret(const char *file_path, const char *file_buffer) {
     Parser parser = {.file_path = file_path, .lexer = {.buffer = file_buffer}};
 
