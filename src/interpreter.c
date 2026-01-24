@@ -80,7 +80,8 @@ static bool compile_identifier(Compiler *compiler, AstNode node,
     } else if (strncmp(identifier, "false", len) == 0) {
         chunk_add_byte(compiler->chunk, OP_FALSE, source);
     } else {
-        compiler_error(compiler, source, "todo: compile global/local variables\n");
+        compiler_error(compiler, source,
+                       "todo: compile global/local variables\n");
 
         return false;
     }
@@ -131,6 +132,37 @@ static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
     }
 
     chunk_add_byte(compiler->chunk, opcode, source);
+
+    return true;
+}
+
+static bool compile_call(Compiler *compiler, AstNode node, uint32_t source) {
+    uint32_t argc = 0;
+
+    if (node.rhs != INVALID_EXTRA_IDX) {
+        uint32_t start = node.rhs + 1;
+
+        argc = compiler->ast.extra.items[node.rhs];
+
+        if (argc > UINT8_MAX) {
+            compiler_error(compiler, source, "passing %d arguments exceeds the limit of %d\n", (int)argc, UINT8_MAX);
+
+            return false;
+        }
+
+        for (uint32_t i = 0; i < argc; i++) {
+            if (!compile_expr(compiler, compiler->ast.extra.items[start + i])) {
+                return false;
+            }
+        }
+    }
+
+    if (!compile_expr(compiler, node.lhs)) {
+        return false;
+    }
+
+    chunk_add_byte(compiler->chunk, OP_CALL, source);
+    chunk_add_byte(compiler->chunk, argc, source);
 
     return true;
 }
@@ -218,6 +250,9 @@ static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_GTE:
         return compile_binary(compiler, node, source, OP_GTE);
+
+    case NODE_CALL:
+        return compile_call(compiler, node, source);
 
     default:
         compiler_error(compiler, source, "todo: compile this\n");

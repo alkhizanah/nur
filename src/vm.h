@@ -87,6 +87,7 @@ typedef enum : uint8_t {
     OP_GT,
     OP_LTE,
     OP_GTE,
+    OP_CALL,
     OP_RETURN,
 } OpCode;
 
@@ -164,7 +165,7 @@ typedef struct {
     size_t next_gc;
 } Vm;
 
-typedef Value (*NativeFn)(Vm *, uint16_t argc);
+typedef bool (*NativeFn)(Vm *, uint16_t argc);
 
 typedef struct {
     Obj obj;

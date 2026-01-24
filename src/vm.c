@@ -523,6 +523,42 @@ static void vm_pow_flt_int(Vm *vm, Value lhs, Value rhs) {
     vm_poke(vm, 0, FLT_VAL(pow(flhs, irhs)));
 }
 
+static bool vm_call(Vm *vm, ObjFunction *fn, uint8_t argc) {
+
+    if (argc != fn->arity) {
+        vm_error(vm, "expected %d arguments but got %d instead", fn->arity,
+                 argc);
+
+        return false;
+    }
+
+    if (vm->frame_count == VM_FRAMES_MAX) {
+        vm_error(vm, "stack overflow");
+
+        return false;
+    }
+
+    CallFrame *new_frame = &vm->frames[vm->frame_count++];
+
+    new_frame->fn = fn;
+    new_frame->ip = fn->chunk.bytes;
+    new_frame->slots = vm->sp - argc;
+
+    return true;
+}
+
+static bool vm_call_value(Vm *vm, Value callee, uint8_t argc) {
+    if (IS_FUNCTION(callee)) {
+        return vm_call(vm, AS_FUNCTION(callee), argc);
+    } else if (IS_NATIVE(callee)) {
+        return AS_NATIVE(callee)->fn(vm, argc);
+    } else {
+        vm_error(vm, "can not call %s value", value_description(callee));
+
+        return false;
+    }
+}
+
 static bool vm_pow(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
@@ -726,6 +762,15 @@ bool vm_run(Vm *vm, Value *result) {
             if (!vm_gte(vm)) {
                 return false;
             }
+
+            break;
+
+        case OP_CALL:
+            if (!vm_call_value(vm, vm_pop(vm), READ_BYTE())) {
+                return false;
+            }
+
+            frame = &vm->frames[vm->frame_count - 1];
 
             break;
 
