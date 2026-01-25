@@ -16,7 +16,6 @@ typedef struct {
     Ast ast;
     Vm *vm;
     Chunk *chunk;
-    bool returned;
 } Compiler;
 
 [[gnu::format(printf, 3, 4)]]
@@ -54,8 +53,6 @@ static bool compile_return(Compiler *compiler, AstNode node, uint32_t source) {
     }
 
     chunk_add_byte(compiler->chunk, OP_RETURN, source);
-
-    compiler->returned = true;
 
     return true;
 }
@@ -130,7 +127,6 @@ static bool compile_function(Compiler *compiler, AstNode node,
     }
 
     Chunk *prev_chunk = compiler->chunk;
-    bool prev_returned = compiler->returned;
 
     CallFrame *frame = &compiler->vm->frames[compiler->vm->frame_count++];
 
@@ -145,16 +141,12 @@ static bool compile_function(Compiler *compiler, AstNode node,
 
     compiler->chunk = &frame->fn->chunk;
 
-    if (!compile_block(compiler, compiler->ast.nodes.items[node.rhs])) {
+    if (!compile_stmt(compiler, node.rhs)) {
         return false;
     }
 
-    if (!compiler->returned) {
-        chunk_add_byte(compiler->chunk, OP_NULL, 0);
-        chunk_add_byte(compiler->chunk, OP_RETURN, 0);
-    }
-
-    compiler->returned = prev_returned;
+    chunk_add_byte(compiler->chunk, OP_NULL, 0);
+    chunk_add_byte(compiler->chunk, OP_RETURN, 0);
 
     compiler->chunk = prev_chunk;
 
@@ -165,36 +157,83 @@ static bool compile_function(Compiler *compiler, AstNode node,
     return true;
 };
 
+static uint32_t compiler_emit_jump(Compiler *compiler, OpCode opcode,
+                                   uint32_t source) {
+
+    chunk_add_byte(compiler->chunk, opcode, source);
+
+    chunk_add_byte(compiler->chunk, 0xff, source);
+    chunk_add_byte(compiler->chunk, 0xff, source);
+
+    return compiler->chunk->count - 2;
+}
+
+static void compiler_patch_jump(Compiler *compiler, uint32_t offset) {
+    uint32_t jump = compiler->chunk->count - offset - 2;
+
+    compiler->chunk->bytes[offset] = jump >> 8;
+    compiler->chunk->bytes[offset + 1] = jump;
+}
+
+static void compiler_emit_loop(Compiler *compiler, uint32_t loop_start,
+                               uint32_t source) {
+    chunk_add_byte(compiler->chunk, OP_LOOP, source);
+
+    uint32_t back_offset = compiler->chunk->count - loop_start + 2;
+
+    chunk_add_byte(compiler->chunk, back_offset >> 8, source);
+    chunk_add_byte(compiler->chunk, back_offset, source);
+}
+
 static bool compile_while_loop(Compiler *compiler, AstNode node,
                                uint32_t source) {
-    uint32_t loop_start_idx = compiler->chunk->count;
+    uint32_t loop_start = compiler->chunk->count;
 
     if (!compile_expr(compiler, node.lhs)) {
         return false;
     }
 
-    chunk_add_byte(compiler->chunk, OP_JUMP_IF_FALSE, source);
+    uint32_t exit_jump =
+        compiler_emit_jump(compiler, OP_POP_JUMP_IF_FALSE, source);
 
-    uint32_t loop_jump_offset_idx = compiler->chunk->count;
-
-    chunk_add_byte(compiler->chunk, 0, source);
-    chunk_add_byte(compiler->chunk, 0, source);
-
-    if (!compile_block(compiler, compiler->ast.nodes.items[node.rhs])) {
+    if (!compile_stmt(compiler, node.rhs)) {
         return false;
     }
 
-    chunk_add_byte(compiler->chunk, OP_LOOP, source);
+    compiler_emit_loop(compiler, loop_start, source);
 
-    uint16_t loop_back_offset = compiler->chunk->count - loop_start_idx + 2;
+    compiler_patch_jump(compiler, exit_jump);
 
-    chunk_add_byte(compiler->chunk, loop_back_offset >> 8, source);
-    chunk_add_byte(compiler->chunk, loop_back_offset, source);
+    return true;
+}
 
-    uint16_t loop_jump_offset = compiler->chunk->count - loop_jump_offset_idx;
+static bool compile_conditional(Compiler *compiler, AstNode node,
+                                uint32_t source) {
+    AstNodeIdx true_case = compiler->ast.extra.items[node.rhs];
+    AstNodeIdx false_case = compiler->ast.extra.items[node.rhs + 1];
 
-    compiler->chunk->bytes[loop_jump_offset_idx] = loop_jump_offset >> 8;
-    compiler->chunk->bytes[loop_jump_offset_idx + 1] = loop_jump_offset;
+    if (!compile_expr(compiler, node.lhs)) {
+        return false;
+    }
+
+    uint32_t then_jump =
+        compiler_emit_jump(compiler, OP_POP_JUMP_IF_FALSE, source);
+
+    if (!compile_stmt(compiler, true_case)) {
+        return false;
+    }
+
+    uint32_t else_jump = compiler_emit_jump(compiler, OP_JUMP, source);
+
+    compiler_patch_jump(compiler, then_jump);
+
+    if (false_case != INVALID_NODE_IDX) {
+        if (!compile_stmt(compiler, false_case)) {
+            return false;
+        }
+    }
+
+    compiler_patch_jump(compiler, else_jump);
 
     return true;
 }
@@ -268,6 +307,12 @@ static bool compile_stmt(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_RETURN:
         return compile_return(compiler, node, source);
+
+    case NODE_WHILE:
+        return compile_while_loop(compiler, node, source);
+
+    case NODE_IF:
+        return compile_conditional(compiler, node, source);
 
     default:
         if (!compile_expr(compiler, node_idx)) {
@@ -348,13 +393,154 @@ static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     case NODE_CALL:
         return compile_call(compiler, node, source);
 
-    case NODE_WHILE:
-        return compile_while_loop(compiler, node, source);
-
     default:
         compiler_error(compiler, source, "todo: compile this\n");
 
         return false;
+    }
+}
+
+static void disassemble(Chunk chunk) {
+    size_t ip = 0;
+
+    for (; ip < chunk.count; printf("\n")) {
+        printf("%-10zu", ip);
+
+        OpCode opcode = chunk.bytes[ip++];
+
+        switch (opcode) {
+        case OP_NULL:
+            printf("NULL");
+            break;
+
+        case OP_TRUE:
+            printf("TRUE");
+            break;
+
+        case OP_FALSE:
+            printf("FALSE");
+            break;
+
+        case OP_CONST:
+            printf("CONST (%d)",
+                   (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                 chunk.bytes[ip - 1]));
+
+            break;
+
+        case OP_POP:
+            printf("POP");
+            break;
+
+        case OP_GET_LOCAL:
+            printf("GET_LOCAL (%d)", chunk.bytes[ip++]);
+            break;
+
+        case OP_SET_LOCAL:
+            printf("SET_LOCAL (%d)", chunk.bytes[ip++]);
+            break;
+
+        case OP_EQL:
+            printf("EQL");
+            break;
+
+        case OP_NEQ:
+            printf("NEQ");
+            break;
+
+        case OP_NOT:
+            printf("NOT");
+            break;
+
+        case OP_NEG:
+            printf("NEG");
+            break;
+
+        case OP_ADD:
+            printf("ADD");
+            break;
+
+        case OP_SUB:
+            printf("SUB");
+            break;
+
+        case OP_MUL:
+            printf("MUL");
+            break;
+
+        case OP_DIV:
+            printf("DIV");
+            break;
+
+        case OP_MOD:
+            printf("MOD");
+            break;
+
+        case OP_POW:
+            printf("POW");
+
+            break;
+
+        case OP_LT:
+            printf("LT");
+            break;
+
+        case OP_GT:
+            printf("GT");
+            break;
+
+        case OP_LTE:
+            printf("LTE");
+            break;
+
+        case OP_GTE:
+            printf("GTE");
+            break;
+
+        case OP_CALL:
+            printf("CALL (%d)", chunk.bytes[ip++]);
+            break;
+
+        case OP_POP_JUMP_IF_FALSE: {
+            uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                            chunk.bytes[ip - 1]);
+
+            printf("POP_JUMP_IF_FALSE (%d), TO (%zu)", offset, ip + offset);
+
+            break;
+        }
+
+        case OP_JUMP_IF_FALSE: {
+            uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                            chunk.bytes[ip - 1]);
+
+            printf("JUMP_IF_FALSE (%d), TO (%zu)", offset, ip + offset);
+
+            break;
+        }
+
+        case OP_JUMP: {
+            uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                            chunk.bytes[ip - 1]);
+
+            printf("JUMP (%d), TO (%zu)", offset, ip + offset);
+
+            break;
+        }
+
+        case OP_LOOP: {
+            uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                            chunk.bytes[ip - 1]);
+
+            printf("LOOP (%d), TO (%zu)", offset, ip - offset);
+
+            break;
+        }
+
+        case OP_RETURN:
+            printf("RETURN");
+            break;
+        }
     }
 }
 
@@ -401,10 +587,8 @@ bool interpret(const char *file_path, const char *file_buffer) {
     free(parser.ast.extra.items);
     free(parser.ast.strings.items);
 
-    if (!compiler.returned) {
-        chunk_add_byte(compiler.chunk, OP_NULL, 0);
-        chunk_add_byte(compiler.chunk, OP_RETURN, 0);
-    }
+    chunk_add_byte(compiler.chunk, OP_NULL, 0);
+    chunk_add_byte(compiler.chunk, OP_RETURN, 0);
 
     frame->ip = frame->fn->chunk.bytes;
 

@@ -774,7 +774,7 @@ bool vm_run(Vm *vm, Value *result) {
 
             break;
 
-        case OP_JUMP_IF_FALSE: {
+        case OP_POP_JUMP_IF_FALSE: {
             uint16_t offset = READ_SHORT();
 
             if (is_falsey(vm_pop(vm)))
@@ -783,15 +783,30 @@ bool vm_run(Vm *vm, Value *result) {
             break;
         }
 
-        case OP_JUMP:
-            frame->ip += READ_SHORT();
+        case OP_JUMP_IF_FALSE: {
+            uint16_t offset = READ_SHORT();
+
+            if (is_falsey(vm_peek(vm, 0)))
+                frame->ip += offset;
 
             break;
+        }
 
-        case OP_LOOP:
-            frame->ip -= READ_SHORT();
+        case OP_JUMP: {
+            uint16_t offset = READ_SHORT();
+
+            frame->ip += offset;
 
             break;
+        }
+
+        case OP_LOOP: {
+            uint16_t offset = READ_SHORT();
+
+            frame->ip -= offset;
+
+            break;
+        }
 
         case OP_RETURN: {
             Value returned = vm_pop(vm);
