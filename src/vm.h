@@ -88,6 +88,9 @@ typedef enum : uint8_t {
     OP_LTE,
     OP_GTE,
     OP_CALL,
+    OP_JUMP_IF_FALSE,
+    OP_JUMP,
+    OP_LOOP,
     OP_RETURN,
 } OpCode;
 

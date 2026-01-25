@@ -165,6 +165,40 @@ static bool compile_function(Compiler *compiler, AstNode node,
     return true;
 };
 
+static bool compile_while_loop(Compiler *compiler, AstNode node,
+                               uint32_t source) {
+    uint32_t loop_start_idx = compiler->chunk->count;
+
+    if (!compile_expr(compiler, node.lhs)) {
+        return false;
+    }
+
+    chunk_add_byte(compiler->chunk, OP_JUMP_IF_FALSE, source);
+
+    uint32_t loop_jump_offset_idx = compiler->chunk->count;
+
+    chunk_add_byte(compiler->chunk, 0, source);
+    chunk_add_byte(compiler->chunk, 0, source);
+
+    if (!compile_block(compiler, compiler->ast.nodes.items[node.rhs])) {
+        return false;
+    }
+
+    chunk_add_byte(compiler->chunk, OP_LOOP, source);
+
+    uint16_t loop_back_offset = compiler->chunk->count - loop_start_idx + 2;
+
+    chunk_add_byte(compiler->chunk, loop_back_offset >> 8, source);
+    chunk_add_byte(compiler->chunk, loop_back_offset, source);
+
+    uint16_t loop_jump_offset = compiler->chunk->count - loop_jump_offset_idx;
+
+    compiler->chunk->bytes[loop_jump_offset_idx] = loop_jump_offset >> 8;
+    compiler->chunk->bytes[loop_jump_offset_idx + 1] = loop_jump_offset;
+
+    return true;
+}
+
 static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
                           OpCode opcode) {
     if (!compile_expr(compiler, node.rhs)) {
@@ -313,6 +347,9 @@ static bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_CALL:
         return compile_call(compiler, node, source);
+
+    case NODE_WHILE:
+        return compile_while_loop(compiler, node, source);
 
     default:
         compiler_error(compiler, source, "todo: compile this\n");

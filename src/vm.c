@@ -774,6 +774,25 @@ bool vm_run(Vm *vm, Value *result) {
 
             break;
 
+        case OP_JUMP_IF_FALSE: {
+            uint16_t offset = READ_SHORT();
+
+            if (is_falsey(vm_pop(vm)))
+                frame->ip += offset;
+
+            break;
+        }
+
+        case OP_JUMP:
+            frame->ip += READ_SHORT();
+
+            break;
+
+        case OP_LOOP:
+            frame->ip -= READ_SHORT();
+
+            break;
+
         case OP_RETURN: {
             Value returned = vm_pop(vm);
 
@@ -818,8 +837,7 @@ void vm_error(Vm *vm, const char *format, ...) {
         SourceLocation loc = source_location_of(
             frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
 
-        fprintf(stderr, "\tat %s:%u:%u\n", loc.file_path, loc.line,
-                loc.column);
+        fprintf(stderr, "\tat %s:%u:%u\n", loc.file_path, loc.line, loc.column);
     }
 }
 
