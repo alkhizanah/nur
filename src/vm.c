@@ -807,6 +807,8 @@ void vm_error(Vm *vm, const char *format, ...) {
 
     va_end(args);
 
+    fprintf(stderr, "\n");
+
     for (ssize_t i = vm->frame_count - 1; i >= 0; i--) {
         CallFrame *frame = &vm->frames[i];
 
@@ -816,7 +818,7 @@ void vm_error(Vm *vm, const char *format, ...) {
         SourceLocation loc = source_location_of(
             frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
 
-        fprintf(stderr, "\n\tat %s:%u:%u\n", loc.file_path, loc.line,
+        fprintf(stderr, "\tat %s:%u:%u\n", loc.file_path, loc.line,
                 loc.column);
     }
 }
