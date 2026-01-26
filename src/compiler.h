@@ -9,6 +9,8 @@ typedef struct {
     Ast ast;
     Vm *vm;
     Chunk *chunk;
+    uint32_t *breaks;
+    uint32_t *continues;
 } Compiler;
 
 bool compile_stmt(Compiler *compiler, AstNodeIdx);

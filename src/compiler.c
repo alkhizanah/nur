@@ -193,6 +193,12 @@ static bool compile_while_loop(Compiler *compiler, AstNode node,
     compiler_emit_loop(compiler, loop_start, source);
 
     compiler_patch_jump(compiler, exit_jump);
+    
+    int len = sizeof(compiler->breaks)/32;
+
+    for(int i = 0; i < len; ++i) {
+        compiler_patch_jump(compiler, compiler->breaks);
+    }
 
     return true;
 }
@@ -254,6 +260,13 @@ static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
     return true;
 }
 
+static bool compile_break(Compiler *compiler, AstNode node, uint32_t source) {
+        // `compiler_emit_jump` returns the adress at which the opcode was pushed
+        uint32_t offset = compiler_emit_jump(compiler, OP_JUMP, source);
+        ARRAY_PUSH(compiler->breaks, offset);
+        return true;
+}
+
 static bool compile_call(Compiler *compiler, AstNode node, uint32_t source) {
     uint32_t argc = 0;
 
@@ -303,6 +316,9 @@ bool compile_stmt(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_IF:
         return compile_conditional(compiler, node, source);
+
+    case NODE_BREAK:
+        return compile_break(compiler, node, source);
 
     default:
         if (!compile_expr(compiler, node_idx)) {
