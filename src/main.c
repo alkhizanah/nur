@@ -96,20 +96,20 @@ static void disassemble(Chunk chunk) {
         OpCode opcode = chunk.bytes[ip++];
 
         switch (opcode) {
-        case OP_NULL:
-            printf("NULL");
+        case OP_PUSH_NULL:
+            printf("PUSH_NULL");
             break;
 
-        case OP_TRUE:
-            printf("TRUE");
+        case OP_PUSH_TRUE:
+            printf("PUSH_TRUE");
             break;
 
-        case OP_FALSE:
-            printf("FALSE");
+        case OP_PUSH_FALSE:
+            printf("PUSH_FALSE");
             break;
 
-        case OP_CONST:
-            printf("CONST (%d)",
+        case OP_PUSH_CONST:
+            printf("PUSH_CONST (%d)",
                    (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
                                  chunk.bytes[ip - 1]));
 
@@ -272,7 +272,7 @@ bool compile_file(const char *file_path, const char *file_buffer, Vm *vm,
     free(parser.ast.extra.items);
     free(parser.ast.strings.items);
 
-    chunk_add_byte(compiler.chunk, OP_NULL, 0);
+    chunk_add_byte(compiler.chunk, OP_PUSH_NULL, 0);
     chunk_add_byte(compiler.chunk, OP_RETURN, 0);
 
     frame->ip = frame->fn->chunk.bytes;

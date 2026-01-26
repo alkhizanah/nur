@@ -648,19 +648,19 @@ bool vm_run(Vm *vm, Value *result) {
         OpCode opcode = READ_BYTE();
 
         switch (opcode) {
-        case OP_NULL:
+        case OP_PUSH_NULL:
             vm_push(vm, NULL_VAL);
             break;
 
-        case OP_TRUE:
+        case OP_PUSH_TRUE:
             vm_push(vm, BOOL_VAL(true));
             break;
 
-        case OP_FALSE:
+        case OP_PUSH_FALSE:
             vm_push(vm, BOOL_VAL(false));
             break;
 
-        case OP_CONST:
+        case OP_PUSH_CONST:
             vm_push(vm, READ_CONSTANT());
             break;
 

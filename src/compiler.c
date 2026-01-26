@@ -50,7 +50,7 @@ static bool compile_return(Compiler *compiler, AstNode node, uint32_t source) {
 static void compiler_push_constant(Compiler *compiler, Value value,
                                    uint32_t source) {
     uint16_t c = chunk_add_constant(compiler->chunk, value);
-    chunk_add_byte(compiler->chunk, OP_CONST, source);
+    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
     chunk_add_byte(compiler->chunk, c >> 8, source);
     chunk_add_byte(compiler->chunk, c, source);
 }
@@ -61,11 +61,11 @@ static bool compile_identifier(Compiler *compiler, AstNode node,
     size_t len = node.rhs - node.lhs;
 
     if (strncmp(identifier, "null", len) == 0) {
-        chunk_add_byte(compiler->chunk, OP_NULL, source);
+        chunk_add_byte(compiler->chunk, OP_PUSH_NULL, source);
     } else if (strncmp(identifier, "true", len) == 0) {
-        chunk_add_byte(compiler->chunk, OP_TRUE, source);
+        chunk_add_byte(compiler->chunk, OP_PUSH_TRUE, source);
     } else if (strncmp(identifier, "false", len) == 0) {
-        chunk_add_byte(compiler->chunk, OP_FALSE, source);
+        chunk_add_byte(compiler->chunk, OP_PUSH_FALSE, source);
     } else {
         compiler_error(compiler, source,
                        "todo: compile global/local variables\n");
@@ -135,7 +135,7 @@ static bool compile_function(Compiler *compiler, AstNode node,
         return false;
     }
 
-    chunk_add_byte(compiler->chunk, OP_NULL, 0);
+    chunk_add_byte(compiler->chunk, OP_PUSH_NULL, 0);
     chunk_add_byte(compiler->chunk, OP_RETURN, 0);
 
     compiler->chunk = prev_chunk;
@@ -388,4 +388,4 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
         return false;
     }
-}
+}  

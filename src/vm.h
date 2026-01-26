@@ -66,10 +66,10 @@ static inline bool is_obj_tag(Value v, ObjTag tag) {
 #define OBJ_VAL(v) ((Value){.tag = VAL_OBJ, .payload = {._obj = (Obj *)(v)}})
 
 typedef enum : uint8_t {
-    OP_NULL,
-    OP_TRUE,
-    OP_FALSE,
-    OP_CONST,
+    OP_PUSH_NULL,
+    OP_PUSH_TRUE,
+    OP_PUSH_FALSE,
+    OP_PUSH_CONST,
     OP_POP,
     OP_GET_LOCAL,
     OP_SET_LOCAL,
