@@ -20,12 +20,6 @@ char *read_entire_file(const char *file_path) {
         exit(1);
     }
 
-    // NOTE(alsakandari): The reason we do this is to check whether we can read
-    // from it or not, then we calculate the size of the file, then we read from
-    // it again, I made it like that after seeing an issue where Linux
-    // allows you to `fopen` a directory, using `ftell` on it gave me a huge
-    // number which in turn makes an out of memory failure instead of indicating
-    // it was a directory
     char c;
 
     fread(&c, 1, 1, file);
