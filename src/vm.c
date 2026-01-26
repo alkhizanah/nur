@@ -3,6 +3,9 @@
 #include <stdarg.h>
 
 #include "array.h"
+#include "ast.h"
+#include "compiler.h"
+#include "parser.h"
 #include "source_location.h"
 #include "vm.h"
 
@@ -49,6 +52,53 @@ void vm_init(Vm *vm) {
     vm->objects = NULL;
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
+}
+
+bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
+    Parser parser = {.file_path = file_path, .lexer = {.buffer = file_buffer}};
+
+    AstNodeIdx program = parse(&parser);
+
+    if (program == INVALID_NODE_IDX) {
+        return false;
+    }
+
+    AstNode block = parser.ast.nodes.items[program];
+
+    CallFrame *frame = &vm->frames[vm->frame_count++];
+
+    frame->fn = vm_new_function(vm,
+                                (Chunk){
+                                    .file_path = file_path,
+                                    .file_content = file_buffer,
+                                },
+                                0);
+
+    frame->slots = vm->stack;
+
+    Compiler compiler = {
+        .file_path = file_path,
+        .file_buffer = file_buffer,
+        .ast = parser.ast,
+        .vm = vm,
+        .chunk = &frame->fn->chunk,
+    };
+
+    if (!compile_block(&compiler, block)) {
+        return false;
+    }
+
+    free(parser.ast.nodes.items);
+    free(parser.ast.nodes.sources);
+    free(parser.ast.extra.items);
+    free(parser.ast.strings.items);
+
+    chunk_add_byte(compiler.chunk, OP_PUSH_NULL, 0);
+    chunk_add_byte(compiler.chunk, OP_RETURN, 0);
+
+    frame->ip = frame->fn->chunk.bytes;
+
+    return true;
 }
 
 static bool vm_neg(Vm *vm) {

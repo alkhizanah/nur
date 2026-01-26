@@ -185,9 +185,11 @@ bool values_equal(Value, Value);         // 4 == 4.0
 
 void value_display(Value);
 
+void vm_stack_reset(Vm *);
+
 void vm_init(Vm *);
 
-void vm_stack_reset(Vm *);
+bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer);
 
 bool vm_run(Vm *, Value *result);
 
