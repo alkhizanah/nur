@@ -3,6 +3,5 @@
 #include "lexer.c"
 #include "main.c"
 #include "parser.c"
-#include "platform.c"
 #include "source_location.c"
 #include "vm.c"
