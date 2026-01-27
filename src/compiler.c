@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "array.h"
 #include "ast.h"
 #include "compiler.h"
 #include "parser.h"
@@ -178,6 +179,10 @@ static void compiler_emit_loop(Compiler *compiler, uint32_t loop_start,
 static bool compile_while_loop(Compiler *compiler, AstNode node,
                                uint32_t source) {
 
+    bool prev_inside_loop = compiler->inside_loop;
+
+    compiler->inside_loop = true;
+
     Offsets prev_breaks = compiler->breaks;
 
     compiler->breaks = (Offsets){0};
@@ -198,15 +203,16 @@ static bool compile_while_loop(Compiler *compiler, AstNode node,
     compiler_emit_loop(compiler, loop_start, source);
 
     compiler_patch_jump(compiler, exit_jump);
-    
+
+    for (size_t i = 0; i < compiler->breaks.count; ++i) {
+        compiler_patch_jump(compiler, compiler->breaks.items[i]);
+    }
+
     ARRAY_FREE(&compiler->breaks);
+
     compiler->breaks = prev_breaks;
 
-    int len = sizeof(compiler->breaks)/32;
-
-    for(int i = 0; i < len; ++i) {
-        compiler_patch_jump(compiler, compiler->breaks);
-    }
+    compiler->inside_loop = prev_inside_loop;
 
     return true;
 }
@@ -268,11 +274,20 @@ static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
     return true;
 }
 
-static bool compile_break(Compiler *compiler, AstNode node, uint32_t source) {
-        // `compiler_emit_jump` returns the adress at which the opcode was pushed
-        uint32_t offset = compiler_emit_jump(compiler, OP_JUMP, source);
-        ARRAY_PUSH(compiler->breaks, offset);
-        return true;
+static bool compile_break(Compiler *compiler, uint32_t source) {
+    if (!compiler->inside_loop) {
+        compiler_error(
+            compiler, source,
+            "using a break statement outside of a loop is meaningless\n");
+
+        return false;
+    }
+
+    uint32_t offset = compiler_emit_jump(compiler, OP_JUMP, source);
+
+    ARRAY_PUSH(&compiler->breaks, offset);
+
+    return true;
 }
 
 static bool compile_call(Compiler *compiler, AstNode node, uint32_t source) {
@@ -326,7 +341,7 @@ bool compile_stmt(Compiler *compiler, AstNodeIdx node_idx) {
         return compile_conditional(compiler, node, source);
 
     case NODE_BREAK:
-        return compile_break(compiler, node, source);
+        return compile_break(compiler, source);
 
     default:
         if (!compile_expr(compiler, node_idx)) {
@@ -412,4 +427,4 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
         return false;
     }
-}  
+}
