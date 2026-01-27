@@ -15,7 +15,8 @@ typedef struct {
     Ast ast;
     Vm *vm;
     Chunk *chunk;
-    int64_t loop_start;
+    bool in_loop;
+    uint32_t loop_start;
     Offsets loop_breaks;
 } Compiler;
 

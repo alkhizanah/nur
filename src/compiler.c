@@ -178,7 +178,11 @@ static void compiler_emit_loop(Compiler *compiler, uint32_t source) {
 static bool compile_while_loop(Compiler *compiler, AstNode node,
                                uint32_t source) {
 
-    int64_t prev_loop_start = compiler->loop_start;
+    bool prev_in_loop = compiler->in_loop;
+
+    compiler->in_loop = true;
+
+    uint32_t prev_loop_start = compiler->loop_start;
 
     compiler->loop_start = compiler->chunk->count;
 
@@ -208,8 +212,8 @@ static bool compile_while_loop(Compiler *compiler, AstNode node,
     ARRAY_FREE(&compiler->loop_breaks);
 
     compiler->loop_breaks = prev_loop_breaks;
-
     compiler->loop_start = prev_loop_start;
+    compiler->in_loop = prev_in_loop;
 
     return true;
 }
@@ -272,7 +276,7 @@ static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
 }
 
 static bool compile_break(Compiler *compiler, uint32_t source) {
-    if (compiler->loop_start == -1) {
+    if (!compiler->in_loop) {
         compiler_error(
             compiler, source,
             "using a break statement outside of a loop is meaningless\n");
@@ -288,7 +292,7 @@ static bool compile_break(Compiler *compiler, uint32_t source) {
 }
 
 static bool compile_continue(Compiler *compiler, uint32_t source) {
-    if (compiler->loop_start == -1) {
+    if (!compiler->in_loop) {
         compiler_error(
             compiler, source,
             "using a continue statement outside of a loop is meaningless\n");
