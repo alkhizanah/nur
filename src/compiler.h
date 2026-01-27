@@ -15,9 +15,8 @@ typedef struct {
     Ast ast;
     Vm *vm;
     Chunk *chunk;
-    bool inside_loop;
-    Offsets breaks;
-    Offsets continues;
+    int64_t loop_start;
+    Offsets loop_breaks;
 } Compiler;
 
 bool compile_stmt(Compiler *compiler, AstNodeIdx);

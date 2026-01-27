@@ -166,11 +166,10 @@ static void compiler_patch_jump(Compiler *compiler, uint32_t offset) {
     compiler->chunk->bytes[offset + 1] = jump;
 }
 
-static void compiler_emit_loop(Compiler *compiler, uint32_t loop_start,
-                               uint32_t source) {
+static void compiler_emit_loop(Compiler *compiler, uint32_t source) {
     chunk_add_byte(compiler->chunk, OP_LOOP, source);
 
-    uint32_t back_offset = compiler->chunk->count - loop_start + 2;
+    uint32_t back_offset = compiler->chunk->count - compiler->loop_start + 2;
 
     chunk_add_byte(compiler->chunk, back_offset >> 8, source);
     chunk_add_byte(compiler->chunk, back_offset, source);
@@ -179,15 +178,13 @@ static void compiler_emit_loop(Compiler *compiler, uint32_t loop_start,
 static bool compile_while_loop(Compiler *compiler, AstNode node,
                                uint32_t source) {
 
-    bool prev_inside_loop = compiler->inside_loop;
+    int64_t prev_loop_start = compiler->loop_start;
 
-    compiler->inside_loop = true;
+    compiler->loop_start = compiler->chunk->count;
 
-    Offsets prev_breaks = compiler->breaks;
+    Offsets prev_loop_breaks = compiler->loop_breaks;
 
-    compiler->breaks = (Offsets){0};
-
-    uint32_t loop_start = compiler->chunk->count;
+    compiler->loop_breaks = (Offsets){0};
 
     if (!compile_expr(compiler, node.lhs)) {
         return false;
@@ -200,19 +197,19 @@ static bool compile_while_loop(Compiler *compiler, AstNode node,
         return false;
     }
 
-    compiler_emit_loop(compiler, loop_start, source);
+    compiler_emit_loop(compiler, source);
 
     compiler_patch_jump(compiler, exit_jump);
 
-    for (size_t i = 0; i < compiler->breaks.count; ++i) {
-        compiler_patch_jump(compiler, compiler->breaks.items[i]);
+    for (size_t i = 0; i < compiler->loop_breaks.count; ++i) {
+        compiler_patch_jump(compiler, compiler->loop_breaks.items[i]);
     }
 
-    ARRAY_FREE(&compiler->breaks);
+    ARRAY_FREE(&compiler->loop_breaks);
 
-    compiler->breaks = prev_breaks;
+    compiler->loop_breaks = prev_loop_breaks;
 
-    compiler->inside_loop = prev_inside_loop;
+    compiler->loop_start = prev_loop_start;
 
     return true;
 }
@@ -275,7 +272,7 @@ static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
 }
 
 static bool compile_break(Compiler *compiler, uint32_t source) {
-    if (!compiler->inside_loop) {
+    if (compiler->loop_start == -1) {
         compiler_error(
             compiler, source,
             "using a break statement outside of a loop is meaningless\n");
@@ -285,7 +282,21 @@ static bool compile_break(Compiler *compiler, uint32_t source) {
 
     uint32_t offset = compiler_emit_jump(compiler, OP_JUMP, source);
 
-    ARRAY_PUSH(&compiler->breaks, offset);
+    ARRAY_PUSH(&compiler->loop_breaks, offset);
+
+    return true;
+}
+
+static bool compile_continue(Compiler *compiler, uint32_t source) {
+    if (compiler->loop_start == -1) {
+        compiler_error(
+            compiler, source,
+            "using a continue statement outside of a loop is meaningless\n");
+
+        return false;
+    }
+
+    compiler_emit_loop(compiler, source);
 
     return true;
 }
@@ -342,6 +353,9 @@ bool compile_stmt(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_BREAK:
         return compile_break(compiler, source);
+
+    case NODE_CONTINUE:
+        return compile_continue(compiler, source);
 
     default:
         if (!compile_expr(compiler, node_idx)) {
