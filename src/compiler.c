@@ -177,6 +177,11 @@ static void compiler_emit_loop(Compiler *compiler, uint32_t loop_start,
 
 static bool compile_while_loop(Compiler *compiler, AstNode node,
                                uint32_t source) {
+
+    Offsets prev_breaks = compiler->breaks;
+
+    compiler->breaks = (Offsets){0};
+
     uint32_t loop_start = compiler->chunk->count;
 
     if (!compile_expr(compiler, node.lhs)) {
@@ -194,6 +199,9 @@ static bool compile_while_loop(Compiler *compiler, AstNode node,
 
     compiler_patch_jump(compiler, exit_jump);
     
+    ARRAY_FREE(&compiler->breaks);
+    compiler->breaks = prev_breaks;
+
     int len = sizeof(compiler->breaks)/32;
 
     for(int i = 0; i < len; ++i) {

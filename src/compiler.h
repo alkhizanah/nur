@@ -4,13 +4,19 @@
 #include "vm.h"
 
 typedef struct {
+    uint32_t *items;
+    size_t count;
+    size_t capacity;
+} Offsets;
+
+typedef struct {
     const char *file_path;
     const char *file_buffer;
     Ast ast;
     Vm *vm;
     Chunk *chunk;
-    uint32_t *breaks;
-    uint32_t *continues;
+    Offsets *breaks;
+    Offsets *continues;
 } Compiler;
 
 bool compile_stmt(Compiler *compiler, AstNodeIdx);
