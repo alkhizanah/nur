@@ -48,12 +48,16 @@ static bool compile_return(Compiler *compiler, AstNode node, uint32_t source) {
     return true;
 }
 
-static void compiler_push_constant(Compiler *compiler, Value value,
-                                   uint32_t source) {
-    uint16_t c = chunk_add_constant(compiler->chunk, value);
-    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+static void compiler_emit_short(Compiler *compiler, uint16_t c,
+                                uint32_t source) {
     chunk_add_byte(compiler->chunk, c >> 8, source);
     chunk_add_byte(compiler->chunk, c, source);
+}
+
+static void compiler_emit_constant(Compiler *compiler, Value value,
+                                   uint32_t source) {
+    uint16_t c = chunk_add_constant(compiler->chunk, value);
+    compiler_emit_short(compiler, c, source);
 }
 
 static bool compiler_find_local(Compiler *compiler, const char *name,
@@ -98,10 +102,9 @@ static bool compile_identifier(Compiler *compiler, AstNode node,
             chunk_add_byte(compiler->chunk, OP_GET_LOCAL, source);
             chunk_add_byte(compiler->chunk, local_idx, source);
         } else {
-            compiler_error(compiler, source,
-                           "todo: compile global variable access\n");
-
-            return false;
+            ObjString *key = vm_copy_string(compiler->vm, name, name_len);
+            chunk_add_byte(compiler->chunk, OP_GET_GLOBAL, source);
+            compiler_emit_constant(compiler, OBJ_VAL(key), source);
         }
     }
 
@@ -111,22 +114,23 @@ static bool compile_identifier(Compiler *compiler, AstNode node,
 static void compile_string(Compiler *compiler, AstNode node, uint32_t source) {
     const char *sv = compiler->ast.strings.items + node.lhs;
     size_t len = node.rhs;
-    ObjString *s = vm_new_string(compiler->vm, node.rhs);
-    memcpy(s->items, sv, len * sizeof(char));
-    s->count = len;
-    compiler_push_constant(compiler, OBJ_VAL(s), source);
+    ObjString *s = vm_copy_string(compiler->vm, sv, len);
+    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+    compiler_emit_constant(compiler, OBJ_VAL(s), source);
 }
 
 static void compile_int(Compiler *compiler, AstNode node, uint32_t source) {
     uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
-    compiler_push_constant(compiler, INT_VAL(v), source);
+    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+    compiler_emit_constant(compiler, INT_VAL(v), source);
 }
 
 static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
     uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
     double f;
     memcpy(&f, &v, sizeof(double));
-    compiler_push_constant(compiler, FLT_VAL(f), source);
+    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+    compiler_emit_constant(compiler, FLT_VAL(f), source);
 }
 
 static bool compile_function(Compiler *compiler, AstNode node,
@@ -190,7 +194,8 @@ static bool compile_function(Compiler *compiler, AstNode node,
 
     fc.vm->frame_count--;
 
-    compiler_push_constant(compiler, OBJ_VAL(frame->fn), source);
+    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+    compiler_emit_constant(compiler, OBJ_VAL(frame->fn), source);
 
     return true;
 };
@@ -222,10 +227,19 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
             chunk_add_byte(compiler->chunk, OP_SET_LOCAL, source);
             chunk_add_byte(compiler->chunk, local_idx, source);
         } else if (has_op) {
-            compiler_error(compiler, source,
-                           "todo: handle global variable assignment\n");
+            ObjString *key = vm_copy_string(compiler->vm, name, name_len);
 
-            return false;
+            uint16_t c = chunk_add_constant(compiler->chunk, OBJ_VAL(key));
+
+            chunk_add_byte(compiler->chunk, OP_GET_GLOBAL, source);
+            compiler_emit_short(compiler, c, source);
+
+            chunk_add_byte(compiler->chunk, OP_SWP, source);
+
+            chunk_add_byte(compiler->chunk, op, source);
+
+            chunk_add_byte(compiler->chunk, OP_SET_GLOBAL, source);
+            compiler_emit_short(compiler, c, source);
         } else if (compiler->parent != NULL) {
             chunk_add_byte(compiler->chunk, OP_DUP, source);
 
@@ -233,10 +247,10 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
 
             ARRAY_PUSH(&compiler->locals, local);
         } else {
-            compiler_error(compiler, source,
-                           "todo: handle global variable assignment\n");
+            ObjString *key = vm_copy_string(compiler->vm, name, name_len);
 
-            return false;
+            chunk_add_byte(compiler->chunk, OP_SET_GLOBAL, source);
+            compiler_emit_constant(compiler, OBJ_VAL(key), source);
         }
     } else if (target.tag == NODE_SUBSCRIPT) {
         compiler_error(compiler, source, "todo: handle subscript assignment\n");
@@ -482,6 +496,14 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     uint32_t source = compiler->ast.nodes.sources[node_idx];
 
     switch (node.tag) {
+    case NODE_BLOCK:
+    case NODE_RETURN:
+    case NODE_WHILE:
+    case NODE_IF:
+    case NODE_BREAK:
+    case NODE_CONTINUE:
+        return false;
+
     case NODE_IDENTIFIER:
         return compile_identifier(compiler, node, source);
 
@@ -566,8 +588,11 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     case NODE_CALL:
         return compile_call(compiler, node, source);
 
-    default:
-        compiler_error(compiler, source, "todo: compile this\n");
+    case NODE_ARRAY:
+    case NODE_MAP:
+    case NODE_SUBSCRIPT:
+    case NODE_MEMBER:
+        compiler_error(compiler, source, "todo: compile those\n");
 
         return false;
     }

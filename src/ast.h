@@ -121,7 +121,7 @@ typedef struct {
     AstExtra extra;
 } Ast;
 
-AstNodeIdx ast_push(Ast *, AstNodeTag tag, AstNodeIdx lhs,
-                    AstNodeIdx rhs, uint32_t source);
+AstNodeIdx ast_push(Ast *, AstNodeTag tag, AstNodeIdx lhs, AstNodeIdx rhs,
+                    uint32_t source);
 
 void ast_display(const Ast *, const char *buffer, AstNodeIdx node);

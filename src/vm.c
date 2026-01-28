@@ -52,6 +52,11 @@ void vm_init(Vm *vm) {
     vm->objects = NULL;
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
+
+    vm->globals = OBJ_ALLOC(vm, OBJ_MAP, ObjMap);
+    vm->globals->entries = NULL;
+    vm->globals->count = 0;
+    vm->globals->capacity = 0;
 }
 
 bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
@@ -131,20 +136,49 @@ ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity) {
     return function;
 }
 
-ObjString *vm_new_string(Vm *vm, size_t reserved_characters) {
-    vm->bytes_allocated += sizeof(char) * reserved_characters;
+static uint32_t string_hash(const char *key, uint32_t count) {
+    uint32_t hash = 2166136261u;
+
+    for (uint32_t i = 0; i < count; i++) {
+        hash ^= (uint8_t)key[i];
+        hash *= 16777619;
+    }
+
+    return hash;
+}
+
+ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash) {
+    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
+
+    string->items = items;
+    string->count = count;
+    string->hash = hash;
+
+    return string;
+}
+
+ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count) {
+    vm->bytes_allocated += count;
 
     if (vm->bytes_allocated > vm->next_gc) {
         vm_gc(vm);
     }
 
-    char *items = malloc(sizeof(char) * reserved_characters);
-
     ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
 
-    string->items = items;
-    string->count = 0;
-    string->capacity = reserved_characters;
+    string->items = malloc(count * sizeof(char));
+
+    if (string->items == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    memcpy(string->items, items, count);
+
+    string->count = count;
+
+    string->hash = string_hash(items, count);
 
     return string;
 }
@@ -162,12 +196,164 @@ static ObjString *vm_to_string(Vm *vm, Value value) {
 }
 
 static ObjString *vm_string_concat(Vm *vm, ObjString *lhs, ObjString *rhs) {
-    ObjString *result = vm_new_string(vm, lhs->count + rhs->count);
+    vm->bytes_allocated += lhs->count + rhs->count;
 
-    ARRAY_EXPAND(result, lhs->items, lhs->count);
-    ARRAY_EXPAND(result, rhs->items, rhs->count);
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
 
-    return result;
+    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
+
+    string->items = malloc((lhs->count + rhs->count) * sizeof(char));
+
+    if (string->items == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    memcpy(string->items, lhs->items, lhs->count);
+    memcpy(string->items + lhs->count, rhs->items, rhs->count);
+
+    string->count = lhs->count + rhs->count;
+
+    string->hash = string_hash(string->items, string->count);
+
+    return string;
+}
+
+static ObjMapEntry *vm_map_find_entry(ObjMapEntry *entries, uint32_t capacity,
+                                      ObjString *key) {
+    uint32_t index = key->hash & (capacity - 1);
+
+    ObjMapEntry *tombstone = NULL;
+
+    for (;;) {
+        ObjMapEntry *entry = &entries[index];
+
+        if (entry->key == NULL) {
+            if (IS_NULL(entry->value)) {
+                return tombstone != NULL ? tombstone : entry;
+            } else if (tombstone == NULL) {
+                tombstone = entry;
+            }
+        } else if (entry->key == key || entry->key->items == key->items ||
+                   (entry->key->count == key->count &&
+                    strncmp(entry->key->items, key->items, key->count) == 0)) {
+            return entry;
+        }
+
+        index = (index + 1) & (capacity - 1);
+    }
+}
+
+static bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value) {
+    if (map->count == 0) {
+        return false;
+    }
+
+    ObjMapEntry *entry = vm_map_find_entry(map->entries, map->capacity, key);
+
+    if (entry->key == NULL) {
+        return false;
+    }
+
+    *value = entry->value;
+
+    return true;
+}
+
+static void vm_free_value(Vm *vm, Value);
+
+static void vm_free_map(Vm *vm, ObjMap *map) {
+    for (size_t i = 0; i < map->capacity; i++) {
+        ObjMapEntry entry = map->entries[i];
+
+        if (entry.key != NULL) {
+            free(entry.key->items);
+
+            vm->bytes_allocated -= entry.key->count;
+
+            vm_free_value(vm, entry.value);
+        }
+    }
+
+    free(map->entries);
+
+    vm->bytes_allocated -= map->capacity * sizeof(ObjMapEntry) + sizeof(ObjMap);
+}
+
+static void vm_map_adjust_capacity(Vm *vm, ObjMap *map, uint32_t capacity) {
+    vm->bytes_allocated += capacity * sizeof(ObjMapEntry);
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    ObjMapEntry *entries = malloc(capacity * sizeof(ObjMapEntry));
+
+    for (uint32_t i = 0; i < capacity; i++) {
+        entries[i].key = NULL;
+        entries[i].value = NULL_VAL;
+    }
+
+    map->count = 0;
+
+    for (uint32_t i = 0; i < map->capacity; i++) {
+        ObjMapEntry *entry = &map->entries[i];
+        if (entry->key == NULL)
+            continue;
+
+        ObjMapEntry *dest = vm_map_find_entry(entries, capacity, entry->key);
+
+        dest->key = entry->key;
+        dest->value = entry->value;
+
+        map->count++;
+    }
+
+    vm_free_map(vm, map);
+
+    map->entries = entries;
+    map->capacity = capacity;
+}
+
+#define VM_MAP_MAX_LOAD 0.75
+
+static bool vm_map_insert(Vm *vm, ObjMap *map, ObjString *key, Value value) {
+
+    if (map->count + 1 > map->capacity * VM_MAP_MAX_LOAD) {
+        vm_map_adjust_capacity(vm, map,
+                               map->capacity == 0 ? 8 : map->capacity * 2);
+    }
+
+    ObjMapEntry *entry = vm_map_find_entry(map->entries, map->capacity, key);
+
+    bool is_new_key = entry->key == NULL;
+
+    if (is_new_key && IS_NULL(entry->value)) {
+        map->count++;
+    }
+
+    entry->key = key;
+    entry->value = value;
+
+    return is_new_key;
+}
+
+bool vm_map_delete(ObjMap *map, ObjString *key) {
+    if (map->count == 0)
+        return false;
+
+    ObjMapEntry *entry = vm_map_find_entry(map->entries, map->capacity, key);
+
+    if (entry->key == NULL)
+        return false;
+
+    entry->key = NULL;
+    entry->value = BOOL_VAL(true);
+
+    return true;
 }
 
 static void vm_add_int(Vm *vm, Value lhs, Value rhs) {
@@ -738,6 +924,27 @@ bool vm_run(Vm *vm, Value *result) {
             frame->slots[READ_BYTE()] = vm_peek(vm, 0);
             break;
 
+        case OP_GET_GLOBAL: {
+            ObjString *key = READ_STRING();
+
+            Value value;
+
+            if (!vm_map_lookup(vm->globals, key, &value)) {
+                vm_error(vm, "'%.*s' is not defined", (int)key->count,
+                         key->items);
+
+                return false;
+            }
+
+            vm_push(vm, value);
+
+            break;
+        }
+
+        case OP_SET_GLOBAL:
+            vm_map_insert(vm, vm->globals, READ_STRING(), vm_peek(vm, 0));
+            break;
+
         case OP_EQL:
             vm_push(vm, BOOL_VAL(values_equal(vm_pop(vm), vm_pop(vm))));
             break;
@@ -996,28 +1203,23 @@ bool objects_equal(Obj *a, Obj *b) {
             return false;
         }
 
-        if (((ObjMap *)a)->keys == ((ObjMap *)b)->keys &&
-            ((ObjMap *)a)->values == ((ObjMap *)b)->values) {
+        if (((ObjMap *)a)->entries == ((ObjMap *)b)->entries) {
             return true;
         }
 
         for (uint32_t i = 0; i < ((ObjMap *)a)->count; i++) {
-            bool found_match = false;
+            ObjMapEntry ae = ((ObjMap *)a)->entries[i];
 
-            for (uint32_t j = 0; j < ((ObjMap *)b)->count; j++) {
-                if (values_equal(((ObjMap *)a)->keys[i],
-                                 ((ObjMap *)b)->keys[j])) {
-                    found_match = true;
+            if (ae.key != NULL) {
+                Value bv;
 
-                    if (!values_equal(((ObjMap *)a)->values[i],
-                                      ((ObjMap *)a)->values[j])) {
-                        return false;
-                    }
+                if (!vm_map_lookup((ObjMap *)b, ae.key, &bv)) {
+                    return false;
                 }
-            }
 
-            if (!found_match) {
-                return false;
+                if (!values_equal(ae.value, bv)) {
+                    return false;
+                }
             }
         }
 
@@ -1132,53 +1334,20 @@ void object_display(Obj *obj) {
 
         printf("{");
 
-        if (map->count > 0) {
-            if (IS_STRING(map->keys[0])) {
-                printf("\"");
-            }
+        bool first = true;
 
-            value_display(map->keys[0]);
+        for (uint32_t i = 0; i < map->capacity; i++) {
+            ObjMapEntry entry = map->entries[i];
 
-            if (IS_STRING(map->keys[0])) {
-                printf("\"");
-            }
-
-            printf(": ");
-
-            if (IS_STRING(map->values[0])) {
-                printf("\"");
-            }
-
-            value_display(map->values[0]);
-
-            if (IS_STRING(map->values[0])) {
-                printf("\"");
-            }
-
-            for (size_t i = 1; i < map->count; i++) {
-                printf(", ");
-
-                if (IS_STRING(map->keys[i])) {
-                    printf("\"");
+            if (entry.key != NULL) {
+                if (first) {
+                    first = false;
+                } else {
+                    printf(", ");
                 }
 
-                value_display(map->keys[i]);
-
-                if (IS_STRING(map->keys[i])) {
-                    printf("\"");
-                }
-
-                printf(": ");
-
-                if (IS_STRING(map->values[i])) {
-                    printf("\"");
-                }
-
-                value_display(map->values[i]);
-
-                if (IS_STRING(map->values[i])) {
-                    printf("\"");
-                }
+                printf("\"%.*s\": ", (int)entry.key->count, entry.key->items);
+                value_display(entry.value);
             }
         }
 
@@ -1293,9 +1462,14 @@ static void vm_mark_object(Vm *vm, Obj *obj) {
     case OBJ_MAP: {
         ObjMap *map = (ObjMap *)obj;
 
-        for (size_t i = 0; i < map->count; i++) {
-            vm_mark_value(vm, map->keys[i]);
-            vm_mark_value(vm, map->values[i]);
+        for (size_t i = 0; i < map->capacity; i++) {
+            ObjMapEntry entry = map->entries[i];
+
+            if (entry.key != NULL) {
+                entry.key->obj.marked = true;
+
+                vm_mark_value(vm, entry.value);
+            }
         }
 
         break;
@@ -1331,6 +1505,8 @@ static void vm_mark_roots(Vm *vm) {
 
         vm_mark_object(vm, &frame.fn->obj);
     }
+
+    vm_mark_object(vm, &vm->globals->obj);
 }
 
 static void vm_free_value(Vm *vm, Value value);
@@ -1342,7 +1518,7 @@ static void vm_free_object(Vm *vm, Obj *obj) {
 
         free(str->items);
 
-        vm->bytes_allocated -= str->capacity * sizeof(char) + sizeof(ObjString);
+        vm->bytes_allocated -= str->count * sizeof(char) + sizeof(ObjString);
 
         break;
     }
@@ -1362,18 +1538,7 @@ static void vm_free_object(Vm *vm, Obj *obj) {
     }
 
     case OBJ_MAP: {
-        ObjMap *map = (ObjMap *)obj;
-
-        for (size_t i = 0; i < map->count; i++) {
-            vm_free_value(vm, map->keys[i]);
-            vm_free_value(vm, map->values[i]);
-        }
-
-        free(map->keys);
-        free(map->values);
-
-        vm->bytes_allocated -=
-            map->capacity * 2 * sizeof(Value) + sizeof(ObjMap);
+        vm_free_map(vm, (ObjMap *)obj);
 
         break;
     }

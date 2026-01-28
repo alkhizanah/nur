@@ -75,6 +75,8 @@ typedef enum : uint8_t {
     OP_PUSH_CONST,
     OP_GET_LOCAL,
     OP_SET_LOCAL,
+    OP_GET_GLOBAL,
+    OP_SET_GLOBAL,
     OP_NEG,
     OP_NOT,
     OP_ADD,
@@ -120,7 +122,7 @@ typedef struct {
     Obj obj;
     char *items;
     uint32_t count;
-    uint32_t capacity;
+    uint32_t hash;
 } ObjString;
 
 typedef struct {
@@ -137,9 +139,13 @@ typedef struct {
 } ObjArray;
 
 typedef struct {
+    ObjString *key;
+    Value value;
+} ObjMapEntry;
+
+typedef struct {
     Obj obj;
-    Value *keys;
-    Value *values;
+    ObjMapEntry *entries;
     uint32_t count;
     uint32_t capacity;
 } ObjMap;
@@ -165,6 +171,8 @@ typedef struct {
 
     Value stack[VM_STACK_MAX];
     Value *sp;
+
+    ObjMap *globals;
 
     Obj *objects;
     size_t bytes_allocated;
@@ -202,7 +210,9 @@ Obj *vm_alloc(Vm *, ObjTag, size_t);
 
 #define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(type))
 
-ObjString *vm_new_string(Vm *vm, size_t reserved_characters);
+ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash);
+ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
+
 ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity);
 
 void vm_gc(Vm *);

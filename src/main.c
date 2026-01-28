@@ -135,6 +135,28 @@ static void disassemble(Chunk chunk) {
             printf("SET_LOCAL %d", (int)chunk.bytes[ip++]);
             break;
 
+        case OP_GET_GLOBAL: {
+            uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                           chunk.bytes[ip - 1]);
+
+            printf("GET_GLOBAL ");
+
+            value_display(chunk.constants.items[index]);
+
+            break;
+        }
+
+        case OP_SET_GLOBAL: {
+            uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                           chunk.bytes[ip - 1]);
+
+            printf("SET_GLOBAL ");
+
+            value_display(chunk.constants.items[index]);
+
+            break;
+        }
+
         case OP_EQL:
             printf("EQL");
             break;
