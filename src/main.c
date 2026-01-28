@@ -109,6 +109,10 @@ static void disassemble(Chunk chunk) {
 
             break;
 
+        case OP_DUP:
+            printf("DUP");
+            break;
+
         case OP_POP:
             printf("POP");
             break;
@@ -223,6 +227,15 @@ static void disassemble(Chunk chunk) {
             break;
         }
     }
+
+    for (size_t i = 0; i < chunk.constants.count; i++) {
+        Value constant = chunk.constants.items[i];
+
+        if (IS_FUNCTION(constant)) {
+            printf("FUNCTION (%zu):\n", i);
+            disassemble(AS_FUNCTION(constant)->chunk);
+        }
+    }
 }
 
 static void usage(const char *program) {
@@ -272,6 +285,8 @@ int main(int argc, const char **argv) {
         if (!vm_run(&vm, &result)) {
             return 1;
         }
+
+        value_display(result);
 
         free(input_file_content);
     } else if (strcmp(command, "dis") == 0) {

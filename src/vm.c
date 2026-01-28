@@ -698,6 +698,14 @@ bool vm_run(Vm *vm, Value *result) {
         OpCode opcode = READ_BYTE();
 
         switch (opcode) {
+        case OP_POP:
+            vm_pop(vm);
+            break;
+
+        case OP_DUP:
+            vm_push(vm, vm_peek(vm, 0));
+            break;
+
         case OP_PUSH_NULL:
             vm_push(vm, NULL_VAL);
             break;
@@ -712,10 +720,6 @@ bool vm_run(Vm *vm, Value *result) {
 
         case OP_PUSH_CONST:
             vm_push(vm, READ_CONSTANT());
-            break;
-
-        case OP_POP:
-            vm_pop(vm);
             break;
 
         case OP_GET_LOCAL:

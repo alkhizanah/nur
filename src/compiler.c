@@ -79,19 +79,22 @@ static bool compiler_find_local(Compiler *compiler, const char *name,
 
 static bool compile_identifier(Compiler *compiler, AstNode node,
                                uint32_t source) {
-    const char *identifier = compiler->file_buffer + node.lhs;
-    size_t len = node.rhs - node.lhs;
+    const char *name = compiler->file_buffer + node.lhs;
+    size_t name_len = node.rhs - node.lhs;
 
-    if (strncmp(identifier, "null", len) == 0) {
+    if (name_len == 4 && name[0] == 'n' && name[1] == 'u' && name[2] == 'l' &&
+        name[3] == 'l') {
         chunk_add_byte(compiler->chunk, OP_PUSH_NULL, source);
-    } else if (strncmp(identifier, "true", len) == 0) {
+    } else if (name_len == 4 && name[0] == 't' && name[1] == 'r' &&
+               name[2] == 'u' && name[3] == 'e') {
         chunk_add_byte(compiler->chunk, OP_PUSH_TRUE, source);
-    } else if (strncmp(identifier, "false", len) == 0) {
+    } else if (name_len == 5 && name[0] == 'f' && name[1] == 'a' &&
+               name[2] == 'l' && name[3] == 's' && name[4] == 'e') {
         chunk_add_byte(compiler->chunk, OP_PUSH_FALSE, source);
     } else {
         uint32_t local_idx;
 
-        if (compiler_find_local(compiler, identifier, len, &local_idx)) {
+        if (compiler_find_local(compiler, name, name_len, &local_idx)) {
             chunk_add_byte(compiler->chunk, OP_GET_LOCAL, source);
             chunk_add_byte(compiler->chunk, local_idx, source);
         } else {
@@ -191,6 +194,55 @@ static bool compile_function(Compiler *compiler, AstNode node,
 
     return true;
 };
+
+static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source) {
+    if (!compile_expr(compiler, node.rhs)) {
+        return false;
+    }
+
+    AstNode target = compiler->ast.nodes.items[node.lhs];
+
+    if (target.tag == NODE_IDENTIFIER) {
+        const char *name = compiler->file_buffer + target.lhs;
+        size_t name_len = target.rhs - target.lhs;
+
+        uint32_t local_idx;
+
+        if (compiler_find_local(compiler, name, name_len, &local_idx)) {
+            chunk_add_byte(compiler->chunk, OP_SET_LOCAL, source);
+            chunk_add_byte(compiler->chunk, local_idx, source);
+        } else if (compiler->parent != NULL) {
+            chunk_add_byte(compiler->chunk, OP_DUP, source);
+
+            Local local = {.name = name, .name_len = name_len};
+
+            ARRAY_PUSH(&compiler->locals, local);
+        } else {
+            compiler_error(compiler, source,
+                           "todo: handle global variable assignment\n");
+
+            return false;
+        }
+    } else if (target.tag == NODE_SUBSCRIPT) {
+        compiler_error(compiler, source, "todo: handle subscript assignment\n");
+
+        return false;
+    } else if (target.tag == NODE_MEMBER) {
+        compiler_error(compiler, source, "todo: handle member assignment\n");
+
+        return false;
+    } else {
+        compiler_error(
+            compiler, source,
+            "target of an assignment can either be an identifier or "
+            "a subscript (i.e `a[b]`) or a member access (i.e `a.b`), "
+            "other things are not allowed to be assigned to");
+
+        return false;
+    }
+
+    return true;
+}
 
 static uint32_t compiler_emit_jump(Compiler *compiler, OpCode opcode,
                                    uint32_t source) {
@@ -432,6 +484,9 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_FUNCTION:
         return compile_function(compiler, node, source);
+
+    case NODE_ASSIGN:
+        return compile_assign(compiler, node, source);
 
     case NODE_NOT:
         return compile_unary(compiler, node, source, OP_NOT);
