@@ -68,6 +68,7 @@ static inline bool is_obj_tag(Value v, ObjTag tag) {
 typedef enum : uint8_t {
     OP_POP,
     OP_DUP,
+    OP_SWP,
     OP_PUSH_NULL,
     OP_PUSH_TRUE,
     OP_PUSH_FALSE,

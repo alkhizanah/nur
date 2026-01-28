@@ -706,6 +706,14 @@ bool vm_run(Vm *vm, Value *result) {
             vm_push(vm, vm_peek(vm, 0));
             break;
 
+        case OP_SWP: {
+            Value a = vm_peek(vm, 0);
+            Value b = vm_peek(vm, 1);
+            vm_poke(vm, 0, b);
+            vm_poke(vm, 1, a);
+            break;
+        }
+
         case OP_PUSH_NULL:
             vm_push(vm, NULL_VAL);
             break;

@@ -90,6 +90,18 @@ static void disassemble(Chunk chunk) {
         OpCode opcode = chunk.bytes[ip++];
 
         switch (opcode) {
+        case OP_POP:
+            printf("POP");
+            break;
+
+        case OP_DUP:
+            printf("DUP");
+            break;
+
+        case OP_SWP:
+            printf("SWP");
+            break;
+
         case OP_PUSH_NULL:
             printf("PUSH_NULL");
             break;
@@ -102,27 +114,25 @@ static void disassemble(Chunk chunk) {
             printf("PUSH_FALSE");
             break;
 
-        case OP_PUSH_CONST:
-            printf("PUSH_CONST (%d)",
-                   (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                 chunk.bytes[ip - 1]));
+        case OP_PUSH_CONST: {
+            uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                           chunk.bytes[ip - 1]);
+
+            printf("PUSH_CONST %d (", (int)index);
+
+            value_display(chunk.constants.items[index]);
+
+            printf(")");
 
             break;
-
-        case OP_DUP:
-            printf("DUP");
-            break;
-
-        case OP_POP:
-            printf("POP");
-            break;
+        }
 
         case OP_GET_LOCAL:
-            printf("GET_LOCAL (%d)", chunk.bytes[ip++]);
+            printf("GET_LOCAL %d", (int)chunk.bytes[ip++]);
             break;
 
         case OP_SET_LOCAL:
-            printf("SET_LOCAL (%d)", chunk.bytes[ip++]);
+            printf("SET_LOCAL %d", (int)chunk.bytes[ip++]);
             break;
 
         case OP_EQL:
@@ -183,14 +193,14 @@ static void disassemble(Chunk chunk) {
             break;
 
         case OP_CALL:
-            printf("CALL (%d)", chunk.bytes[ip++]);
+            printf("CALL %d", (int)chunk.bytes[ip++]);
             break;
 
         case OP_POP_JUMP_IF_FALSE: {
             uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
                                             chunk.bytes[ip - 1]);
 
-            printf("POP_JUMP_IF_FALSE (%d), TO (%zu)", offset, ip + offset);
+            printf("POP_JUMP_IF_FALSE TO %zu", ip + offset);
 
             break;
         }
@@ -199,7 +209,7 @@ static void disassemble(Chunk chunk) {
             uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
                                             chunk.bytes[ip - 1]);
 
-            printf("JUMP_IF_FALSE (%d), TO (%zu)", offset, ip + offset);
+            printf("JUMP_IF_FALSE TO %zu", ip + offset);
 
             break;
         }
@@ -208,7 +218,7 @@ static void disassemble(Chunk chunk) {
             uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
                                             chunk.bytes[ip - 1]);
 
-            printf("JUMP (%d), TO (%zu)", offset, ip + offset);
+            printf("JUMP TO %zu", ip + offset);
 
             break;
         }
@@ -217,7 +227,7 @@ static void disassemble(Chunk chunk) {
             uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
                                             chunk.bytes[ip - 1]);
 
-            printf("LOOP (%d), TO (%zu)", offset, ip - offset);
+            printf("LOOP TO %zu", ip - offset);
 
             break;
         }
@@ -285,8 +295,6 @@ int main(int argc, const char **argv) {
         if (!vm_run(&vm, &result)) {
             return 1;
         }
-
-        value_display(result);
 
         free(input_file_content);
     } else if (strcmp(command, "dis") == 0) {

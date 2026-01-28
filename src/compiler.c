@@ -195,7 +195,8 @@ static bool compile_function(Compiler *compiler, AstNode node,
     return true;
 };
 
-static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source) {
+static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
+                           bool has_op, OpCode op) {
     if (!compile_expr(compiler, node.rhs)) {
         return false;
     }
@@ -209,8 +210,22 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source) {
         uint32_t local_idx;
 
         if (compiler_find_local(compiler, name, name_len, &local_idx)) {
+            if (has_op) {
+                chunk_add_byte(compiler->chunk, OP_GET_LOCAL, source);
+                chunk_add_byte(compiler->chunk, local_idx, source);
+
+                chunk_add_byte(compiler->chunk, OP_SWP, source);
+
+                chunk_add_byte(compiler->chunk, op, source);
+            }
+
             chunk_add_byte(compiler->chunk, OP_SET_LOCAL, source);
             chunk_add_byte(compiler->chunk, local_idx, source);
+        } else if (has_op) {
+            compiler_error(compiler, source,
+                           "todo: handle global variable assignment\n");
+
+            return false;
         } else if (compiler->parent != NULL) {
             chunk_add_byte(compiler->chunk, OP_DUP, source);
 
@@ -486,7 +501,25 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
         return compile_function(compiler, node, source);
 
     case NODE_ASSIGN:
-        return compile_assign(compiler, node, source);
+        return compile_assign(compiler, node, source, false, 0);
+
+    case NODE_ASSIGN_ADD:
+        return compile_assign(compiler, node, source, true, OP_ADD);
+
+    case NODE_ASSIGN_SUB:
+        return compile_assign(compiler, node, source, true, OP_SUB);
+
+    case NODE_ASSIGN_MUL:
+        return compile_assign(compiler, node, source, true, OP_MUL);
+
+    case NODE_ASSIGN_DIV:
+        return compile_assign(compiler, node, source, true, OP_DIV);
+
+    case NODE_ASSIGN_MOD:
+        return compile_assign(compiler, node, source, true, OP_MOD);
+
+    case NODE_ASSIGN_POW:
+        return compile_assign(compiler, node, source, true, OP_POW);
 
     case NODE_NOT:
         return compile_unary(compiler, node, source, OP_NOT);
