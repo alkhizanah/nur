@@ -56,6 +56,27 @@ static void compiler_push_constant(Compiler *compiler, Value value,
     chunk_add_byte(compiler->chunk, c, source);
 }
 
+static bool compiler_find_local(Compiler *compiler, const char *name,
+                                size_t name_len, uint32_t *local_idx) {
+    for (*local_idx = 0; *local_idx < compiler->locals.count; (*local_idx)++) {
+        Local local = compiler->locals.items[*local_idx];
+
+        if (local.name_len != name_len) {
+            continue;
+        }
+
+        if (local.name == name) {
+            return true;
+        }
+
+        if (strncmp(local.name, name, name_len) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool compile_identifier(Compiler *compiler, AstNode node,
                                uint32_t source) {
     const char *identifier = compiler->file_buffer + node.lhs;
@@ -68,10 +89,17 @@ static bool compile_identifier(Compiler *compiler, AstNode node,
     } else if (strncmp(identifier, "false", len) == 0) {
         chunk_add_byte(compiler->chunk, OP_PUSH_FALSE, source);
     } else {
-        compiler_error(compiler, source,
-                       "todo: compile global/local variables\n");
+        uint32_t local_idx;
 
-        return false;
+        if (compiler_find_local(compiler, identifier, len, &local_idx)) {
+            chunk_add_byte(compiler->chunk, OP_GET_LOCAL, source);
+            chunk_add_byte(compiler->chunk, local_idx, source);
+        } else {
+            compiler_error(compiler, source,
+                           "todo: compile global variable access\n");
+
+            return false;
+        }
     }
 
     return true;
@@ -100,10 +128,10 @@ static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
 
 static bool compile_function(Compiler *compiler, AstNode node,
                              uint32_t source) {
-    uint32_t arity = 0;
+    Locals parameters = {0};
 
     if (node.lhs != INVALID_EXTRA_IDX) {
-        arity = compiler->ast.extra.items[node.lhs];
+        uint32_t arity = compiler->ast.extra.items[node.lhs];
 
         if (arity > UINT8_MAX) {
             compiler_error(compiler, source,
@@ -113,37 +141,53 @@ static bool compile_function(Compiler *compiler, AstNode node,
             return false;
         }
 
-        // TODO: if local variables are supported this should read the parameter
-        // names and do something with them, however we ignore them for now
+        for (uint32_t i = 0; i < arity; i++) {
+            AstNode parameter =
+                compiler->ast.nodes
+                    .items[compiler->ast.extra.items[node.lhs + 1 + i]];
+
+            Local local = {
+                .name = compiler->file_buffer + parameter.lhs,
+                .name_len = parameter.rhs - parameter.lhs,
+            };
+
+            ARRAY_PUSH(&parameters, local);
+        }
     }
 
-    Chunk *prev_chunk = compiler->chunk;
+    Compiler fc = {
+        .parent = compiler,
+        .file_buffer = compiler->file_buffer,
+        .file_path = compiler->file_path,
+        .ast = compiler->ast,
+        .vm = compiler->vm,
+        .locals = parameters,
+        .loop = {0},
+    };
 
-    CallFrame *frame = &compiler->vm->frames[compiler->vm->frame_count++];
+    CallFrame *frame = &fc.vm->frames[fc.vm->frame_count++];
 
-    frame->fn = vm_new_function(compiler->vm,
+    frame->fn = vm_new_function(fc.vm,
                                 (Chunk){
-                                    .file_path = compiler->file_path,
-                                    .file_content = compiler->file_buffer,
+                                    .file_path = fc.file_path,
+                                    .file_content = fc.file_buffer,
                                 },
-                                arity);
+                                parameters.count);
 
     frame->slots = compiler->vm->stack;
 
-    compiler->chunk = &frame->fn->chunk;
+    fc.chunk = &frame->fn->chunk;
 
-    if (!compile_stmt(compiler, node.rhs)) {
+    if (!compile_stmt(&fc, node.rhs)) {
         return false;
     }
 
-    chunk_add_byte(compiler->chunk, OP_PUSH_NULL, 0);
-    chunk_add_byte(compiler->chunk, OP_RETURN, 0);
+    chunk_add_byte(fc.chunk, OP_PUSH_NULL, 0);
+    chunk_add_byte(fc.chunk, OP_RETURN, 0);
 
-    compiler->chunk = prev_chunk;
+    fc.vm->frame_count--;
 
     compiler_push_constant(compiler, OBJ_VAL(frame->fn), source);
-
-    compiler->vm->frame_count--;
 
     return true;
 };
@@ -178,9 +222,9 @@ static void compiler_emit_loop(Compiler *compiler, uint32_t source) {
 static bool compile_while_loop(Compiler *compiler, AstNode node,
                                uint32_t source) {
 
-    LoopContext prev_loop = compiler->loop;
+    Loop prev_loop = compiler->loop;
 
-    compiler->loop = (LoopContext){
+    compiler->loop = (Loop){
         .breaks = {0},
         .start = compiler->chunk->count,
         .inside = true,
