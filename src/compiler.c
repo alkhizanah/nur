@@ -210,7 +210,7 @@ static bool compile_function(Compiler *compiler, AstNode node,
 
 static bool compile_array(Compiler *compiler, AstNode node, uint32_t source) {
     for (uint32_t i = 0; i < node.rhs; i++) {
-        if (!compile_expr(compiler, compiler->ast.extra.items[i])) {
+        if (!compile_expr(compiler, compiler->ast.extra.items[node.lhs + i])) {
             return false;
         }
     }
@@ -221,11 +221,45 @@ static bool compile_array(Compiler *compiler, AstNode node, uint32_t source) {
     return true;
 }
 
+static bool compile_map(Compiler *compiler, AstNode node, uint32_t source) {
+    for (uint32_t i = 0; i < node.rhs * 2; i++) {
+        if (!compile_expr(compiler, compiler->ast.extra.items[node.lhs + i])) {
+            return false;
+        }
+    }
+
+    chunk_add_byte(compiler->chunk, OP_MAKE_MAP, source);
+    compiler_emit_word(compiler, node.rhs, source);
+
+    return true;
+}
+
 static bool compile_subscript(Compiler *compiler, AstNode node,
                               uint32_t source) {
     if (!compile_expr(compiler, node.rhs)) {
         return false;
     }
+
+    if (!compile_expr(compiler, node.lhs)) {
+        return false;
+    }
+
+    chunk_add_byte(compiler->chunk, OP_GET_SUBSCRIPT, source);
+
+    return true;
+}
+
+static bool compile_member(Compiler *compiler, AstNode node, uint32_t source) {
+
+    AstNode identifier = compiler->ast.nodes.items[node.rhs];
+
+    const char *key = compiler->file_buffer + identifier.lhs;
+    uint32_t key_len = identifier.rhs - identifier.lhs;
+
+    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+
+    compiler_emit_constant(
+        compiler, OBJ_VAL(vm_copy_string(compiler->vm, key, key_len)), source);
 
     if (!compile_expr(compiler, node.lhs)) {
         return false;
@@ -299,9 +333,22 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
 
         chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT, source);
     } else if (target.tag == NODE_MEMBER) {
-        compiler_error(compiler, source, "todo: handle member assignment\n");
+        AstNode identifier = compiler->ast.nodes.items[target.rhs];
 
-        return false;
+        const char *key = compiler->file_buffer + identifier.lhs;
+        uint32_t key_len = identifier.rhs - identifier.lhs;
+
+        chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+
+        compiler_emit_constant(
+            compiler, OBJ_VAL(vm_copy_string(compiler->vm, key, key_len)),
+            source);
+
+        if (!compile_expr(compiler, target.lhs)) {
+            return false;
+        }
+
+        chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT, source);
     } else {
         compiler_error(
             compiler, source,
@@ -567,8 +614,14 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     case NODE_ARRAY:
         return compile_array(compiler, node, source);
 
+    case NODE_MAP:
+        return compile_map(compiler, node, source);
+
     case NODE_SUBSCRIPT:
         return compile_subscript(compiler, node, source);
+
+    case NODE_MEMBER:
+        return compile_member(compiler, node, source);
 
     case NODE_ASSIGN:
         return compile_assign(compiler, node, source, false, 0);
@@ -635,11 +688,5 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_CALL:
         return compile_call(compiler, node, source);
-
-    case NODE_MAP:
-    case NODE_MEMBER:
-        compiler_error(compiler, source, "todo: compile those\n");
-
-        return false;
     }
 }

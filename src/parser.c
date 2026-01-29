@@ -550,8 +550,7 @@ static AstNodeIdx parse_array(Parser *parser) {
 static AstNodeIdx parse_map(Parser *parser) {
     Token token = parser_advance(parser);
 
-    AstExtra keys = {0};
-    AstExtra values = {0};
+    AstExtra pairs = {0};
 
     while (parser_peek(parser).tag != TOK_CBRACE) {
         AstNodeIdx key = parse_expr(parser, PR_LOWEST);
@@ -585,33 +584,22 @@ static AstNodeIdx parse_map(Parser *parser) {
             return INVALID_NODE_IDX;
         }
 
-        ARRAY_PUSH(&keys, key);
-        ARRAY_PUSH(&values, value);
+        ARRAY_PUSH(&pairs, key);
+        ARRAY_PUSH(&pairs, value);
     }
 
     parser_advance(parser);
 
-    if (keys.count == 0) {
-        return ast_push(&parser->ast, NODE_MAP, INVALID_EXTRA_IDX,
-                        INVALID_EXTRA_IDX, token.range.start);
-    } else {
-        uint32_t keys_start = parser->ast.extra.count;
+    uint32_t pairs_start = parser->ast.extra.count;
 
-        ARRAY_PUSH(&parser->ast.extra, keys.count);
+    ARRAY_EXPAND(&parser->ast.extra, pairs.items, pairs.count);
 
-        ARRAY_EXPAND(&parser->ast.extra, keys.items, keys.count);
+    uint32_t pairs_count = pairs.count / 2;
 
-        ARRAY_FREE(&keys);
+    ARRAY_FREE(&pairs);
 
-        uint32_t values_start = parser->ast.extra.count;
-
-        ARRAY_EXPAND(&parser->ast.extra, values.items, values.count);
-
-        ARRAY_FREE(&values);
-
-        return ast_push(&parser->ast, NODE_MAP, keys_start, values_start,
-                        token.range.start);
-    }
+    return ast_push(&parser->ast, NODE_MAP, pairs_start, pairs_count,
+                    token.range.start);
 }
 
 static AstNodeIdx parse_unary_op(Parser *parser, AstNodeTag tag) {

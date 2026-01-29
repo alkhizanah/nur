@@ -80,6 +80,7 @@ typedef enum : uint8_t {
     OP_GET_SUBSCRIPT,
     OP_SET_SUBSCRIPT,
     OP_MAKE_ARRAY,
+    OP_MAKE_MAP,
     OP_NEG,
     OP_NOT,
     OP_ADD,
@@ -212,6 +213,8 @@ void vm_error(Vm *vm, const char *format, ...);
 Obj *vm_alloc(Vm *, ObjTag, size_t);
 
 #define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(type))
+
+ObjMap *vm_new_map(Vm *vm);
 
 ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash);
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);

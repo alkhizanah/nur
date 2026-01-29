@@ -234,6 +234,18 @@ static void disassemble(Chunk chunk) {
             break;
         }
 
+        case OP_MAKE_MAP: {
+            uint32_t count =
+                (ip += 4, ((uint16_t)chunk.bytes[ip - 4] << 24) |
+                              ((uint16_t)chunk.bytes[ip - 3] << 16) |
+                              ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                              chunk.bytes[ip - 1]);
+
+            printf("MAKE_MAP %d", (int)count);
+
+            break;
+        }
+
         case OP_CALL:
             printf("CALL %d", (int)chunk.bytes[ip++]);
             break;

@@ -53,10 +53,7 @@ void vm_init(Vm *vm) {
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
 
-    vm->globals = OBJ_ALLOC(vm, OBJ_MAP, ObjMap);
-    vm->globals->entries = NULL;
-    vm->globals->count = 0;
-    vm->globals->capacity = 0;
+    vm->globals = vm_new_map(vm);
 }
 
 bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
@@ -145,6 +142,16 @@ static uint32_t string_hash(const char *key, uint32_t count) {
     }
 
     return hash;
+}
+
+ObjMap *vm_new_map(Vm *vm) {
+    ObjMap *map = OBJ_ALLOC(vm, OBJ_MAP, ObjMap);
+
+    map->entries = NULL;
+    map->count = 0;
+    map->capacity = 0;
+
+    return map;
 }
 
 ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash) {
@@ -1112,6 +1119,34 @@ bool vm_run(Vm *vm, Value *result) {
             break;
         }
 
+        case OP_MAKE_MAP: {
+            uint32_t count = READ_WORD();
+
+            ObjMap *map = vm_new_map(vm);
+
+            Value *start = vm->sp - count * 2;
+
+            for (uint32_t i = 0; i < count * 2; i += 2) {
+                if (!IS_STRING(start[i])) {
+                    vm_error(vm, "expected a string got %s",
+                             value_description(start[i]));
+
+                    return false;
+                }
+
+                ObjString *key = AS_STRING(start[i]);
+                Value value = start[i + 1];
+
+                vm_map_insert(vm, map, key, value);
+            }
+
+            vm->sp = start;
+
+            vm_push(vm, OBJ_VAL(map));
+
+            break;
+        }
+
         case OP_EQL:
             vm_push(vm, BOOL_VAL(values_equal(vm_pop(vm), vm_pop(vm))));
             break;
@@ -1456,7 +1491,7 @@ void object_display(Obj *obj) {
     switch (obj->tag) {
     case OBJ_STRING: {
         ObjString *str = (ObjString *)obj;
-        printf("%.*s", (int)str->count, str->items);
+        printf("\"%.*s\"", (int)str->count, str->items);
         break;
     }
 
