@@ -41,9 +41,67 @@ static inline const char *value_description(Value value) {
     }
 }
 
+void vm_error(Vm *vm, const char *format, ...) {
+    va_list args;
+
+    va_start(args, format);
+
+    fprintf(stderr, "error: ");
+    vfprintf(stderr, format, args);
+
+    va_end(args);
+
+    fprintf(stderr, "\n");
+
+    for (ssize_t i = vm->frame_count - 1; i >= 0; i--) {
+        CallFrame *frame = &vm->frames[i];
+
+        size_t instruction = frame->ip - frame->fn->chunk.bytes - 1;
+        size_t source = frame->fn->chunk.sources[instruction];
+
+        SourceLocation loc = source_location_of(
+            frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
+
+        fprintf(stderr, "\tat %s:%u:%u\n", loc.file_path, loc.line, loc.column);
+    }
+}
+
 void vm_stack_reset(Vm *vm) {
     vm->sp = vm->stack;
     vm->frame_count = 0;
+}
+
+bool vm_print(Vm *vm, Value *argv, uint8_t argc) {
+
+    for (uint8_t i = 0; i < argc; i++) {
+        Value arg = argv[i];
+
+        if (IS_STRING(arg)) {
+            printf("%.*s", AS_STRING(arg)->count, AS_STRING(arg)->items);
+        } else {
+            value_display(arg);
+        }
+    }
+
+    vm_push(vm, NULL_VAL);
+
+    return true;
+}
+
+bool vm_println(Vm *vm, Value *argv, uint8_t argc) {
+    vm_print(vm, argv, argc);
+    printf("\n");
+    return true;
+}
+
+void vm_insert_global(Vm *vm, const char *key, Value value) {
+    vm_map_insert(vm, vm->globals, vm_copy_string(vm, key, strlen(key)), value);
+}
+
+void vm_insert_global_native(Vm *vm, const char *key, NativeFn call) {
+    ObjNative *native = OBJ_ALLOC(vm, OBJ_NATIVE, ObjNative);
+    native->fn = call;
+    vm_insert_global(vm, key, OBJ_VAL(native));
 }
 
 void vm_init(Vm *vm) {
@@ -54,6 +112,9 @@ void vm_init(Vm *vm) {
     vm->next_gc = 1024 * 1024;
 
     vm->globals = vm_new_map(vm);
+
+    vm_insert_global_native(vm, "print", vm_print);
+    vm_insert_global_native(vm, "println", vm_println);
 }
 
 bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
@@ -279,7 +340,7 @@ static ObjMapEntry *vm_map_find_entry(ObjMapEntry *entries, uint32_t capacity,
     }
 }
 
-static bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value) {
+bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value) {
     if (map->count == 0) {
         return false;
     }
@@ -315,7 +376,7 @@ static void vm_free_map(Vm *vm, ObjMap *map) {
     vm->bytes_allocated -= map->capacity * sizeof(ObjMapEntry) + sizeof(ObjMap);
 }
 
-static void vm_map_adjust_capacity(Vm *vm, ObjMap *map, uint32_t capacity) {
+void vm_map_adjust_capacity(Vm *vm, ObjMap *map, uint32_t capacity) {
     vm->bytes_allocated += capacity * sizeof(ObjMapEntry);
 
     if (vm->bytes_allocated > vm->next_gc) {
@@ -352,7 +413,7 @@ static void vm_map_adjust_capacity(Vm *vm, ObjMap *map, uint32_t capacity) {
 
 #define VM_MAP_MAX_LOAD 0.75
 
-static bool vm_map_insert(Vm *vm, ObjMap *map, ObjString *key, Value value) {
+bool vm_map_insert(Vm *vm, ObjMap *map, ObjString *key, Value value) {
 
     if (map->count + 1 > map->capacity * VM_MAP_MAX_LOAD) {
         vm_map_adjust_capacity(vm, map,
@@ -819,7 +880,13 @@ static bool vm_call_value(Vm *vm, Value callee, uint8_t argc) {
     if (IS_FUNCTION(callee)) {
         return vm_call(vm, AS_FUNCTION(callee), argc);
     } else if (IS_NATIVE(callee)) {
-        return AS_NATIVE(callee)->fn(vm, argc);
+        if (!AS_NATIVE(callee)->fn(vm, vm->sp - argc, argc)) {
+            return false;
+        }
+
+        vm->sp -= argc;
+
+        return true;
     } else {
         vm_error(vm, "can not call %s value", value_description(callee));
 
@@ -1299,31 +1366,6 @@ bool vm_run(Vm *vm, Value *result) {
             break;
         }
         }
-    }
-}
-
-void vm_error(Vm *vm, const char *format, ...) {
-    va_list args;
-
-    va_start(args, format);
-
-    fprintf(stderr, "error: ");
-    vfprintf(stderr, format, args);
-
-    va_end(args);
-
-    fprintf(stderr, "\n");
-
-    for (ssize_t i = vm->frame_count - 1; i >= 0; i--) {
-        CallFrame *frame = &vm->frames[i];
-
-        size_t instruction = frame->ip - frame->fn->chunk.bytes - 1;
-        size_t source = frame->fn->chunk.sources[instruction];
-
-        SourceLocation loc = source_location_of(
-            frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
-
-        fprintf(stderr, "\tat %s:%u:%u\n", loc.file_path, loc.line, loc.column);
     }
 }
 

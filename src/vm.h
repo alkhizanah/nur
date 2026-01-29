@@ -183,7 +183,7 @@ typedef struct {
     size_t next_gc;
 } Vm;
 
-typedef bool (*NativeFn)(Vm *, uint16_t argc);
+typedef bool (*NativeFn)(Vm *, Value *argv, uint8_t argc);
 
 typedef struct {
     Obj obj;
@@ -203,6 +203,10 @@ void vm_stack_reset(Vm *);
 
 void vm_init(Vm *);
 
+void vm_insert_global(Vm *vm, const char *key, Value value);
+
+void vm_insert_global_native(Vm *vm, const char *key, NativeFn call);
+
 bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer);
 
 bool vm_run(Vm *, Value *result);
@@ -215,6 +219,9 @@ Obj *vm_alloc(Vm *, ObjTag, size_t);
 #define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(type))
 
 ObjMap *vm_new_map(Vm *vm);
+
+bool vm_map_insert(Vm *vm, ObjMap *map, ObjString *key, Value value);
+bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value);
 
 ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash);
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
