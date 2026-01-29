@@ -54,6 +54,14 @@ static void compiler_emit_short(Compiler *compiler, uint16_t c,
     chunk_add_byte(compiler->chunk, c, source);
 }
 
+static void compiler_emit_word(Compiler *compiler, uint32_t c,
+                               uint32_t source) {
+    chunk_add_byte(compiler->chunk, c >> 24, source);
+    chunk_add_byte(compiler->chunk, c >> 16, source);
+    chunk_add_byte(compiler->chunk, c >> 8, source);
+    chunk_add_byte(compiler->chunk, c, source);
+}
+
 static void compiler_emit_constant(Compiler *compiler, Value value,
                                    uint32_t source) {
     uint16_t c = chunk_add_constant(compiler->chunk, value);
@@ -200,6 +208,34 @@ static bool compile_function(Compiler *compiler, AstNode node,
     return true;
 };
 
+static bool compile_array(Compiler *compiler, AstNode node, uint32_t source) {
+    for (uint32_t i = 0; i < node.rhs; i++) {
+        if (!compile_expr(compiler, compiler->ast.extra.items[i])) {
+            return false;
+        }
+    }
+
+    chunk_add_byte(compiler->chunk, OP_MAKE_ARRAY, source);
+    compiler_emit_word(compiler, node.rhs, source);
+
+    return true;
+}
+
+static bool compile_subscript(Compiler *compiler, AstNode node,
+                              uint32_t source) {
+    if (!compile_expr(compiler, node.rhs)) {
+        return false;
+    }
+
+    if (!compile_expr(compiler, node.lhs)) {
+        return false;
+    }
+
+    chunk_add_byte(compiler->chunk, OP_GET_SUBSCRIPT, source);
+
+    return true;
+}
+
 static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
                            bool has_op, OpCode op) {
     if (!compile_expr(compiler, node.rhs)) {
@@ -253,9 +289,15 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
             compiler_emit_constant(compiler, OBJ_VAL(key), source);
         }
     } else if (target.tag == NODE_SUBSCRIPT) {
-        compiler_error(compiler, source, "todo: handle subscript assignment\n");
+        if (!compile_expr(compiler, target.rhs)) {
+            return false;
+        }
 
-        return false;
+        if (!compile_expr(compiler, target.lhs)) {
+            return false;
+        }
+
+        chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT, source);
     } else if (target.tag == NODE_MEMBER) {
         compiler_error(compiler, source, "todo: handle member assignment\n");
 
@@ -522,6 +564,12 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     case NODE_FUNCTION:
         return compile_function(compiler, node, source);
 
+    case NODE_ARRAY:
+        return compile_array(compiler, node, source);
+
+    case NODE_SUBSCRIPT:
+        return compile_subscript(compiler, node, source);
+
     case NODE_ASSIGN:
         return compile_assign(compiler, node, source, false, 0);
 
@@ -588,9 +636,7 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     case NODE_CALL:
         return compile_call(compiler, node, source);
 
-    case NODE_ARRAY:
     case NODE_MAP:
-    case NODE_SUBSCRIPT:
     case NODE_MEMBER:
         compiler_error(compiler, source, "todo: compile those\n");
 

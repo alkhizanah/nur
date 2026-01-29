@@ -58,7 +58,7 @@ A list of values
 
 ## Map
 
-A map of key to value
+A map of a string to any value
 
 ```
 {"a": "b"}

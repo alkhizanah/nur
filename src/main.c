@@ -157,6 +157,14 @@ static void disassemble(Chunk chunk) {
             break;
         }
 
+        case OP_GET_SUBSCRIPT:
+            printf("GET_SUBSCRIPT");
+            break;
+
+        case OP_SET_SUBSCRIPT:
+            printf("SET_SUBSCRIPT");
+            break;
+
         case OP_EQL:
             printf("EQL");
             break;
@@ -213,6 +221,18 @@ static void disassemble(Chunk chunk) {
         case OP_GTE:
             printf("GTE");
             break;
+
+        case OP_MAKE_ARRAY: {
+            uint32_t count =
+                (ip += 4, ((uint16_t)chunk.bytes[ip - 4] << 24) |
+                              ((uint16_t)chunk.bytes[ip - 3] << 16) |
+                              ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                              chunk.bytes[ip - 1]);
+
+            printf("MAKE_ARRAY %d", (int)count);
+
+            break;
+        }
 
         case OP_CALL:
             printf("CALL %d", (int)chunk.bytes[ip++]);

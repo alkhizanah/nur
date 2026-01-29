@@ -158,7 +158,7 @@ ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash) {
 }
 
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count) {
-    vm->bytes_allocated += count;
+    vm->bytes_allocated += count * sizeof(*items);
 
     if (vm->bytes_allocated > vm->next_gc) {
         vm_gc(vm);
@@ -166,7 +166,7 @@ ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count) {
 
     ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
 
-    string->items = malloc(count * sizeof(char));
+    string->items = malloc(count * sizeof(*items));
 
     if (string->items == NULL) {
         fprintf(stderr, "error: out of memory\n");
@@ -174,13 +174,38 @@ ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count) {
         exit(1);
     }
 
-    memcpy(string->items, items, count);
+    memcpy(string->items, items, count * sizeof(*items));
 
     string->count = count;
 
     string->hash = string_hash(items, count);
 
     return string;
+}
+
+ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count) {
+    vm->bytes_allocated += count * sizeof(*items);
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    ObjArray *array = OBJ_ALLOC(vm, OBJ_ARRAY, ObjArray);
+
+    array->items = malloc(count * sizeof(*items));
+
+    if (array->items == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    memcpy(array->items, items, count * sizeof(*items));
+
+    array->count = count;
+    array->capacity = count;
+
+    return array;
 }
 
 static ObjString *vm_to_string(Vm *vm, Value value) {
@@ -837,6 +862,115 @@ static bool vm_pow(Vm *vm) {
     return true;
 }
 
+static bool vm_get_subscript(Vm *vm) {
+    Value target = vm_pop(vm);
+    Value index = vm_pop(vm);
+
+    if (IS_ARRAY(target)) {
+        if (!IS_INT(index)) {
+            vm_error(vm, "cannot access an array with %s value",
+                     value_description(index));
+
+            return false;
+        }
+
+        ObjArray *array = AS_ARRAY(target);
+
+        int64_t i = AS_INT(index);
+
+        if (i < 0 || i >= array->count) {
+            vm_error(vm,
+                     "access out of bounds, array has %d elements "
+                     "while the index is %ld",
+                     array->count, i);
+
+            return false;
+        }
+
+        vm_push(vm, array->items[i]);
+    } else if (IS_MAP(target)) {
+        if (!IS_STRING(index)) {
+            vm_error(vm, "cannot access a map with %s value",
+                     value_description(index));
+
+            return false;
+        }
+
+        ObjMap *map = AS_MAP(target);
+
+        ObjString *key = AS_STRING(index);
+
+        Value value;
+
+        if (!vm_map_lookup(map, key, &value)) {
+            vm_error(vm, "map does not have a '%.*s' key", key->count,
+                     key->items);
+
+            return false;
+        }
+
+        vm_push(vm, value);
+    } else {
+        vm_error(vm, "expected an array or a map but got %s",
+                 value_description(target));
+
+        return false;
+    }
+
+    return true;
+}
+
+static bool vm_set_subscript(Vm *vm) {
+    Value target = vm_pop(vm);
+    Value index = vm_pop(vm);
+
+    if (IS_ARRAY(target)) {
+        if (!IS_INT(index)) {
+            vm_error(vm, "cannot access an array with %s value",
+                     value_description(index));
+
+            return false;
+        }
+
+        ObjArray *array = AS_ARRAY(target);
+
+        int64_t i = AS_INT(index);
+
+        if (i < 0 || i >= array->count) {
+            vm_error(vm,
+                     "access out of bounds, array has %d elements "
+                     "while the index is %ld",
+                     array->count, i);
+
+            return false;
+        }
+
+        array->items[i] = vm_peek(vm, 0);
+    } else if (IS_MAP(target)) {
+        if (!IS_STRING(index)) {
+            vm_error(vm, "cannot access a map with %s value",
+                     value_description(index));
+
+            return false;
+        }
+
+        ObjMap *map = AS_MAP(target);
+
+        ObjString *key = AS_STRING(index);
+
+        Value value = vm_peek(vm, 0);
+
+        vm_map_insert(vm, map, key, value);
+    } else {
+        vm_error(vm, "expected an array or a map but got %s",
+                 value_description(target));
+
+        return false;
+    }
+
+    return true;
+}
+
 #define VM_CMP_FN(name, op)                                                    \
     static bool name(Vm *vm) {                                                 \
         Value rhs = vm_peek(vm, 0);                                            \
@@ -876,8 +1010,15 @@ bool vm_run(Vm *vm, Value *result) {
     CallFrame *frame = &vm->frames[vm->frame_count - 1];
 
 #define READ_BYTE() (*frame->ip++)
+
 #define READ_SHORT() (((uint16_t)READ_BYTE() << 8) | READ_BYTE())
+
+#define READ_WORD()                                                            \
+    (((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |           \
+     ((uint32_t)READ_BYTE() << 8) | READ_BYTE())
+
 #define READ_CONSTANT() (frame->fn->chunk.constants.items[READ_SHORT()])
+
 #define READ_STRING() (AS_STRING(READ_CONSTANT()))
 
     for (;;) {
@@ -944,6 +1085,32 @@ bool vm_run(Vm *vm, Value *result) {
         case OP_SET_GLOBAL:
             vm_map_insert(vm, vm->globals, READ_STRING(), vm_peek(vm, 0));
             break;
+
+        case OP_GET_SUBSCRIPT:
+            if (!vm_get_subscript(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_SET_SUBSCRIPT:
+            if (!vm_set_subscript(vm)) {
+                return false;
+            }
+
+            break;
+
+        case OP_MAKE_ARRAY: {
+            uint32_t count = READ_WORD();
+
+            ObjArray *array = vm_copy_array(vm, vm->sp - count, count);
+
+            vm->sp -= count;
+
+            vm_push(vm, OBJ_VAL(array));
+
+            break;
+        }
 
         case OP_EQL:
             vm_push(vm, BOOL_VAL(values_equal(vm_pop(vm), vm_pop(vm))));

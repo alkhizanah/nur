@@ -77,6 +77,9 @@ typedef enum : uint8_t {
     OP_SET_LOCAL,
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,
+    OP_GET_SUBSCRIPT,
+    OP_SET_SUBSCRIPT,
+    OP_MAKE_ARRAY,
     OP_NEG,
     OP_NOT,
     OP_ADD,
@@ -212,6 +215,8 @@ Obj *vm_alloc(Vm *, ObjTag, size_t);
 
 ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash);
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
+
+ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count);
 
 ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity);
 
