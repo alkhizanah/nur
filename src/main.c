@@ -10,6 +10,16 @@
 #include "parser.h"
 #include "vm.h"
 
+int file_exists(const char *file_path) {
+#if _WIN32
+#include <windows.h>
+    return GetFileAttributesA(file_path) != INVALID_FILE_ATTRIBUTES;
+#else
+#include <unistd.h>
+    return access(file_path, F_OK) == 0;
+#endif
+}
+
 char *read_entire_file(const char *file_path) {
     FILE *file = fopen(file_path, "r");
 
@@ -324,6 +334,10 @@ int main(int argc, const char **argv) {
 
     const char *command = ARRAY_SHIFT(argc, argv);
 
+    Vm vm = {0};
+
+    vm_init(&vm);
+
     if (strcmp(command, "run") == 0) {
         if (argc == 0) {
             usage(program);
@@ -335,10 +349,6 @@ int main(int argc, const char **argv) {
         const char *input_file_path = ARRAY_SHIFT(argc, argv);
 
         char *input_file_content = read_entire_file(input_file_path);
-
-        Vm vm = {0};
-
-        vm_init(&vm);
 
         if (!vm_load_file(&vm, input_file_path, input_file_content)) {
             return 1;
@@ -363,15 +373,27 @@ int main(int argc, const char **argv) {
 
         char *input_file_content = read_entire_file(input_file_path);
 
-        Vm vm = {0};
-
-        vm_init(&vm);
-
         if (!vm_load_file(&vm, input_file_path, input_file_content)) {
             return 1;
         }
 
         disassemble(vm.frames[0].fn->chunk);
+
+        free(input_file_content);
+    } else if (file_exists(command)) {
+        const char *input_file_path = command;
+
+        char *input_file_content = read_entire_file(input_file_path);
+
+        if (!vm_load_file(&vm, input_file_path, input_file_content)) {
+            return 1;
+        }
+
+        Value result;
+
+        if (!vm_run(&vm, &result)) {
+            return 1;
+        }
 
         free(input_file_content);
     } else {
