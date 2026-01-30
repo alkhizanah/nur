@@ -29,11 +29,21 @@ static void compiler_error(const Compiler *compiler, uint32_t start,
 }
 
 bool compile_block(Compiler *compiler, AstNode block) {
+    uint32_t prev_locals_count = compiler->locals.count;
+
     for (uint32_t i = 0; i < block.rhs; i++) {
         if (!compile_stmt(compiler, compiler->ast.extra.items[block.lhs + i])) {
             return false;
         }
     }
+
+    uint32_t amount_of_new_locals = compiler->locals.count - prev_locals_count;
+
+    for (uint32_t i = 0; i < amount_of_new_locals; i++) {
+        chunk_add_byte(compiler->chunk, OP_POP, 0);
+    }
+
+    compiler->locals.count = prev_locals_count;
 
     return true;
 }
