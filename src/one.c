@@ -6,5 +6,6 @@
 #include "source_location.c"
 #include "vm.c"
 #include "vm_gc.c"
+#include "vm_globals.c"
 #include "vm_map.c"
 #include "vm_util.c"

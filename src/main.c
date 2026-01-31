@@ -381,6 +381,8 @@ int main(int argc, const char **argv) {
 
         char *input_file_content = read_entire_file(input_file_path);
 
+        vm_insert_globals(&vm);
+
         if (!vm_load_file(&vm, input_file_path, input_file_content)) {
             return 1;
         }
@@ -415,6 +417,8 @@ int main(int argc, const char **argv) {
         const char *input_file_path = command;
 
         char *input_file_content = read_entire_file(input_file_path);
+
+        vm_insert_globals(&vm);
 
         if (!vm_load_file(&vm, input_file_path, input_file_content)) {
             return 1;

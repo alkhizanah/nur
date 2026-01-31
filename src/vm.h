@@ -229,6 +229,7 @@ void vm_stack_reset(Vm *);
 
 void vm_init(Vm *);
 
+void vm_insert_globals(Vm *);
 void vm_insert_global(Vm *vm, const char *key, Value value);
 void vm_insert_global_native(Vm *vm, const char *key, NativeFn call);
 
