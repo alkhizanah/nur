@@ -216,19 +216,20 @@ typedef struct {
 
 #define AS_NATIVE(v) ((ObjNative *)AS_OBJ(v))
 
+const char *value_description(Value value);
+void value_display(Value);
+bool value_is_falsey(Value);
+uint32_t string_hash(const char *key, uint32_t count);
 bool chunks_equal(Chunk, Chunk);
 bool objects_equal(Obj *, Obj *);
 bool values_exactly_equal(Value, Value); // 4 != 4.0
 bool values_equal(Value, Value);         // 4 == 4.0
-
-void value_display(Value);
 
 void vm_stack_reset(Vm *);
 
 void vm_init(Vm *);
 
 void vm_insert_global(Vm *vm, const char *key, Value value);
-
 void vm_insert_global_native(Vm *vm, const char *key, NativeFn call);
 
 bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer);
@@ -238,36 +239,29 @@ bool vm_run(Vm *, Value *result);
 [[gnu::format(printf, 2, 3)]]
 void vm_error(Vm *vm, const char *format, ...);
 
-Obj *vm_alloc(Vm *, ObjTag, size_t);
-
-#define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(type))
-
 ObjMap *vm_new_map(Vm *vm);
-
 bool vm_map_insert(Vm *vm, ObjMap *map, ObjString *key, Value value);
 bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value);
 
+void vm_push(Vm *, Value);
+Value vm_pop(Vm *);
+Value vm_peek(const Vm *, size_t distance);
+void vm_poke(Vm *, size_t distance, Value);
+
+#define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(type))
+
+Obj *vm_alloc(Vm *, ObjTag, size_t);
+void vm_free_object(Vm *vm, Obj *obj);
+void vm_free_map(Vm *vm, ObjMap *map);
+void vm_free_value(Vm *vm, Value);
 ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash);
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
-
 ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count);
-
-ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity, uint8_t upvalues_count);
-
+ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity,
+                             uint8_t upvalues_count);
 ObjClosure *vm_new_closure(Vm *vm, ObjFunction *);
-
 ObjUpvalue *vm_new_upvalue(Vm *vm, Value *);
-
-ObjUpvalue *vm_capture_upvalue(Vm *vm, Value *);
-
-void vm_close_upvalues(Vm *vm, Value *);
-
+void vm_mark_object(Vm *vm, Obj *);
+void vm_mark_value(Vm *vm, Value);
+void vm_mark_roots(Vm *vm);
 void vm_gc(Vm *);
-
-void vm_push(Vm *, Value);
-
-Value vm_pop(Vm *);
-
-Value vm_peek(const Vm *, size_t distance);
-
-void vm_poke(Vm *, size_t distance, Value);

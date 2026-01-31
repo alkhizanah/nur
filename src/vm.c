@@ -9,42 +9,6 @@
 #include "source_location.h"
 #include "vm.h"
 
-static inline bool is_falsey(Value value) {
-    return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
-}
-
-static inline const char *value_description(Value value) {
-    switch (value.tag) {
-    case VAL_NULL:
-        return "a null";
-    case VAL_BOOL:
-        return "a boolean";
-    case VAL_INT:
-        return "an integer";
-    case VAL_FLT:
-        return "a floating point";
-    case VAL_OBJ:
-        switch (AS_OBJ(value)->tag) {
-        case OBJ_STRING:
-            return "a string";
-
-        case OBJ_ARRAY:
-            return "an array";
-
-        case OBJ_MAP:
-            return "a map";
-
-        case OBJ_CLOSURE:
-        case OBJ_FUNCTION:
-        case OBJ_NATIVE:
-            return "a function";
-
-        case OBJ_UPVALUE:
-            return "an upvalue";
-        }
-    }
-}
-
 void vm_error(Vm *vm, const char *format, ...) {
     va_list args;
 
@@ -192,163 +156,25 @@ static bool vm_neg(Vm *vm) {
     }
 }
 
-ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity,
-                             uint8_t upvalues_count) {
-    ObjFunction *function = OBJ_ALLOC(vm, OBJ_FUNCTION, ObjFunction);
-
-    function->chunk = chunk;
-    function->arity = arity;
-    function->upvalues_count = upvalues_count;
-
-    return function;
+static void vm_add_int(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    int64_t irhs = AS_INT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, INT_VAL(ilhs + irhs));
 }
 
-ObjClosure *vm_new_closure(Vm *vm, ObjFunction *fn) {
-    vm->bytes_allocated += fn->upvalues_count * sizeof(ObjUpvalue);
-
-    if (vm->bytes_allocated > vm->next_gc) {
-        vm_gc(vm);
-    }
-
-    ObjClosure *closure = OBJ_ALLOC(vm, OBJ_CLOSURE, ObjClosure);
-
-    ObjUpvalue **upvalues = malloc(fn->upvalues_count * sizeof(ObjUpvalue));
-
-    for (uint8_t i = 0; i < fn->upvalues_count; i++) {
-        upvalues[i] = NULL;
-    }
-
-    closure->fn = fn;
-    closure->upvalues = upvalues;
-
-    return closure;
+static void vm_add_flt(Vm *vm, Value lhs, Value rhs) {
+    double flhs = AS_FLT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(flhs + frhs));
 }
 
-ObjUpvalue *vm_new_upvalue(Vm *vm, Value *location) {
-    ObjUpvalue *upvalue = OBJ_ALLOC(vm, OBJ_UPVALUE, ObjUpvalue);
-
-    upvalue->location = location;
-    upvalue->closed = NULL_VAL;
-    upvalue->next = NULL;
-
-    return upvalue;
-}
-
-ObjUpvalue *vm_capture_upvalue(Vm *vm, Value *local) {
-    ObjUpvalue *prev_upvalue = NULL;
-    ObjUpvalue *open_upvalue = vm->open_upvalues;
-
-    while (open_upvalue != NULL && open_upvalue->location > local) {
-        prev_upvalue = open_upvalue;
-        open_upvalue = open_upvalue->next;
-    }
-
-    if (open_upvalue != NULL && open_upvalue->location == local) {
-        return open_upvalue;
-    }
-
-    ObjUpvalue *new_upvalue = vm_new_upvalue(vm, local);
-
-    new_upvalue->next = open_upvalue;
-
-    if (prev_upvalue == NULL) {
-        vm->open_upvalues = new_upvalue;
-    } else {
-        prev_upvalue->next = new_upvalue;
-    }
-
-    return new_upvalue;
-}
-
-void vm_close_upvalues(Vm *vm, Value *last) {
-    while (vm->open_upvalues != NULL && vm->open_upvalues->location >= last) {
-        ObjUpvalue *upvalue = vm->open_upvalues;
-        upvalue->closed = *upvalue->location;
-        upvalue->location = &upvalue->closed;
-        vm->open_upvalues = upvalue->next;
-    }
-}
-
-static uint32_t string_hash(const char *key, uint32_t count) {
-    uint32_t hash = 2166136261u;
-
-    for (uint32_t i = 0; i < count; i++) {
-        hash ^= (uint8_t)key[i];
-        hash *= 16777619;
-    }
-
-    return hash;
-}
-
-ObjMap *vm_new_map(Vm *vm) {
-    ObjMap *map = OBJ_ALLOC(vm, OBJ_MAP, ObjMap);
-
-    map->entries = NULL;
-    map->count = 0;
-    map->capacity = 0;
-
-    return map;
-}
-
-ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash) {
-    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
-
-    string->items = items;
-    string->count = count;
-    string->hash = hash;
-
-    return string;
-}
-
-ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count) {
-    vm->bytes_allocated += count * sizeof(*items);
-
-    if (vm->bytes_allocated > vm->next_gc) {
-        vm_gc(vm);
-    }
-
-    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
-
-    string->items = malloc(count * sizeof(*items));
-
-    if (string->items == NULL) {
-        fprintf(stderr, "error: out of memory\n");
-
-        exit(1);
-    }
-
-    memcpy(string->items, items, count * sizeof(*items));
-
-    string->count = count;
-
-    string->hash = string_hash(items, count);
-
-    return string;
-}
-
-ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count) {
-    vm->bytes_allocated += count * sizeof(*items);
-
-    if (vm->bytes_allocated > vm->next_gc) {
-        vm_gc(vm);
-    }
-
-    ObjArray *array = OBJ_ALLOC(vm, OBJ_ARRAY, ObjArray);
-
-    array->items = malloc(count * sizeof(*items));
-
-    if (array->items == NULL) {
-        fprintf(stderr, "error: out of memory\n");
-
-        exit(1);
-    }
-
-    memcpy(array->items, items, count * sizeof(*items));
-
-    array->count = count;
-    array->capacity = count;
-
-    return array;
+static void vm_add_int_flt(Vm *vm, Value lhs, Value rhs) {
+    int64_t ilhs = AS_INT(lhs);
+    double frhs = AS_FLT(rhs);
+    vm_pop(vm);
+    vm_poke(vm, 0, FLT_VAL(ilhs + frhs));
 }
 
 static ObjString *vm_to_string(Vm *vm, Value value) {
@@ -388,161 +214,6 @@ static ObjString *vm_string_concat(Vm *vm, ObjString *lhs, ObjString *rhs) {
     string->hash = string_hash(string->items, string->count);
 
     return string;
-}
-
-static ObjMapEntry *vm_map_find_entry(ObjMapEntry *entries, uint32_t capacity,
-                                      ObjString *key) {
-    uint32_t index = key->hash & (capacity - 1);
-
-    ObjMapEntry *tombstone = NULL;
-
-    for (;;) {
-        ObjMapEntry *entry = &entries[index];
-
-        if (entry->key == NULL) {
-            if (IS_NULL(entry->value)) {
-                return tombstone != NULL ? tombstone : entry;
-            } else if (tombstone == NULL) {
-                tombstone = entry;
-            }
-        } else if (entry->key == key || entry->key->items == key->items ||
-                   (entry->key->count == key->count &&
-                    strncmp(entry->key->items, key->items, key->count) == 0)) {
-            return entry;
-        }
-
-        index = (index + 1) & (capacity - 1);
-    }
-}
-
-bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value) {
-    if (map->count == 0) {
-        return false;
-    }
-
-    ObjMapEntry *entry = vm_map_find_entry(map->entries, map->capacity, key);
-
-    if (entry->key == NULL) {
-        return false;
-    }
-
-    *value = entry->value;
-
-    return true;
-}
-
-static void vm_free_value(Vm *vm, Value);
-
-static void vm_free_map(Vm *vm, ObjMap *map) {
-    for (size_t i = 0; i < map->capacity; i++) {
-        ObjMapEntry entry = map->entries[i];
-
-        if (entry.key != NULL) {
-            free(entry.key->items);
-
-            vm->bytes_allocated -= entry.key->count;
-
-            vm_free_value(vm, entry.value);
-        }
-    }
-
-    free(map->entries);
-
-    vm->bytes_allocated -= map->capacity * sizeof(ObjMapEntry) + sizeof(ObjMap);
-}
-
-void vm_map_adjust_capacity(Vm *vm, ObjMap *map, uint32_t capacity) {
-    vm->bytes_allocated += capacity * sizeof(ObjMapEntry);
-
-    if (vm->bytes_allocated > vm->next_gc) {
-        vm_gc(vm);
-    }
-
-    ObjMapEntry *entries = malloc(capacity * sizeof(ObjMapEntry));
-
-    for (uint32_t i = 0; i < capacity; i++) {
-        entries[i].key = NULL;
-        entries[i].value = NULL_VAL;
-    }
-
-    map->count = 0;
-
-    for (uint32_t i = 0; i < map->capacity; i++) {
-        ObjMapEntry *entry = &map->entries[i];
-        if (entry->key == NULL)
-            continue;
-
-        ObjMapEntry *dest = vm_map_find_entry(entries, capacity, entry->key);
-
-        dest->key = entry->key;
-        dest->value = entry->value;
-
-        map->count++;
-    }
-
-    vm_free_map(vm, map);
-
-    map->entries = entries;
-    map->capacity = capacity;
-}
-
-#define VM_MAP_MAX_LOAD 0.75
-
-bool vm_map_insert(Vm *vm, ObjMap *map, ObjString *key, Value value) {
-
-    if (map->count + 1 > map->capacity * VM_MAP_MAX_LOAD) {
-        vm_map_adjust_capacity(vm, map,
-                               map->capacity == 0 ? 8 : map->capacity * 2);
-    }
-
-    ObjMapEntry *entry = vm_map_find_entry(map->entries, map->capacity, key);
-
-    bool is_new_key = entry->key == NULL;
-
-    if (is_new_key && IS_NULL(entry->value)) {
-        map->count++;
-    }
-
-    entry->key = key;
-    entry->value = value;
-
-    return is_new_key;
-}
-
-bool vm_map_delete(ObjMap *map, ObjString *key) {
-    if (map->count == 0)
-        return false;
-
-    ObjMapEntry *entry = vm_map_find_entry(map->entries, map->capacity, key);
-
-    if (entry->key == NULL)
-        return false;
-
-    entry->key = NULL;
-    entry->value = BOOL_VAL(true);
-
-    return true;
-}
-
-static void vm_add_int(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, INT_VAL(ilhs + irhs));
-}
-
-static void vm_add_flt(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(flhs + frhs));
-}
-
-static void vm_add_int_flt(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(ilhs + frhs));
 }
 
 static bool vm_add(Vm *vm) {
@@ -1022,6 +693,41 @@ static bool vm_pow(Vm *vm) {
     return true;
 }
 
+#define VM_CMP_FN(name, op)                                                    \
+    static bool name(Vm *vm) {                                                 \
+        Value rhs = vm_peek(vm, 0);                                            \
+        Value lhs = vm_peek(vm, 1);                                            \
+                                                                               \
+        if ((!IS_INT(lhs) && !IS_FLT(lhs)) ||                                  \
+            (!IS_INT(rhs) && !IS_FLT(rhs))) {                                  \
+            vm_error(vm, "can not compare %s value with %s value",             \
+                     value_description(lhs), value_description(rhs));          \
+                                                                               \
+            return false;                                                      \
+        }                                                                      \
+                                                                               \
+        vm_pop(vm);                                                            \
+                                                                               \
+        if (IS_INT(lhs)) {                                                     \
+            if (IS_INT(rhs)) {                                                 \
+                vm_poke(vm, 0, BOOL_VAL(AS_INT(lhs) op AS_INT(rhs)));          \
+            } else {                                                           \
+                vm_poke(vm, 0, BOOL_VAL(AS_INT(lhs) op AS_FLT(rhs)));          \
+            }                                                                  \
+        } else if (IS_INT(rhs)) {                                              \
+            vm_poke(vm, 0, BOOL_VAL(AS_FLT(lhs) op AS_INT(rhs)));              \
+        } else {                                                               \
+            vm_poke(vm, 0, BOOL_VAL(AS_FLT(lhs) op AS_FLT(rhs)));              \
+        }                                                                      \
+                                                                               \
+        return true;                                                           \
+    }
+
+VM_CMP_FN(vm_lt, <);
+VM_CMP_FN(vm_gt, >);
+VM_CMP_FN(vm_lte, <=);
+VM_CMP_FN(vm_gte, >=);
+
 static bool vm_get_subscript(Vm *vm) {
     Value target = vm_pop(vm);
     Value index = vm_pop(vm);
@@ -1131,40 +837,40 @@ static bool vm_set_subscript(Vm *vm) {
     return true;
 }
 
-#define VM_CMP_FN(name, op)                                                    \
-    static bool name(Vm *vm) {                                                 \
-        Value rhs = vm_peek(vm, 0);                                            \
-        Value lhs = vm_peek(vm, 1);                                            \
-                                                                               \
-        if ((!IS_INT(lhs) && !IS_FLT(lhs)) ||                                  \
-            (!IS_INT(rhs) && !IS_FLT(rhs))) {                                  \
-            vm_error(vm, "can not compare %s value with %s value",             \
-                     value_description(lhs), value_description(rhs));          \
-                                                                               \
-            return false;                                                      \
-        }                                                                      \
-                                                                               \
-        vm_pop(vm);                                                            \
-                                                                               \
-        if (IS_INT(lhs)) {                                                     \
-            if (IS_INT(rhs)) {                                                 \
-                vm_poke(vm, 0, BOOL_VAL(AS_INT(lhs) op AS_INT(rhs)));          \
-            } else {                                                           \
-                vm_poke(vm, 0, BOOL_VAL(AS_INT(lhs) op AS_FLT(rhs)));          \
-            }                                                                  \
-        } else if (IS_INT(rhs)) {                                              \
-            vm_poke(vm, 0, BOOL_VAL(AS_FLT(lhs) op AS_INT(rhs)));              \
-        } else {                                                               \
-            vm_poke(vm, 0, BOOL_VAL(AS_FLT(lhs) op AS_FLT(rhs)));              \
-        }                                                                      \
-                                                                               \
-        return true;                                                           \
+static ObjUpvalue *vm_capture_upvalue(Vm *vm, Value *local) {
+    ObjUpvalue *prev_upvalue = NULL;
+    ObjUpvalue *open_upvalue = vm->open_upvalues;
+
+    while (open_upvalue != NULL && open_upvalue->location > local) {
+        prev_upvalue = open_upvalue;
+        open_upvalue = open_upvalue->next;
     }
 
-VM_CMP_FN(vm_lt, <)
-VM_CMP_FN(vm_gt, >)
-VM_CMP_FN(vm_lte, <=)
-VM_CMP_FN(vm_gte, >=)
+    if (open_upvalue != NULL && open_upvalue->location == local) {
+        return open_upvalue;
+    }
+
+    ObjUpvalue *new_upvalue = vm_new_upvalue(vm, local);
+
+    new_upvalue->next = open_upvalue;
+
+    if (prev_upvalue == NULL) {
+        vm->open_upvalues = new_upvalue;
+    } else {
+        prev_upvalue->next = new_upvalue;
+    }
+
+    return new_upvalue;
+}
+
+static void vm_close_upvalues(Vm *vm, Value *last) {
+    while (vm->open_upvalues != NULL && vm->open_upvalues->location >= last) {
+        ObjUpvalue *upvalue = vm->open_upvalues;
+        upvalue->closed = *upvalue->location;
+        upvalue->location = &upvalue->closed;
+        vm->open_upvalues = upvalue->next;
+    }
+}
 
 bool vm_run(Vm *vm, Value *result) {
     CallFrame *frame = &vm->frames[vm->frame_count - 1];
@@ -1345,7 +1051,7 @@ bool vm_run(Vm *vm, Value *result) {
             break;
 
         case OP_NOT:
-            vm_poke(vm, 0, BOOL_VAL(is_falsey(vm_peek(vm, 0))));
+            vm_poke(vm, 0, BOOL_VAL(value_is_falsey(vm_peek(vm, 0))));
             break;
 
         case OP_NEG:
@@ -1437,7 +1143,7 @@ bool vm_run(Vm *vm, Value *result) {
         case OP_POP_JUMP_IF_FALSE: {
             uint16_t offset = READ_SHORT();
 
-            if (is_falsey(vm_pop(vm)))
+            if (value_is_falsey(vm_pop(vm)))
                 frame->ip += offset;
 
             break;
@@ -1446,7 +1152,7 @@ bool vm_run(Vm *vm, Value *result) {
         case OP_JUMP_IF_FALSE: {
             uint16_t offset = READ_SHORT();
 
-            if (is_falsey(vm_peek(vm, 0)))
+            if (value_is_falsey(vm_peek(vm, 0)))
                 frame->ip += offset;
 
             break;
@@ -1491,562 +1197,4 @@ bool vm_run(Vm *vm, Value *result) {
         }
         }
     }
-}
-
-bool chunks_equal(Chunk a, Chunk b) {
-    if (a.count != b.count || a.constants.count != b.constants.count) {
-        return false;
-    }
-
-    for (size_t i = 0; i < a.count; i++) {
-        if (a.bytes[i] != b.bytes[i] || a.sources[i] != b.sources[i]) {
-            return false;
-        }
-    }
-
-    for (size_t i = 0; i < a.constants.count; i++) {
-        if (!values_equal(a.constants.items[i], b.constants.items[i])) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool objects_equal(Obj *a, Obj *b) {
-    if (a == b) {
-        return true;
-    }
-
-    if (a->tag != b->tag) {
-        return false;
-    }
-
-    switch (a->tag) {
-    case OBJ_STRING:
-        if (((ObjString *)a)->count != ((ObjString *)b)->count) {
-            return false;
-        }
-
-        if (((ObjString *)a)->items == ((ObjString *)b)->items) {
-            return true;
-        }
-
-        for (uint32_t i = 0; i < ((ObjString *)a)->count; i++) {
-            if (((ObjString *)a)->items[i] != ((ObjString *)b)->items[i]) {
-                return false;
-            }
-        }
-
-        return true;
-
-    case OBJ_FUNCTION:
-        if (((ObjFunction *)a)->arity != ((ObjFunction *)b)->arity) {
-            return false;
-        }
-
-        return chunks_equal(((ObjFunction *)a)->chunk,
-                            ((ObjFunction *)b)->chunk);
-
-    case OBJ_CLOSURE:
-        return objects_equal(&((ObjClosure *)a)->fn->obj,
-                             &((ObjClosure *)b)->fn->obj);
-
-    case OBJ_ARRAY:
-        if (((ObjArray *)a)->count != ((ObjArray *)b)->count) {
-            return false;
-        }
-
-        if (((ObjArray *)a)->items == ((ObjArray *)b)->items) {
-            return true;
-        }
-
-        for (uint32_t i = 0; i < ((ObjArray *)a)->count; i++) {
-            if (!values_equal(((ObjArray *)a)->items[i],
-                              ((ObjArray *)b)->items[i])) {
-                return false;
-            }
-        }
-
-        return true;
-
-    case OBJ_MAP:
-        if (((ObjMap *)a)->count != ((ObjMap *)b)->count) {
-            return false;
-        }
-
-        if (((ObjMap *)a)->entries == ((ObjMap *)b)->entries) {
-            return true;
-        }
-
-        for (uint32_t i = 0; i < ((ObjMap *)a)->count; i++) {
-            ObjMapEntry ae = ((ObjMap *)a)->entries[i];
-
-            if (ae.key != NULL) {
-                Value bv;
-
-                if (!vm_map_lookup((ObjMap *)b, ae.key, &bv)) {
-                    return false;
-                }
-
-                if (!values_equal(ae.value, bv)) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-
-    case OBJ_NATIVE:
-        return ((ObjNative *)a)->fn == ((ObjNative *)b)->fn;
-
-    case OBJ_UPVALUE:
-        return false;
-    }
-}
-
-bool values_exactly_equal(Value a, Value b) {
-    if (a.tag != b.tag) {
-        return false;
-    }
-
-    switch (a.tag) {
-    case VAL_NULL:
-        return true;
-
-    case VAL_BOOL:
-        return AS_BOOL(a) == AS_BOOL(b);
-
-    case VAL_INT:
-        return AS_INT(a) == AS_INT(b);
-
-    case VAL_FLT:
-        return AS_FLT(a) == AS_FLT(b);
-
-    case VAL_OBJ:
-        return objects_equal(AS_OBJ(a), AS_OBJ(b));
-    }
-}
-
-bool values_equal(Value a, Value b) {
-    if (a.tag != b.tag && !((a.tag == VAL_INT && b.tag == VAL_FLT) ||
-                            (a.tag == VAL_FLT && b.tag == VAL_INT))) {
-        return false;
-    }
-
-    switch (a.tag) {
-    case VAL_NULL:
-        return true;
-
-    case VAL_BOOL:
-        return AS_BOOL(a) == AS_BOOL(b);
-
-    case VAL_INT:
-        if (b.tag == VAL_FLT) {
-            return AS_INT(a) == AS_FLT(b);
-        } else {
-            return AS_INT(a) == AS_INT(b);
-        }
-
-    case VAL_FLT:
-        if (b.tag == VAL_INT) {
-            return AS_FLT(a) == AS_INT(b);
-        } else {
-            return AS_FLT(a) == AS_FLT(b);
-        }
-
-    case VAL_OBJ:
-        return objects_equal(AS_OBJ(a), AS_OBJ(b));
-    }
-}
-
-void object_display(Obj *obj) {
-    switch (obj->tag) {
-    case OBJ_STRING: {
-        ObjString *str = (ObjString *)obj;
-        printf("\"%.*s\"", (int)str->count, str->items);
-        break;
-    }
-
-    case OBJ_ARRAY: {
-        ObjArray *arr = (ObjArray *)obj;
-
-        printf("[");
-
-        if (arr->count > 0) {
-            if (IS_STRING(arr->items[0])) {
-                printf("\"");
-            }
-
-            value_display(arr->items[0]);
-
-            if (IS_STRING(arr->items[0])) {
-                printf("\"");
-            }
-
-            for (size_t i = 1; i < arr->count; i++) {
-                printf(", ");
-
-                if (IS_STRING(arr->items[i])) {
-                    printf("\"");
-                }
-
-                value_display(arr->items[i]);
-
-                if (IS_STRING(arr->items[i])) {
-                    printf("\"");
-                }
-            }
-        }
-
-        printf("]");
-
-        break;
-    }
-
-    case OBJ_MAP: {
-        ObjMap *map = (ObjMap *)obj;
-
-        printf("{");
-
-        bool first = true;
-
-        for (uint32_t i = 0; i < map->capacity; i++) {
-            ObjMapEntry entry = map->entries[i];
-
-            if (entry.key != NULL) {
-                if (first) {
-                    first = false;
-                } else {
-                    printf(", ");
-                }
-
-                printf("\"%.*s\": ", (int)entry.key->count, entry.key->items);
-                value_display(entry.value);
-            }
-        }
-
-        printf("}");
-
-        break;
-    }
-
-    case OBJ_CLOSURE:
-    case OBJ_FUNCTION:
-    case OBJ_NATIVE:
-        printf("<function>");
-
-        break;
-
-    case OBJ_UPVALUE:
-        printf("<upvalue>");
-
-        break;
-    }
-}
-
-void value_display(Value value) {
-    switch (value.tag) {
-    case VAL_NULL:
-        printf("null");
-        break;
-
-    case VAL_BOOL:
-        printf(AS_BOOL(value) ? "true" : "false");
-        break;
-
-    case VAL_INT:
-        printf("%ld", AS_INT(value));
-        break;
-
-    case VAL_FLT:
-        printf("%g", AS_FLT(value));
-        break;
-
-    case VAL_OBJ:
-        object_display(AS_OBJ(value));
-        break;
-    }
-}
-
-size_t chunk_add_constant(Chunk *chunk, Value value) {
-    for (size_t i = 0; i < chunk->constants.count; i++) {
-        if (values_exactly_equal(chunk->constants.items[i], value)) {
-            return i;
-        }
-    }
-
-    size_t i = chunk->constants.count;
-
-    ARRAY_PUSH(&chunk->constants, value);
-
-    return i;
-}
-
-size_t chunk_add_byte(Chunk *chunk, uint8_t byte, uint32_t source) {
-    if (chunk->count + 1 > chunk->capacity) {
-        size_t new_cap =
-            chunk->capacity ? chunk->capacity * 2 : ARRAY_INIT_CAPACITY;
-
-        chunk->bytes = realloc(chunk->bytes, sizeof(*chunk->bytes) * new_cap);
-
-        chunk->sources =
-            realloc(chunk->sources, sizeof(*chunk->sources) * new_cap);
-
-        if (chunk->bytes == NULL || chunk->sources == NULL) {
-            fprintf(stderr, "error: out of memory\n");
-
-            exit(1);
-        }
-
-        chunk->capacity = new_cap;
-    }
-
-    chunk->bytes[chunk->count] = byte;
-    chunk->sources[chunk->count] = source;
-
-    return chunk->count++;
-}
-
-void vm_push(Vm *vm, Value value) {
-    *vm->sp = value;
-    vm->sp++;
-}
-
-Value vm_pop(Vm *vm) {
-    vm->sp--;
-    return *vm->sp;
-}
-
-Value vm_peek(const Vm *vm, size_t distance) { return vm->sp[-1 - distance]; }
-
-void vm_poke(Vm *vm, size_t distance, Value value) {
-    vm->sp[-1 - distance] = value;
-}
-
-static void vm_mark_value(Vm *vm, Value value);
-
-static void vm_mark_object(Vm *vm, Obj *obj) {
-    obj->marked = true;
-
-    switch (obj->tag) {
-    case OBJ_ARRAY: {
-        ObjArray *arr = (ObjArray *)obj;
-
-        for (size_t i = 0; i < arr->count; i++) {
-            vm_mark_value(vm, arr->items[i]);
-        }
-
-        break;
-    }
-
-    case OBJ_MAP: {
-        ObjMap *map = (ObjMap *)obj;
-
-        for (size_t i = 0; i < map->capacity; i++) {
-            ObjMapEntry entry = map->entries[i];
-
-            if (entry.key != NULL) {
-                entry.key->obj.marked = true;
-
-                vm_mark_value(vm, entry.value);
-            }
-        }
-
-        break;
-    }
-
-    case OBJ_FUNCTION: {
-        ObjFunction *fn = (ObjFunction *)obj;
-
-        for (size_t j = 0; j < fn->chunk.constants.count; j++) {
-            vm_mark_value(vm, fn->chunk.constants.items[j]);
-        }
-    }
-
-    case OBJ_CLOSURE: {
-        ObjClosure *closure = (ObjClosure *)obj;
-
-        vm_mark_object(vm, &closure->fn->obj);
-    }
-
-    case OBJ_UPVALUE: {
-        ObjUpvalue *upvalue = (ObjUpvalue *)obj;
-
-        vm_mark_value(vm, *upvalue->location);
-        vm_mark_value(vm, upvalue->closed);
-
-        if (upvalue->next != NULL) {
-            vm_mark_object(vm, &upvalue->next->obj);
-        }
-    }
-
-    case OBJ_STRING:
-    case OBJ_NATIVE:
-        break;
-    }
-}
-
-static void vm_mark_value(Vm *vm, Value value) {
-    if (IS_OBJ(value)) {
-        vm_mark_object(vm, AS_OBJ(value));
-    }
-}
-
-static void vm_mark_roots(Vm *vm) {
-    for (Value *v = vm->stack; v < vm->sp; v++) {
-        vm_mark_value(vm, *v);
-    }
-
-    for (size_t i = 0; i < vm->frame_count; i++) {
-        CallFrame frame = vm->frames[i];
-
-        vm_mark_object(vm, &frame.closure->fn->obj);
-    }
-
-    vm_mark_object(vm, &vm->globals->obj);
-}
-
-static void vm_free_value(Vm *vm, Value value);
-
-static void vm_free_object(Vm *vm, Obj *obj) {
-    switch (obj->tag) {
-    case OBJ_STRING: {
-        ObjString *str = (ObjString *)obj;
-
-        free(str->items);
-
-        vm->bytes_allocated -= str->count * sizeof(char) + sizeof(ObjString);
-
-        break;
-    }
-
-    case OBJ_ARRAY: {
-        ObjArray *arr = (ObjArray *)obj;
-
-        for (size_t i = 0; i < arr->count; i++) {
-            vm_free_value(vm, arr->items[i]);
-        }
-
-        free(arr->items);
-
-        vm->bytes_allocated -= arr->capacity * sizeof(Value) + sizeof(ObjArray);
-
-        break;
-    }
-
-    case OBJ_MAP: {
-        vm_free_map(vm, (ObjMap *)obj);
-
-        break;
-    }
-
-    case OBJ_FUNCTION: {
-        ObjFunction *fn = (ObjFunction *)obj;
-
-        for (size_t i = 0; i < fn->chunk.constants.count; i++) {
-            vm_free_value(vm, fn->chunk.constants.items[i]);
-        }
-
-        free(fn->chunk.constants.items);
-
-        free(fn->chunk.bytes);
-        free(fn->chunk.sources);
-
-        vm->bytes_allocated -=
-            fn->chunk.constants.capacity * sizeof(Value) + sizeof(ObjFunction);
-
-        break;
-    }
-
-    case OBJ_CLOSURE: {
-        ObjClosure *closure = (ObjClosure *)obj;
-
-        vm_free_object(vm, &closure->fn->obj);
-
-        for (uint8_t i = 0; i < closure->fn->upvalues_count; i++) {
-            vm_free_object(vm, &closure->upvalues[i]->obj);
-        }
-
-        free(closure->upvalues);
-
-        vm->bytes_allocated -=
-            closure->fn->upvalues_count * sizeof(ObjUpvalue *) +
-            sizeof(ObjClosure);
-    }
-
-    case OBJ_UPVALUE: {
-        vm->bytes_allocated -= sizeof(ObjUpvalue);
-    }
-
-    case OBJ_NATIVE:
-        vm->bytes_allocated -= sizeof(ObjNative);
-
-        break;
-    }
-
-    free(obj);
-}
-
-static void vm_free_value(Vm *vm, Value value) {
-    if (IS_OBJ(value)) {
-        vm_free_object(vm, AS_OBJ(value));
-    }
-}
-
-static void vm_sweep(Vm *vm) {
-    Obj *prev = NULL;
-    Obj *curr = vm->objects;
-
-    while (curr != NULL) {
-        if (curr->marked) {
-            curr->marked = false;
-            prev = curr;
-            curr = curr->next;
-        } else {
-            Obj *unreached = curr;
-
-            if (prev != NULL) {
-                prev->next = curr->next;
-            } else {
-                vm->objects = curr->next;
-            }
-
-            curr = curr->next;
-
-            vm_free_object(vm, unreached);
-        }
-    }
-}
-
-void vm_gc(Vm *vm) {
-    vm_mark_roots(vm);
-
-    vm_sweep(vm);
-
-    vm->next_gc = vm->bytes_allocated * VM_GC_GROW_FACTOR;
-}
-
-Obj *vm_alloc(Vm *vm, ObjTag tag, size_t size) {
-    vm->bytes_allocated += size;
-
-    if (vm->bytes_allocated > vm->next_gc) {
-        vm_gc(vm);
-    }
-
-    Obj *object = malloc(size);
-
-    if (object == NULL) {
-        fprintf(stderr, "error: out of memory\n");
-
-        exit(1);
-    }
-
-    object->tag = tag;
-    object->marked = false;
-    object->next = vm->objects;
-
-    vm->objects = object;
-
-    return object;
 }
