@@ -12,13 +12,13 @@ typedef struct {
 typedef struct {
     const char *name;
     uint32_t name_len;
+    bool is_captured;
 } Local;
 
 typedef struct {
-    Local *items;
-    size_t count;
-    size_t capacity;
-} Locals;
+    uint32_t index;
+    bool is_local;
+} Upvalue;
 
 typedef struct {
     Offsets breaks;
@@ -27,14 +27,17 @@ typedef struct {
 } Loop;
 
 typedef struct Compiler {
-    const struct Compiler *parent;
+    struct Compiler *parent;
     const char *file_path;
     const char *file_buffer;
     Ast ast;
     Vm *vm;
     Chunk *chunk;
     Loop loop;
-    Locals locals;
+    Local locals[UINT8_MAX];
+    uint8_t locals_count;
+    Upvalue upvalues[UINT8_MAX];
+    uint8_t upvalues_count;
 } Compiler;
 
 bool compile_stmt(Compiler *compiler, AstNodeIdx);

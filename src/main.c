@@ -95,7 +95,7 @@ static void disassemble(Chunk chunk) {
     size_t ip = 0;
 
     for (; ip < chunk.count; printf("\n")) {
-        printf("%-10zu", ip);
+        printf("%04zu\t", ip);
 
         OpCode opcode = chunk.bytes[ip++];
 
@@ -141,11 +141,17 @@ static void disassemble(Chunk chunk) {
             uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
                                            chunk.bytes[ip - 1]);
 
-            printf("MAKE_CLOSURE %d (", (int)index);
+            printf("MAKE_CLOSURE %d (<function>)", (int)index);
 
-            value_display(chunk.constants.items[index]);
+            ObjFunction *function = AS_FUNCTION(chunk.constants.items[index]);
 
-            printf(")");
+            for (int i = 0; i < function->upvalues_count; i++) {
+                int isLocal = chunk.bytes[ip++];
+                int index = chunk.bytes[ip++];
+
+                printf("\n%04zu\t|\t\t%s %d", ip - 2,
+                       isLocal ? "local" : "upvalue", index);
+            }
 
             break;
         }
@@ -156,6 +162,18 @@ static void disassemble(Chunk chunk) {
 
         case OP_SET_LOCAL:
             printf("SET_LOCAL %d", (int)chunk.bytes[ip++]);
+            break;
+
+        case OP_GET_UPVALUE:
+            printf("GET_UPVALUE %d", (int)chunk.bytes[ip++]);
+            break;
+
+        case OP_SET_UPVALUE:
+            printf("SET_UPVALUE %d", (int)chunk.bytes[ip++]);
+            break;
+
+        case OP_CLOSE_UPVALUE:
+            printf("CLOSE_UPVALUE");
             break;
 
         case OP_GET_GLOBAL: {

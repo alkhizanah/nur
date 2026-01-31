@@ -38,6 +38,9 @@ static inline const char *value_description(Value value) {
         case OBJ_FUNCTION:
         case OBJ_NATIVE:
             return "a function";
+
+        case OBJ_UPVALUE:
+            return "an upvalue";
         }
     }
 }
@@ -137,7 +140,7 @@ bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
                                           .file_path = file_path,
                                           .file_content = file_buffer,
                                       },
-                                      0);
+                                      0, 0);
 
     frame->closure = vm_new_closure(vm, fn);
 
@@ -189,21 +192,81 @@ static bool vm_neg(Vm *vm) {
     }
 }
 
-ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity) {
+ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity,
+                             uint8_t upvalues_count) {
     ObjFunction *function = OBJ_ALLOC(vm, OBJ_FUNCTION, ObjFunction);
 
     function->chunk = chunk;
     function->arity = arity;
+    function->upvalues_count = upvalues_count;
 
     return function;
 }
 
 ObjClosure *vm_new_closure(Vm *vm, ObjFunction *fn) {
+    vm->bytes_allocated += fn->upvalues_count * sizeof(ObjUpvalue);
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
     ObjClosure *closure = OBJ_ALLOC(vm, OBJ_CLOSURE, ObjClosure);
 
+    ObjUpvalue **upvalues = malloc(fn->upvalues_count * sizeof(ObjUpvalue));
+
+    for (uint8_t i = 0; i < fn->upvalues_count; i++) {
+        upvalues[i] = NULL;
+    }
+
     closure->fn = fn;
+    closure->upvalues = upvalues;
 
     return closure;
+}
+
+ObjUpvalue *vm_new_upvalue(Vm *vm, Value *location) {
+    ObjUpvalue *upvalue = OBJ_ALLOC(vm, OBJ_UPVALUE, ObjUpvalue);
+
+    upvalue->location = location;
+    upvalue->closed = NULL_VAL;
+    upvalue->next = NULL;
+
+    return upvalue;
+}
+
+ObjUpvalue *vm_capture_upvalue(Vm *vm, Value *local) {
+    ObjUpvalue *prev_upvalue = NULL;
+    ObjUpvalue *open_upvalue = vm->open_upvalues;
+
+    while (open_upvalue != NULL && open_upvalue->location > local) {
+        prev_upvalue = open_upvalue;
+        open_upvalue = open_upvalue->next;
+    }
+
+    if (open_upvalue != NULL && open_upvalue->location == local) {
+        return open_upvalue;
+    }
+
+    ObjUpvalue *new_upvalue = vm_new_upvalue(vm, local);
+
+    new_upvalue->next = open_upvalue;
+
+    if (prev_upvalue == NULL) {
+        vm->open_upvalues = new_upvalue;
+    } else {
+        prev_upvalue->next = new_upvalue;
+    }
+
+    return new_upvalue;
+}
+
+void vm_close_upvalues(Vm *vm, Value *last) {
+    while (vm->open_upvalues != NULL && vm->open_upvalues->location >= last) {
+        ObjUpvalue *upvalue = vm->open_upvalues;
+        upvalue->closed = *upvalue->location;
+        upvalue->location = &upvalue->closed;
+        vm->open_upvalues = upvalue->next;
+    }
 }
 
 static uint32_t string_hash(const char *key, uint32_t count) {
@@ -866,8 +929,8 @@ static void vm_pow_flt_int(Vm *vm, Value lhs, Value rhs) {
 
 static bool vm_call(Vm *vm, ObjClosure *closure, uint8_t argc) {
     if (argc != closure->fn->arity) {
-        vm_error(vm, "expected %d arguments but got %d instead", closure->fn->arity,
-                 argc);
+        vm_error(vm, "expected %d arguments but got %d instead",
+                 closure->fn->arity, argc);
 
         return false;
     }
@@ -1114,7 +1177,8 @@ bool vm_run(Vm *vm, Value *result) {
     (((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |           \
      ((uint32_t)READ_BYTE() << 8) | READ_BYTE())
 
-#define READ_CONSTANT() (frame->closure->fn->chunk.constants.items[READ_SHORT()])
+#define READ_CONSTANT()                                                        \
+    (frame->closure->fn->chunk.constants.items[READ_SHORT()])
 
 #define READ_STRING() (AS_STRING(READ_CONSTANT()))
 
@@ -1160,6 +1224,19 @@ bool vm_run(Vm *vm, Value *result) {
 
         case OP_SET_LOCAL:
             frame->slots[READ_BYTE()] = vm_peek(vm, 0);
+            break;
+
+        case OP_GET_UPVALUE:
+            vm_push(vm, *frame->closure->upvalues[READ_BYTE()]->location);
+            break;
+
+        case OP_SET_UPVALUE:
+            *frame->closure->upvalues[READ_BYTE()]->location = vm_peek(vm, 0);
+            break;
+
+        case OP_CLOSE_UPVALUE:
+            vm_close_upvalues(vm, vm->sp - 1);
+            vm_pop(vm);
             break;
 
         case OP_GET_GLOBAL: {
@@ -1239,8 +1316,23 @@ bool vm_run(Vm *vm, Value *result) {
 
         case OP_MAKE_CLOSURE: {
             ObjFunction *fn = AS_FUNCTION(READ_CONSTANT());
+
             ObjClosure *closure = vm_new_closure(vm, fn);
+
+            for (uint8_t i = 0; i < fn->upvalues_count; i++) {
+                uint8_t is_local = READ_BYTE();
+                uint8_t index = READ_BYTE();
+
+                if (is_local) {
+                    closure->upvalues[i] =
+                        vm_capture_upvalue(vm, frame->slots + index);
+                } else {
+                    closure->upvalues[i] = frame->closure->upvalues[index];
+                }
+            }
+
             vm_push(vm, OBJ_VAL(closure));
+
             break;
         }
 
@@ -1379,6 +1471,8 @@ bool vm_run(Vm *vm, Value *result) {
         case OP_RETURN: {
             Value returned = vm_pop(vm);
 
+            vm_close_upvalues(vm, frame->slots);
+
             vm->frame_count--;
 
             if (vm->frame_count == 0) {
@@ -1505,6 +1599,9 @@ bool objects_equal(Obj *a, Obj *b) {
 
     case OBJ_NATIVE:
         return ((ObjNative *)a)->fn == ((ObjNative *)b)->fn;
+
+    case OBJ_UPVALUE:
+        return false;
     }
 }
 
@@ -1640,6 +1737,11 @@ void object_display(Obj *obj) {
         printf("<function>");
 
         break;
+
+    case OBJ_UPVALUE:
+        printf("<upvalue>");
+
+        break;
     }
 }
 
@@ -1768,6 +1870,17 @@ static void vm_mark_object(Vm *vm, Obj *obj) {
         vm_mark_object(vm, &closure->fn->obj);
     }
 
+    case OBJ_UPVALUE: {
+        ObjUpvalue *upvalue = (ObjUpvalue *)obj;
+
+        vm_mark_value(vm, *upvalue->location);
+        vm_mark_value(vm, upvalue->closed);
+
+        if (upvalue->next != NULL) {
+            vm_mark_object(vm, &upvalue->next->obj);
+        }
+    }
+
     case OBJ_STRING:
     case OBJ_NATIVE:
         break;
@@ -1850,9 +1963,25 @@ static void vm_free_object(Vm *vm, Obj *obj) {
         ObjClosure *closure = (ObjClosure *)obj;
 
         vm_free_object(vm, &closure->fn->obj);
+
+        for (uint8_t i = 0; i < closure->fn->upvalues_count; i++) {
+            vm_free_object(vm, &closure->upvalues[i]->obj);
+        }
+
+        free(closure->upvalues);
+
+        vm->bytes_allocated -=
+            closure->fn->upvalues_count * sizeof(ObjUpvalue *) +
+            sizeof(ObjClosure);
+    }
+
+    case OBJ_UPVALUE: {
+        vm->bytes_allocated -= sizeof(ObjUpvalue);
     }
 
     case OBJ_NATIVE:
+        vm->bytes_allocated -= sizeof(ObjNative);
+
         break;
     }
 

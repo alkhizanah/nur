@@ -6,6 +6,7 @@
 
 typedef enum {
     OBJ_CLOSURE,
+    OBJ_UPVALUE,
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_ARRAY,
@@ -77,6 +78,9 @@ typedef enum : uint8_t {
     OP_PUSH_CONST,
     OP_GET_LOCAL,
     OP_SET_LOCAL,
+    OP_GET_UPVALUE,
+    OP_SET_UPVALUE,
+    OP_CLOSE_UPVALUE,
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,
     OP_GET_SUBSCRIPT,
@@ -136,11 +140,20 @@ typedef struct {
     Obj obj;
     Chunk chunk;
     uint8_t arity;
+    uint8_t upvalues_count;
 } ObjFunction;
+
+typedef struct ObjUpvalue {
+    Obj obj;
+    Value *location;
+    Value closed;
+    struct ObjUpvalue *next;
+} ObjUpvalue;
 
 typedef struct {
     Obj obj;
     ObjFunction *fn;
+    ObjUpvalue **upvalues;
 } ObjClosure;
 
 typedef struct {
@@ -186,6 +199,8 @@ typedef struct {
     Value *sp;
 
     ObjMap *globals;
+
+    ObjUpvalue *open_upvalues;
 
     Obj *objects;
     size_t bytes_allocated;
@@ -237,9 +252,15 @@ ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
 
 ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count);
 
-ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity);
+ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity, uint8_t upvalues_count);
 
 ObjClosure *vm_new_closure(Vm *vm, ObjFunction *);
+
+ObjUpvalue *vm_new_upvalue(Vm *vm, Value *);
+
+ObjUpvalue *vm_capture_upvalue(Vm *vm, Value *);
+
+void vm_close_upvalues(Vm *vm, Value *);
 
 void vm_gc(Vm *);
 

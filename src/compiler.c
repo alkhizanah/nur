@@ -29,7 +29,7 @@ static void compiler_error(const Compiler *compiler, uint32_t start,
 }
 
 bool compile_block(Compiler *compiler, AstNode block) {
-    uint32_t prev_locals_count = compiler->locals.count;
+    uint32_t prev_locals_count = compiler->locals_count;
 
     for (uint32_t i = 0; i < block.rhs; i++) {
         if (!compile_stmt(compiler, compiler->ast.extra.items[block.lhs + i])) {
@@ -37,13 +37,19 @@ bool compile_block(Compiler *compiler, AstNode block) {
         }
     }
 
-    uint32_t amount_of_new_locals = compiler->locals.count - prev_locals_count;
+    uint32_t amount_of_new_locals = compiler->locals_count - prev_locals_count;
 
     for (uint32_t i = 0; i < amount_of_new_locals; i++) {
-        chunk_add_byte(compiler->chunk, OP_POP, 0);
+        Local local = compiler->locals[i];
+
+        if (local.is_captured) {
+            chunk_add_byte(compiler->chunk, OP_CLOSE_UPVALUE, 0);
+        } else {
+            chunk_add_byte(compiler->chunk, OP_POP, 0);
+        }
     }
 
-    compiler->locals.count = prev_locals_count;
+    compiler->locals_count = prev_locals_count;
 
     return true;
 }
@@ -79,9 +85,9 @@ static void compiler_emit_constant(Compiler *compiler, Value value,
 }
 
 static bool compiler_find_local(Compiler *compiler, const char *name,
-                                size_t name_len, uint32_t *local_idx) {
-    for (*local_idx = 0; *local_idx < compiler->locals.count; (*local_idx)++) {
-        Local local = compiler->locals.items[*local_idx];
+                                size_t name_len, uint32_t *index) {
+    for (*index = 0; *index < compiler->locals_count; (*index)++) {
+        Local local = compiler->locals[*index];
 
         if (local.name_len != name_len) {
             continue;
@@ -94,6 +100,73 @@ static bool compiler_find_local(Compiler *compiler, const char *name,
         if (strncmp(local.name, name, name_len) == 0) {
             return true;
         }
+    }
+
+    return false;
+}
+
+static bool compiler_add_local(Compiler *compiler, const char *name,
+                               uint32_t name_len) {
+    Local local = {
+        .name = name,
+        .name_len = name_len,
+    };
+
+    if (compiler->locals_count == UINT8_MAX) {
+        return false;
+    }
+
+    compiler->locals[compiler->locals_count++] = local;
+
+    return true;
+}
+
+static uint32_t compiler_add_upvalue(Compiler *compiler, uint32_t index,
+                                     bool is_local) {
+    Upvalue upvalue = {
+        .index = index,
+        .is_local = is_local,
+    };
+
+    if (compiler->upvalues_count == UINT8_MAX) {
+        printf("error: too much upvalues");
+        exit(1);
+    }
+
+    for (uint8_t i = 0; i < compiler->upvalues_count; i++) {
+        Upvalue upvalue = compiler->upvalues[i];
+
+        if (upvalue.index == index && upvalue.is_local == is_local) {
+            return i;
+        }
+    }
+
+    compiler->upvalues[compiler->upvalues_count++] = upvalue;
+
+    return compiler->upvalues_count - 1;
+}
+
+static bool compiler_find_upvalue(Compiler *compiler, const char *name,
+                                  size_t name_len, uint32_t *upvalue_index) {
+    if (compiler->parent == NULL) {
+        return false;
+    }
+
+    uint32_t index;
+
+    if (compiler_find_local(compiler->parent, name, name_len, &index)) {
+        compiler->parent->locals[index].is_captured = true;
+
+        *upvalue_index = compiler_add_upvalue(compiler, index, true);
+
+        return true;
+    }
+
+    if (compiler_find_upvalue(compiler->parent, name, name_len, &index)) {
+
+        *upvalue_index = compiler_add_upvalue(compiler, index, false);
+
+        return true;
     }
 
     return false;
@@ -114,11 +187,14 @@ static bool compile_identifier(Compiler *compiler, AstNode node,
                name[2] == 'l' && name[3] == 's' && name[4] == 'e') {
         chunk_add_byte(compiler->chunk, OP_PUSH_FALSE, source);
     } else {
-        uint32_t local_idx;
+        uint32_t index;
 
-        if (compiler_find_local(compiler, name, name_len, &local_idx)) {
+        if (compiler_find_local(compiler, name, name_len, &index)) {
             chunk_add_byte(compiler->chunk, OP_GET_LOCAL, source);
-            chunk_add_byte(compiler->chunk, local_idx, source);
+            chunk_add_byte(compiler->chunk, index, source);
+        } else if (compiler_find_upvalue(compiler, name, name_len, &index)) {
+            chunk_add_byte(compiler->chunk, OP_GET_UPVALUE, source);
+            chunk_add_byte(compiler->chunk, index, source);
         } else {
             ObjString *key = vm_copy_string(compiler->vm, name, name_len);
             chunk_add_byte(compiler->chunk, OP_GET_GLOBAL, source);
@@ -153,7 +229,18 @@ static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
 
 static bool compile_function(Compiler *compiler, AstNode node,
                              uint32_t source) {
-    Locals parameters = {0};
+    Compiler fc = {
+        .parent = compiler,
+        .file_buffer = compiler->file_buffer,
+        .file_path = compiler->file_path,
+        .ast = compiler->ast,
+        .vm = compiler->vm,
+        .locals = {0},
+        .locals_count = 0,
+        .upvalues = {0},
+        .upvalues_count = 0,
+        .loop = {0},
+    };
 
     if (node.lhs != INVALID_EXTRA_IDX) {
         uint32_t arity = compiler->ast.extra.items[node.lhs];
@@ -171,33 +258,19 @@ static bool compile_function(Compiler *compiler, AstNode node,
                 compiler->ast.nodes
                     .items[compiler->ast.extra.items[node.lhs + 1 + i]];
 
-            Local local = {
-                .name = compiler->file_buffer + parameter.lhs,
-                .name_len = parameter.rhs - parameter.lhs,
-            };
-
-            ARRAY_PUSH(&parameters, local);
+            compiler_add_local(compiler, compiler->file_buffer + parameter.lhs,
+                               parameter.rhs - parameter.lhs);
         }
     }
-
-    Compiler fc = {
-        .parent = compiler,
-        .file_buffer = compiler->file_buffer,
-        .file_path = compiler->file_path,
-        .ast = compiler->ast,
-        .vm = compiler->vm,
-        .locals = parameters,
-        .loop = {0},
-    };
 
     CallFrame *frame = &fc.vm->frames[fc.vm->frame_count++];
 
     ObjFunction *fn = vm_new_function(fc.vm,
-                                (Chunk){
-                                    .file_path = fc.file_path,
-                                    .file_content = fc.file_buffer,
-                                },
-                                parameters.count);
+                                      (Chunk){
+                                          .file_path = fc.file_path,
+                                          .file_content = fc.file_buffer,
+                                      },
+                                      fc.locals_count, 0);
 
     frame->closure = vm_new_closure(fc.vm, fn);
 
@@ -214,8 +287,15 @@ static bool compile_function(Compiler *compiler, AstNode node,
 
     fc.vm->frame_count--;
 
+    fn->upvalues_count = fc.upvalues_count;
+
     chunk_add_byte(compiler->chunk, OP_MAKE_CLOSURE, source);
     compiler_emit_constant(compiler, OBJ_VAL(frame->closure->fn), source);
+
+    for (uint8_t i = 0; i < fc.upvalues_count; i++) {
+        chunk_add_byte(compiler->chunk, fc.upvalues[i].is_local, source);
+        chunk_add_byte(compiler->chunk, fc.upvalues[i].index, source);
+    }
 
     return true;
 };
@@ -294,12 +374,12 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
         const char *name = compiler->file_buffer + target.lhs;
         size_t name_len = target.rhs - target.lhs;
 
-        uint32_t local_idx;
+        uint32_t index;
 
-        if (compiler_find_local(compiler, name, name_len, &local_idx)) {
+        if (compiler_find_local(compiler, name, name_len, &index)) {
             if (has_op) {
                 chunk_add_byte(compiler->chunk, OP_GET_LOCAL, source);
-                chunk_add_byte(compiler->chunk, local_idx, source);
+                chunk_add_byte(compiler->chunk, index, source);
 
                 chunk_add_byte(compiler->chunk, OP_SWP, source);
 
@@ -307,7 +387,19 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
             }
 
             chunk_add_byte(compiler->chunk, OP_SET_LOCAL, source);
-            chunk_add_byte(compiler->chunk, local_idx, source);
+            chunk_add_byte(compiler->chunk, index, source);
+        } else if (compiler_find_upvalue(compiler, name, name_len, &index)) {
+            if (has_op) {
+                chunk_add_byte(compiler->chunk, OP_GET_UPVALUE, source);
+                chunk_add_byte(compiler->chunk, index, source);
+
+                chunk_add_byte(compiler->chunk, OP_SWP, source);
+
+                chunk_add_byte(compiler->chunk, op, source);
+            }
+
+            chunk_add_byte(compiler->chunk, OP_SET_UPVALUE, source);
+            chunk_add_byte(compiler->chunk, index, source);
         } else if (has_op) {
             ObjString *key = vm_copy_string(compiler->vm, name, name_len);
 
@@ -325,9 +417,14 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
         } else if (compiler->parent != NULL) {
             chunk_add_byte(compiler->chunk, OP_DUP, source);
 
-            Local local = {.name = name, .name_len = name_len};
+            if (!compiler_add_local(compiler, name, name_len)) {
+                compiler_error(
+                    compiler, source,
+                    "using %d local variables exceeds the limit of %d\n",
+                    (int)compiler->locals_count + 1, UINT8_MAX);
 
-            ARRAY_PUSH(&compiler->locals, local);
+                return false;
+            }
         } else {
             ObjString *key = vm_copy_string(compiler->vm, name, name_len);
 
