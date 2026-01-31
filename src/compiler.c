@@ -192,16 +192,18 @@ static bool compile_function(Compiler *compiler, AstNode node,
 
     CallFrame *frame = &fc.vm->frames[fc.vm->frame_count++];
 
-    frame->fn = vm_new_function(fc.vm,
+    ObjFunction *fn = vm_new_function(fc.vm,
                                 (Chunk){
                                     .file_path = fc.file_path,
                                     .file_content = fc.file_buffer,
                                 },
                                 parameters.count);
 
+    frame->closure = vm_new_closure(fc.vm, fn);
+
     frame->slots = compiler->vm->stack;
 
-    fc.chunk = &frame->fn->chunk;
+    fc.chunk = &frame->closure->fn->chunk;
 
     if (!compile_stmt(&fc, node.rhs)) {
         return false;
@@ -212,8 +214,8 @@ static bool compile_function(Compiler *compiler, AstNode node,
 
     fc.vm->frame_count--;
 
-    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
-    compiler_emit_constant(compiler, OBJ_VAL(frame->fn), source);
+    chunk_add_byte(compiler->chunk, OP_MAKE_CLOSURE, source);
+    compiler_emit_constant(compiler, OBJ_VAL(frame->closure->fn), source);
 
     return true;
 };

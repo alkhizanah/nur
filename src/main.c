@@ -137,6 +137,19 @@ static void disassemble(Chunk chunk) {
             break;
         }
 
+        case OP_MAKE_CLOSURE: {
+            uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
+                                           chunk.bytes[ip - 1]);
+
+            printf("MAKE_CLOSURE %d (", (int)index);
+
+            value_display(chunk.constants.items[index]);
+
+            printf(")");
+
+            break;
+        }
+
         case OP_GET_LOCAL:
             printf("GET_LOCAL %d", (int)chunk.bytes[ip++]);
             break;
@@ -377,7 +390,7 @@ int main(int argc, const char **argv) {
             return 1;
         }
 
-        disassemble(vm.frames[0].fn->chunk);
+        disassemble(vm.frames[0].closure->fn->chunk);
 
         free(input_file_content);
     } else if (file_exists(command)) {

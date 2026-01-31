@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 typedef enum {
+    OBJ_CLOSURE,
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_ARRAY,
@@ -53,6 +54,7 @@ static inline bool is_obj_tag(Value v, ObjTag tag) {
     return IS_OBJ(v) && AS_OBJ(v)->tag == tag;
 }
 
+#define IS_CLOSURE(v) is_obj_tag(v, OBJ_CLOSURE)
 #define IS_FUNCTION(v) is_obj_tag(v, OBJ_FUNCTION)
 #define IS_NATIVE(v) is_obj_tag(v, OBJ_NATIVE)
 #define IS_ARRAY(v) is_obj_tag(v, OBJ_ARRAY)
@@ -81,6 +83,7 @@ typedef enum : uint8_t {
     OP_SET_SUBSCRIPT,
     OP_MAKE_ARRAY,
     OP_MAKE_MAP,
+    OP_MAKE_CLOSURE,
     OP_NEG,
     OP_NOT,
     OP_ADD,
@@ -137,6 +140,11 @@ typedef struct {
 
 typedef struct {
     Obj obj;
+    ObjFunction *fn;
+} ObjClosure;
+
+typedef struct {
+    Obj obj;
     Value *items;
     uint32_t count;
     uint32_t capacity;
@@ -155,6 +163,7 @@ typedef struct {
 } ObjMap;
 
 #define AS_STRING(v) ((ObjString *)AS_OBJ(v))
+#define AS_CLOSURE(v) ((ObjClosure *)AS_OBJ(v))
 #define AS_FUNCTION(v) ((ObjFunction *)AS_OBJ(v))
 #define AS_ARRAY(v) ((ObjArray *)AS_OBJ(v))
 #define AS_MAP(v) ((ObjMap *)AS_OBJ(v))
@@ -164,7 +173,7 @@ typedef struct {
 #define VM_GC_GROW_FACTOR 2
 
 typedef struct {
-    ObjFunction *fn;
+    ObjClosure *closure;
     uint8_t *ip;
     Value *slots;
 } CallFrame;
@@ -229,6 +238,8 @@ ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
 ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count);
 
 ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity);
+
+ObjClosure *vm_new_closure(Vm *vm, ObjFunction *);
 
 void vm_gc(Vm *);
 

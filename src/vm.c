@@ -34,6 +34,7 @@ static inline const char *value_description(Value value) {
         case OBJ_MAP:
             return "a map";
 
+        case OBJ_CLOSURE:
         case OBJ_FUNCTION:
         case OBJ_NATIVE:
             return "a function";
@@ -56,11 +57,12 @@ void vm_error(Vm *vm, const char *format, ...) {
     for (ssize_t i = vm->frame_count - 1; i >= 0; i--) {
         CallFrame *frame = &vm->frames[i];
 
-        size_t instruction = frame->ip - frame->fn->chunk.bytes - 1;
-        size_t source = frame->fn->chunk.sources[instruction];
+        size_t instruction = frame->ip - frame->closure->fn->chunk.bytes - 1;
+        size_t source = frame->closure->fn->chunk.sources[instruction];
 
-        SourceLocation loc = source_location_of(
-            frame->fn->chunk.file_path, frame->fn->chunk.file_content, source);
+        SourceLocation loc =
+            source_location_of(frame->closure->fn->chunk.file_path,
+                               frame->closure->fn->chunk.file_content, source);
 
         fprintf(stderr, "\tat %s:%u:%u\n", loc.file_path, loc.line, loc.column);
     }
@@ -130,12 +132,14 @@ bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
 
     CallFrame *frame = &vm->frames[vm->frame_count++];
 
-    frame->fn = vm_new_function(vm,
-                                (Chunk){
-                                    .file_path = file_path,
-                                    .file_content = file_buffer,
-                                },
-                                0);
+    ObjFunction *fn = vm_new_function(vm,
+                                      (Chunk){
+                                          .file_path = file_path,
+                                          .file_content = file_buffer,
+                                      },
+                                      0);
+
+    frame->closure = vm_new_closure(vm, fn);
 
     frame->slots = vm->stack;
 
@@ -144,7 +148,7 @@ bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
         .file_buffer = file_buffer,
         .ast = parser.ast,
         .vm = vm,
-        .chunk = &frame->fn->chunk,
+        .chunk = &frame->closure->fn->chunk,
     };
 
     if (!compile_block(&compiler, block)) {
@@ -159,7 +163,7 @@ bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
     chunk_add_byte(compiler.chunk, OP_PUSH_NULL, 0);
     chunk_add_byte(compiler.chunk, OP_RETURN, 0);
 
-    frame->ip = frame->fn->chunk.bytes;
+    frame->ip = frame->closure->fn->chunk.bytes;
 
     return true;
 }
@@ -192,6 +196,14 @@ ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity) {
     function->arity = arity;
 
     return function;
+}
+
+ObjClosure *vm_new_closure(Vm *vm, ObjFunction *fn) {
+    ObjClosure *closure = OBJ_ALLOC(vm, OBJ_CLOSURE, ObjClosure);
+
+    closure->fn = fn;
+
+    return closure;
 }
 
 static uint32_t string_hash(const char *key, uint32_t count) {
@@ -852,10 +864,9 @@ static void vm_pow_flt_int(Vm *vm, Value lhs, Value rhs) {
     vm_poke(vm, 0, FLT_VAL(pow(flhs, irhs)));
 }
 
-static bool vm_call(Vm *vm, ObjFunction *fn, uint8_t argc) {
-
-    if (argc != fn->arity) {
-        vm_error(vm, "expected %d arguments but got %d instead", fn->arity,
+static bool vm_call(Vm *vm, ObjClosure *closure, uint8_t argc) {
+    if (argc != closure->fn->arity) {
+        vm_error(vm, "expected %d arguments but got %d instead", closure->fn->arity,
                  argc);
 
         return false;
@@ -869,29 +880,41 @@ static bool vm_call(Vm *vm, ObjFunction *fn, uint8_t argc) {
 
     CallFrame *frame = &vm->frames[vm->frame_count++];
 
-    frame->fn = fn;
-    frame->ip = fn->chunk.bytes;
+    frame->closure = closure;
+    frame->ip = closure->fn->chunk.bytes;
     frame->slots = vm->sp - argc;
 
     return true;
 }
 
 static bool vm_call_value(Vm *vm, Value callee, uint8_t argc) {
-    if (IS_FUNCTION(callee)) {
-        return vm_call(vm, AS_FUNCTION(callee), argc);
-    } else if (IS_NATIVE(callee)) {
-        if (!AS_NATIVE(callee)->fn(vm, vm->sp - argc, argc)) {
-            return false;
+    if (IS_OBJ(callee)) {
+        switch (AS_OBJ(callee)->tag) {
+        case OBJ_FUNCTION:
+            assert(false && "UNREACHABLE");
+
+            break;
+
+        case OBJ_CLOSURE:
+            return vm_call(vm, AS_CLOSURE(callee), argc);
+
+        case OBJ_NATIVE:
+            if (!AS_NATIVE(callee)->fn(vm, vm->sp - argc, argc)) {
+                return false;
+            }
+
+            vm->sp -= argc;
+
+            return true;
+
+        default:
+            break;
         }
-
-        vm->sp -= argc;
-
-        return true;
-    } else {
-        vm_error(vm, "can not call %s value", value_description(callee));
-
-        return false;
     }
+
+    vm_error(vm, "can not call %s value", value_description(callee));
+
+    return false;
 }
 
 static bool vm_pow(Vm *vm) {
@@ -1091,7 +1114,7 @@ bool vm_run(Vm *vm, Value *result) {
     (((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |           \
      ((uint32_t)READ_BYTE() << 8) | READ_BYTE())
 
-#define READ_CONSTANT() (frame->fn->chunk.constants.items[READ_SHORT()])
+#define READ_CONSTANT() (frame->closure->fn->chunk.constants.items[READ_SHORT()])
 
 #define READ_STRING() (AS_STRING(READ_CONSTANT()))
 
@@ -1211,6 +1234,13 @@ bool vm_run(Vm *vm, Value *result) {
 
             vm_push(vm, OBJ_VAL(map));
 
+            break;
+        }
+
+        case OP_MAKE_CLOSURE: {
+            ObjFunction *fn = AS_FUNCTION(READ_CONSTANT());
+            ObjClosure *closure = vm_new_closure(vm, fn);
+            vm_push(vm, OBJ_VAL(closure));
             break;
         }
 
@@ -1424,6 +1454,10 @@ bool objects_equal(Obj *a, Obj *b) {
         return chunks_equal(((ObjFunction *)a)->chunk,
                             ((ObjFunction *)b)->chunk);
 
+    case OBJ_CLOSURE:
+        return objects_equal(&((ObjClosure *)a)->fn->obj,
+                             &((ObjClosure *)b)->fn->obj);
+
     case OBJ_ARRAY:
         if (((ObjArray *)a)->count != ((ObjArray *)b)->count) {
             return false;
@@ -1600,6 +1634,7 @@ void object_display(Obj *obj) {
         break;
     }
 
+    case OBJ_CLOSURE:
     case OBJ_FUNCTION:
     case OBJ_NATIVE:
         printf("<function>");
@@ -1727,6 +1762,12 @@ static void vm_mark_object(Vm *vm, Obj *obj) {
         }
     }
 
+    case OBJ_CLOSURE: {
+        ObjClosure *closure = (ObjClosure *)obj;
+
+        vm_mark_object(vm, &closure->fn->obj);
+    }
+
     case OBJ_STRING:
     case OBJ_NATIVE:
         break;
@@ -1747,7 +1788,7 @@ static void vm_mark_roots(Vm *vm) {
     for (size_t i = 0; i < vm->frame_count; i++) {
         CallFrame frame = vm->frames[i];
 
-        vm_mark_object(vm, &frame.fn->obj);
+        vm_mark_object(vm, &frame.closure->fn->obj);
     }
 
     vm_mark_object(vm, &vm->globals->obj);
@@ -1803,6 +1844,12 @@ static void vm_free_object(Vm *vm, Obj *obj) {
             fn->chunk.constants.capacity * sizeof(Value) + sizeof(ObjFunction);
 
         break;
+    }
+
+    case OBJ_CLOSURE: {
+        ObjClosure *closure = (ObjClosure *)obj;
+
+        vm_free_object(vm, &closure->fn->obj);
     }
 
     case OBJ_NATIVE:
