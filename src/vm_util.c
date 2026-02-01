@@ -190,8 +190,12 @@ double value_to_float(Value value) {
     }
 }
 
-bool value_is_falsey(Value value) {
-    return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+bool value_is_falsey(Value v) {
+    return IS_NULL(v) || (IS_BOOL(v) && !AS_BOOL(v)) ||
+           (IS_INT(v) && AS_INT(v) == 0) || (IS_FLT(v) && AS_FLT(v) == 0) ||
+           (IS_STRING(v) && AS_STRING(v)->count == 0) ||
+           (IS_ARRAY(v) && AS_ARRAY(v)->count == 0) ||
+           (IS_MAP(v) && AS_MAP(v)->count == 0);
 }
 
 const char *value_description(Value value) {
