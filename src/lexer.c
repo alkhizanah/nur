@@ -167,9 +167,6 @@ retry:
         if (lexer->buffer[lexer->index] == '=') {
             token.tag = TOK_LESS_THAN_OR_EQL;
             token.range.end = ++lexer->index;
-        } else if (lexer->buffer[lexer->index] == '-') {
-            token.tag = TOK_LARROW;
-            token.range.end = ++lexer->index;
         } else {
             token.tag = TOK_LESS_THAN;
             token.range.end = lexer->index;

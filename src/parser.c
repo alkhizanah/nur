@@ -25,7 +25,6 @@ typedef enum : uint8_t {
 static Precedence precedence_of(TokenTag token) {
     switch (token) {
     case TOK_ASSIGN:
-    case TOK_LARROW:
     case TOK_PLUS_ASSIGN:
     case TOK_MINUS_ASSIGN:
     case TOK_MULTIPLY_ASSIGN:
@@ -242,7 +241,6 @@ static AstNodeIdx parse_binary_op(Parser *parser, AstNodeIdx lhs,
 static AstNodeIdx parse_binary_expr(Parser *parser, AstNodeIdx lhs) {
     switch (parser_peek(parser).tag) {
     case TOK_ASSIGN:
-    case TOK_LARROW:
         return parse_assign(parser, lhs, NODE_ASSIGN);
     case TOK_PLUS_ASSIGN:
         return parse_assign(parser, lhs, NODE_ASSIGN_ADD);
