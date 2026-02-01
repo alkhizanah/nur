@@ -258,7 +258,7 @@ static bool compile_function(Compiler *compiler, AstNode node,
                 compiler->ast.nodes
                     .items[compiler->ast.extra.items[node.lhs + 1 + i]];
 
-            compiler_add_local(compiler, compiler->file_buffer + parameter.lhs,
+            compiler_add_local(&fc, fc.file_buffer + parameter.lhs,
                                parameter.rhs - parameter.lhs);
         }
     }
