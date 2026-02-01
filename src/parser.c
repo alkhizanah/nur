@@ -25,6 +25,7 @@ typedef enum : uint8_t {
 static Precedence precedence_of(TokenTag token) {
     switch (token) {
     case TOK_ASSIGN:
+    case TOK_LARROW:
     case TOK_PLUS_ASSIGN:
     case TOK_MINUS_ASSIGN:
     case TOK_MULTIPLY_ASSIGN:
@@ -241,6 +242,7 @@ static AstNodeIdx parse_binary_op(Parser *parser, AstNodeIdx lhs,
 static AstNodeIdx parse_binary_expr(Parser *parser, AstNodeIdx lhs) {
     switch (parser_peek(parser).tag) {
     case TOK_ASSIGN:
+    case TOK_LARROW:
         return parse_assign(parser, lhs, NODE_ASSIGN);
     case TOK_PLUS_ASSIGN:
         return parse_assign(parser, lhs, NODE_ASSIGN_ADD);
@@ -480,13 +482,20 @@ static AstNodeIdx parse_function(Parser *parser) {
 
     parser_advance(parser);
 
-    if (parser_peek(parser).tag != TOK_OBRACE) {
-        parser_error(parser, parser_peek(parser).range.start, "expected '{'\n");
+    AstNodeIdx block;
+
+    if (parser_peek(parser).tag == TOK_RARROW) {
+        parser_advance(parser);
+
+        block = parse_stmt(parser);
+    } else if (parser_peek(parser).tag == TOK_OBRACE) {
+        block = parse_block(parser);
+    } else {
+        parser_error(parser, parser_peek(parser).range.start,
+                     "expected '->' or '{'\n");
 
         return INVALID_NODE_IDX;
     }
-
-    AstNodeIdx block = parse_block(parser);
 
     if (block == INVALID_NODE_IDX) {
         return INVALID_NODE_IDX;
@@ -667,13 +676,20 @@ static AstNodeIdx parse_while_loop(Parser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    if (parser_peek(parser).tag != TOK_OBRACE) {
-        parser_error(parser, parser_peek(parser).range.start, "expected '{'\n");
+    AstNodeIdx block;
+
+    if (parser_peek(parser).tag == TOK_RARROW) {
+        parser_advance(parser);
+
+        block = parse_stmt(parser);
+    } else if (parser_peek(parser).tag == TOK_OBRACE) {
+        block = parse_block(parser);
+    } else {
+        parser_error(parser, parser_peek(parser).range.start,
+                     "expected '->' or '{'\n");
 
         return INVALID_NODE_IDX;
     }
-
-    AstNodeIdx block = parse_block(parser);
 
     if (block == INVALID_NODE_IDX) {
         return INVALID_NODE_IDX;
@@ -693,13 +709,20 @@ static AstNodeIdx parse_conditional(Parser *parser) {
         return INVALID_NODE_IDX;
     }
 
-    if (parser_peek(parser).tag != TOK_OBRACE) {
-        parser_error(parser, parser_peek(parser).range.start, "expected '{'\n");
+    AstNodeIdx true_case;
+
+    if (parser_peek(parser).tag == TOK_RARROW) {
+        parser_advance(parser);
+
+        true_case = parse_stmt(parser);
+    } else if (parser_peek(parser).tag == TOK_OBRACE) {
+        true_case = parse_block(parser);
+    } else {
+        parser_error(parser, parser_peek(parser).range.start,
+                     "expected '->' or '{'\n");
 
         return INVALID_NODE_IDX;
     }
-
-    AstNodeIdx true_case = parse_block(parser);
 
     if (true_case == INVALID_NODE_IDX) {
         return INVALID_NODE_IDX;
@@ -720,6 +743,17 @@ static AstNodeIdx parse_conditional(Parser *parser) {
 
             break;
 
+        case TOK_RARROW:
+            parser_advance(parser);
+
+            false_case = parse_stmt(parser);
+
+            if (false_case == INVALID_NODE_IDX) {
+                return INVALID_NODE_IDX;
+            }
+
+            break;
+
         case TOK_OBRACE:
             false_case = parse_block(parser);
 
@@ -731,7 +765,7 @@ static AstNodeIdx parse_conditional(Parser *parser) {
 
         default: {
             parser_error(parser, parser_peek(parser).range.start,
-                         "expected '{' or 'if'\n");
+                         "expected '->' or '{' or 'if'\n");
 
             return INVALID_NODE_IDX;
         }

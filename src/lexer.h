@@ -22,6 +22,8 @@ typedef enum {
     TOK_CBRACE,
     TOK_OBRACKET,
     TOK_CBRACKET,
+    TOK_LARROW,
+    TOK_RARROW,
     TOK_ASSIGN,
     TOK_EQL,
     TOK_LOGICAL_NOT,
