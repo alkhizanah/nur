@@ -58,12 +58,20 @@ void vm_mark_object(Vm *vm, Obj *obj) {
         for (size_t j = 0; j < fn->chunk.constants.count; j++) {
             vm_mark_value(vm, fn->chunk.constants.items[j]);
         }
+
+        break;
     }
 
     case OBJ_CLOSURE: {
         ObjClosure *closure = (ObjClosure *)obj;
 
         vm_mark_object(vm, &closure->fn->obj);
+
+        for (size_t j = 0; j < closure->upvalues_count; j++) {
+            vm_mark_object(vm, &closure->upvalues[j]->obj);
+        }
+
+        break;
     }
 
     case OBJ_UPVALUE: {
@@ -75,6 +83,8 @@ void vm_mark_object(Vm *vm, Obj *obj) {
         if (upvalue->next != NULL) {
             vm_mark_object(vm, &upvalue->next->obj);
         }
+
+        break;
     }
 
     case OBJ_STRING:
@@ -156,21 +166,24 @@ void vm_free_object(Vm *vm, Obj *obj) {
     case OBJ_CLOSURE: {
         ObjClosure *closure = (ObjClosure *)obj;
 
-        vm_free_object(vm, &closure->fn->obj);
-
-        for (uint8_t i = 0; i < closure->fn->upvalues_count; i++) {
+        for (uint8_t i = 0; i < closure->upvalues_count; i++) {
             vm_free_object(vm, &closure->upvalues[i]->obj);
         }
 
         free(closure->upvalues);
 
+        vm_free_object(vm, &closure->fn->obj);
+
         vm->bytes_allocated -=
-            closure->fn->upvalues_count * sizeof(ObjUpvalue *) +
-            sizeof(ObjClosure);
+            closure->upvalues_count * sizeof(ObjUpvalue *) + sizeof(ObjClosure);
+
+        break;
     }
 
     case OBJ_UPVALUE: {
         vm->bytes_allocated -= sizeof(ObjUpvalue);
+
+        break;
     }
 
     case OBJ_NATIVE:
@@ -273,6 +286,7 @@ ObjClosure *vm_new_closure(Vm *vm, ObjFunction *fn) {
 
     closure->fn = fn;
     closure->upvalues = upvalues;
+    closure->upvalues_count = fn->upvalues_count;
 
     return closure;
 }

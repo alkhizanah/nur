@@ -154,6 +154,7 @@ typedef struct {
     Obj obj;
     ObjFunction *fn;
     ObjUpvalue **upvalues;
+    uint8_t upvalues_count;
 } ObjClosure;
 
 typedef struct {

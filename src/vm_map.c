@@ -62,6 +62,7 @@ void vm_map_adjust_capacity(Vm *vm, ObjMap *map, uint32_t capacity) {
 
     for (uint32_t i = 0; i < map->capacity; i++) {
         ObjMapEntry *entry = &map->entries[i];
+
         if (entry->key == NULL)
             continue;
 
@@ -73,7 +74,9 @@ void vm_map_adjust_capacity(Vm *vm, ObjMap *map, uint32_t capacity) {
         map->count++;
     }
 
-    vm_free_map(vm, map);
+    free(map->entries);
+
+    vm->bytes_allocated -= map->capacity * sizeof(ObjMapEntry);
 
     map->entries = entries;
     map->capacity = capacity;
