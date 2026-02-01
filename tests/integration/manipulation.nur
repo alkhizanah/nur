@@ -1,6 +1,6 @@
 tester = import("tester.nur")
 
-tester.run("manipulate the last element with negative indexing", fn () {
+tester.run("manipulate the last element with negative indexing", fn {
     arr = [0, 1, 2, 3, 4, 5]
 
     arr[-1] = 6
@@ -8,7 +8,7 @@ tester.run("manipulate the last element with negative indexing", fn () {
     return arr[5] == 6
 })
 
-tester.run("swap two elements", fn () {
+tester.run("swap two elements", fn {
     arr = [0, 1, 2, 3, 4, 6]
 
     temp = arr[0]
@@ -22,7 +22,7 @@ tester.run("swap two elements", fn () {
     return  arr[-1] == 0
 })
 
-tester.run("copy elements from array to another array", fn () {
+tester.run("copy elements from array to another array", fn {
     arr = [6, 1, 2, 3, 4, 0]
 
     zero_arr = [0, 0, 0, 0, 0, 0]
@@ -36,7 +36,7 @@ tester.run("copy elements from array to another array", fn () {
     return arr == zero_arr
 })
 
-tester.run("duplicate an array", fn () {
+tester.run("duplicate an array", fn {
     arr = [0, 0, 0, 0, 0, 0]
 
     arr_copied = arr + []

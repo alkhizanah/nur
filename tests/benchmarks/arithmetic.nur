@@ -1,6 +1,6 @@
 benchmarker = import("benchmarker.nur")
 
-benchmarker.run("common arithmetic operations loop", fn () {
+benchmarker.run("common arithmetic operations loop", fn {
     result = 1
 
     i = 1

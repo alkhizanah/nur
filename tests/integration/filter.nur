@@ -1,14 +1,14 @@
 tester = import("tester.nur")
 
-tester.run("pass-through on an empty map", fn () {
+tester.run("pass-through on an empty map", fn {
     unfiltered_map = {}
 
-    filtered_map = filter(unfiltered_map, fn (k, v) { return true })
+    filtered_map = filter(unfiltered_map, fn (k, v) => true)
 
     return filtered_map == unfiltered_map
 })
 
-tester.run("pass-through on a non-empty empty map", fn () {
+tester.run("pass-through on a non-empty empty map", fn {
     unfiltered_map = {
         "1": 1,
         "2": 2,
@@ -17,12 +17,12 @@ tester.run("pass-through on a non-empty empty map", fn () {
         "5": 5,
     }
 
-    filtered_map = filter(unfiltered_map, fn (k, v) { return true })
+    filtered_map = filter(unfiltered_map, fn (k, v) => true)
 
     return filtered_map == unfiltered_map
 })
 
-tester.run("filter a map based on its member values", fn () {
+tester.run("filter a map based on its member values", fn {
     unfiltered_map = {
         "1": 1,
         "2": 2,
@@ -31,53 +31,53 @@ tester.run("filter a map based on its member values", fn () {
         "5": 5,
     }
 
-    filtered_map = filter(unfiltered_map, fn (k, v) { return (v % 2) == 0 })
+    filtered_map = filter(unfiltered_map, fn (k, v) => (v % 2) == 0)
 
     expected_map = {"2": 2, "4": 4}
 
     return filtered_map == expected_map
 })
 
-tester.run("pass-through on an empty array", fn () {
+tester.run("pass-through on an empty array", fn {
     unfiltered_arr = []
 
-    filtered_arr = filter(unfiltered_arr, fn (v) { return true })
+    filtered_arr = filter(unfiltered_arr, fn v => true)
 
     return filtered_arr == unfiltered_arr
 })
 
-tester.run("pass-through on a non-empty array", fn () {
+tester.run("pass-through on a non-empty array", fn {
     unfiltered_arr = [1, 2, 3, 4, 5]
 
-    filtered_arr = filter(unfiltered_arr, fn (v) { return true })
+    filtered_arr = filter(unfiltered_arr, fn v => true)
 
     return filtered_arr == unfiltered_arr
 })
 
-tester.run("filter an array based on its values", fn () {
+tester.run("filter an array based on its values", fn {
     unfiltered_arr = [1, 2, 3, 4, 5]
 
-    filtered_arr = filter(unfiltered_arr, fn (v) { return (v % 2) == 0 })
+    filtered_arr = filter(unfiltered_arr, fn v => (v % 2) == 0)
 
     expected_arr = [2, 4]
 
     return filtered_arr == expected_arr
 })
 
-tester.run("pass-through on a non-empty string", fn () {
+tester.run("pass-through on a non-empty string", fn {
     unfiltered_str = "12345"
 
-    filtered_str = filter(unfiltered_str, fn (v) { return true })
+    filtered_str = filter(unfiltered_str, fn v => true)
 
     return filtered_str == unfiltered_str
 })
 
-tester.run("filter a string based on its values", fn () {
+tester.run("filter a string based on its values", fn {
     unfiltered_str = "12345"
 
     expected_str = "24"
 
-    filtered_str = filter(unfiltered_str, fn (v) { return ((to_int(v)) % 2) == 0 })
+    filtered_str = filter(unfiltered_str, fn v => ((to_int(v)) % 2) == 0)
 
     return filtered_str == expected_str
 })

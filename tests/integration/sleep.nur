@@ -1,6 +1,6 @@
 tester = import("tester.nur")
 
-tester.run("sleep for 1 second", fn () {
+tester.run("sleep for 1 second", fn {
     time = import("time")
 
     start = time.now()

@@ -1,6 +1,6 @@
 tester = import("tester.nur")
 
-tester.run("reverse an array", fn () {
+tester.run("reverse an array", fn {
     reversed_arr = reverse(["0", 1, 2, [3]])
 
     expected_arr = [[3], 2, 1, "0"]
@@ -8,7 +8,7 @@ tester.run("reverse an array", fn () {
     return reversed_arr == expected_arr
 })
 
-tester.run("reverse a string", fn () {
+tester.run("reverse a string", fn {
     reversed_str = reverse("hello, world!123")
 
     expected_str = "321!dlrow ,olleh"

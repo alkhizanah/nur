@@ -1,11 +1,11 @@
 benchmarker = import("benchmarker.nur")
 
-benchmarker.run("empty loop", fn () {
+benchmarker.run("empty loop", fn {
     i = -1
 
     while (i += 1) < 10 ** 6 {}
 })
 
-benchmarker.run("empty loop using range", fn () {
+benchmarker.run("empty loop using range", fn {
     foreach(range(0, 10 ** 6), fn (v) {})
 })

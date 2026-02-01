@@ -1,10 +1,10 @@
 tester = import("tester.nur")
 
-tester.run("1 level closure", fn () {
-    high = fn () {
+tester.run("1 level closure", fn {
+    high = fn {
         x = 5
 
-        low = fn () {
+        low = fn {
             return x
         }
 
@@ -16,12 +16,12 @@ tester.run("1 level closure", fn () {
     return low() == 5
 })
 
-tester.run("2 levels closure", fn () {
-    high = fn () {
+tester.run("2 levels closure", fn {
+    high = fn {
         x = 5
 
-        medium = fn () {
-            low = fn () {
+        medium = fn {
+            low = fn {
                 return x
             }
 
@@ -38,14 +38,14 @@ tester.run("2 levels closure", fn () {
     return low() == 5
 })
 
-tester.run("while loop closure", fn () {
+tester.run("while loop closure", fn {
     closures = []
 
-    fn () {
+    fn {
         i = 0
 
         while i < 10 {
-            low = fn () {
+            low = fn {
                 return i
             }
 
@@ -66,18 +66,18 @@ tester.run("while loop closure", fn () {
     return passed
 })
 
-tester.run("multiple closures capture the same value", fn () {
+tester.run("multiple closures capture the same value", fn {
     first = null
     second = null
 
-    fn () {
+    fn {
         x = 5
 
-        first = fn () {
+        first = fn {
             return x
         }
 
-        second = fn () {
+        second = fn {
             x += 1
 
             return x

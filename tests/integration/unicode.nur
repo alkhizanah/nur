@@ -2,19 +2,19 @@ unicode = import("unicode")
 
 tester = import("tester.nur")
 
-tester.run("encode an english character", fn () {
+tester.run("encode an english character", fn {
     return unicode.utf8_encode(69) == "E"
 })
 
-tester.run("decode an english character", fn () {
+tester.run("decode an english character", fn {
     return unicode.utf8_decode("E") == 69
 })
 
-tester.run("encode an arabic character", fn () {
+tester.run("encode an arabic character", fn {
     return unicode.utf8_encode(1575) == "ا"
 })
 
-tester.run("decode an arabic character", fn () {
+tester.run("decode an arabic character", fn {
     return unicode.utf8_decode("ا") == 1575
 })
 

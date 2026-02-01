@@ -1,18 +1,18 @@
 tester = import("tester.nur")
 
-tester.run("subscript an array", fn () {
+tester.run("subscript an array", fn {
     arr = [0, 2, 4, 3, 5]
 
     return arr[3] == 3
 })
 
-tester.run("subscript a string", fn () {
+tester.run("subscript a string", fn {
     str = "Hello, World!"
 
     return str[3] == "l"
 })
 
-tester.run("subscript a map", fn () {
+tester.run("subscript a map", fn {
     map = {1: 2, 3: 4, 4: 5}
 
     return map[3] == 4

@@ -1,14 +1,14 @@
 tester = import("tester.nur")
 
-tester.run("pass-through an empty map", fn () {
+tester.run("pass-through an empty map", fn {
     untransformed_map = {}
 
-    transformed_map = transform(untransformed_map, fn (k, v) { return [k, v] })
+    transformed_map = transform(untransformed_map, fn (k, v) => [k, v])
 
     return transformed_map == untransformed_map
 })
 
-tester.run("pass-through a non-empty map", fn () {
+tester.run("pass-through a non-empty map", fn {
     untransformed_map = {
         "1": 1,
         "2": 2,
@@ -17,12 +17,12 @@ tester.run("pass-through a non-empty map", fn () {
         "5": 5,
     }
 
-    transformed_map = transform(untransformed_map, fn (k, v) { return [k, v] })
+    transformed_map = transform(untransformed_map, fn (k, v) => [k, v])
 
     return transformed_map == untransformed_map
 })
 
-tester.run("apply a simple tranformation to values but not keys", fn () {
+tester.run("apply a simple tranformation to values but not keys", fn {
     untransformed_map = {
         "1": 1,
         "2": 2,
@@ -31,7 +31,7 @@ tester.run("apply a simple tranformation to values but not keys", fn () {
         "5": 5,
     }
 
-    transformed_map = transform(untransformed_map, fn (k, v) { return [k, v + 1] })
+    transformed_map = transform(untransformed_map, fn (k, v) => [k, v + 1])
 
     expected_map = {
         "1": 2,
@@ -44,7 +44,7 @@ tester.run("apply a simple tranformation to values but not keys", fn () {
     return transformed_map == expected_map
 })
 
-tester.run("apply a simple tranformation to keys but not values", fn () {
+tester.run("apply a simple tranformation to keys but not values", fn {
     untransformed_map = {
         "1": 1,
         "2": 2,
@@ -53,7 +53,7 @@ tester.run("apply a simple tranformation to keys but not values", fn () {
         "5": 5,
     }
 
-    transformed_map = transform(untransformed_map, fn (k, v) { return [to_string(to_int(k) + 1), v] })
+    transformed_map = transform(untransformed_map, fn (k, v) => [to_string(to_int(k) + 1), v])
     
     expected_map = {
         "2": 1,
@@ -66,7 +66,7 @@ tester.run("apply a simple tranformation to keys but not values", fn () {
     return transformed_map == expected_map
 })
 
-tester.run("apply a simple tranformation both keys and values", fn () {
+tester.run("apply a simple tranformation both keys and values", fn {
     untransformed_map = {
         "1": 1,
         "2": 2,
@@ -75,7 +75,7 @@ tester.run("apply a simple tranformation both keys and values", fn () {
         "5": 5,
     }
 
-    transformed_map = transform(untransformed_map, fn (k, v) { return [to_string(to_int(k) + 1), v + 1] })
+    transformed_map = transform(untransformed_map, fn (k, v) => [to_string(to_int(k) + 1), v + 1])
     
     expected_map = {
         "2": 2,
@@ -88,18 +88,18 @@ tester.run("apply a simple tranformation both keys and values", fn () {
     return transformed_map == expected_map
 })
 
-tester.run("pass-through a non-empty array", fn () {
+tester.run("pass-through a non-empty array", fn {
     untransformed_arr = [1, 2, 3, 4, 5]
 
-    transformed_arr = transform(untransformed_arr, fn (v) { return v })
+    transformed_arr = transform(untransformed_arr, fn v => v)
 
     return transformed_arr == untransformed_arr
 })
 
-tester.run("apply a simple transformation to array's values", fn () {
+tester.run("apply a simple transformation to array's values", fn {
     untransformed_arr = [1, 2, 3, 4, 5]
 
-    transformed_arr = transform(untransformed_arr, fn (v) { return v + 1 })
+    transformed_arr = transform(untransformed_arr, fn v => v + 1)
 
     expected_arr = [2, 3, 4, 5, 6]
 

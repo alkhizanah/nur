@@ -2,13 +2,13 @@ fs = import("fs")
 io = import("io")
 process = import("process")
 
-duplicate_stdin = fn () {
+duplicate_stdin = fn {
     while (input = fs.read_line(io.stdin)) != null {
         println(input)
     }
 }
 
-concatenate_files = fn () {
+concatenate_files = fn {
     i = 0
 
     while (i += 1) < len(process.argv) {

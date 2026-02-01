@@ -1,6 +1,6 @@
 tester = import("tester.nur")
 
-tester.run("generate a range array", fn () {
+tester.run("generate a range array", fn {
     range_arr = range(6)
 
     expected_arr = [0, 1, 2, 3, 4, 5]
@@ -8,7 +8,7 @@ tester.run("generate a range array", fn () {
     return range_arr == expected_arr
 })
 
-tester.run("generate a range array with a specified starting point", fn () {
+tester.run("generate a range array with a specified starting point", fn {
     range_arr = range(1, 6)
 
     expected_arr = [1, 2, 3, 4, 5]
@@ -16,7 +16,7 @@ tester.run("generate a range array with a specified starting point", fn () {
     return range_arr == expected_arr
 })
 
-tester.run("generate a range array with a specified starting point and step incrementor", fn () {
+tester.run("generate a range array with a specified starting point and step incrementor", fn {
     range_arr = range(0, 12, 2)
 
     expected_arr = [0, 2, 4, 6, 8, 10]

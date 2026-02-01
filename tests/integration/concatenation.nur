@@ -1,6 +1,6 @@
 tester = import("tester.nur")
 
-tester.run("concatenate an array", fn () {
+tester.run("concatenate an array", fn {
     arr = [0, 1, 2]
 
     arr += [3, 4, 5]
@@ -8,7 +8,7 @@ tester.run("concatenate an array", fn () {
     return arr == [0, 1, 2, 3, 4, 5] 
 })
 
-tester.run("concatenate a string", fn () {
+tester.run("concatenate a string", fn {
     str = "Hello"
 
     str += ", World!"

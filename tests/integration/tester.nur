@@ -17,7 +17,7 @@ return {
         }
     },
 
-    "end": fn () {
+    "end": fn {
         if stats.passed + stats.failed == 0 {
             return null
         }
