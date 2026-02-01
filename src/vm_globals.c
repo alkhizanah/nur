@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "vm.h"
 
@@ -79,8 +81,54 @@ bool vm_len(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     }
 }
 
+bool vm_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 2) {
+        vm_error(vm, "random() takes exactly two arguments, but got %d", argc);
+
+        return false;
+    }
+
+    Value first = argv[0];
+    Value second = argv[1];
+
+    if (!IS_INT(first) && !IS_FLT(first)) {
+        vm_error(vm,
+                 "error: expected first argument to be a number, got %s value",
+                 value_description(first));
+
+        return false;
+    }
+
+    if (!IS_INT(second) && !IS_FLT(second)) {
+        vm_error(vm,
+                 "error: expected second argument to be a number, got %s value",
+                 value_description(second));
+
+        return false;
+    }
+
+    double min = value_to_float(first);
+    double max = value_to_float(second);
+
+    if (min > max) {
+        double temp = max;
+        max = min;
+        min = temp;
+    }
+
+    double r = (double)rand() / ((double)RAND_MAX + 1.0);
+    double v = min + r * (max - min);
+
+    *result = FLT_VAL(v);
+
+    return true;
+}
+
 void vm_insert_globals(Vm *vm) {
+    srand(time(NULL));
+
     vm_insert_global_native(vm, "print", vm_print);
     vm_insert_global_native(vm, "println", vm_println);
     vm_insert_global_native(vm, "len", vm_len);
+    vm_insert_global_native(vm, "random", vm_random);
 }

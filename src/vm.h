@@ -219,6 +219,8 @@ typedef struct {
 const char *value_description(Value value);
 void value_display(Value);
 bool value_is_falsey(Value);
+int64_t value_to_int(Value);
+double value_to_float(Value);
 uint32_t string_hash(const char *key, uint32_t count);
 bool chunks_equal(Chunk, Chunk);
 bool objects_equal(Obj *, Obj *);

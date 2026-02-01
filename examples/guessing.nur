@@ -1,6 +1,5 @@
 fs = import("fs")
 io = import("io")
-process = import("process")
 
 secret = to_int(random(0, 10))
 

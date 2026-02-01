@@ -37,7 +37,7 @@ Hello, World!
 
 - random
 
-Gives you a random value between two values exclusivly
+Gives you a random float between two values
 
 Usage:
 
@@ -46,7 +46,7 @@ random(5, 10) # 7.268858764248719
 random(10, 5) # same as above
 random(0.1, 0.2) # 0.1783036218123609
 random(0, 0) # 0.0
-random("", "") # error: expected range start to be a number, got a string value
+random("", "") # error: expected first argument to be a number, got a string value
 ```
 
 - exit

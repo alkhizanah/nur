@@ -170,6 +170,26 @@ bool values_equal(Value a, Value b) {
     }
 }
 
+int64_t value_to_int(Value value) {
+    if (IS_INT(value)) {
+        return AS_INT(value);
+    } else if (IS_FLT(value)) {
+        return AS_FLT(value);
+    } else {
+        return INT64_MAX;
+    }
+}
+
+double value_to_float(Value value) {
+    if (IS_INT(value)) {
+        return AS_INT(value);
+    } else if (IS_FLT(value)) {
+        return AS_FLT(value);
+    } else {
+        return 0.0 / 0.0;
+    }
+}
+
 bool value_is_falsey(Value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
