@@ -432,6 +432,22 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
             compiler_emit_constant(compiler, OBJ_VAL(key), source);
         }
     } else if (target.tag == NODE_SUBSCRIPT) {
+        if (has_op) {
+            if (!compile_expr(compiler, target.rhs)) {
+                return false;
+            }
+
+            if (!compile_expr(compiler, target.lhs)) {
+                return false;
+            }
+
+            chunk_add_byte(compiler->chunk, OP_GET_SUBSCRIPT, source);
+
+            chunk_add_byte(compiler->chunk, OP_SWP, source);
+
+            chunk_add_byte(compiler->chunk, op, source);
+        }
+
         if (!compile_expr(compiler, target.rhs)) {
             return false;
         }
@@ -441,11 +457,30 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
         }
 
         chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT, source);
+
     } else if (target.tag == NODE_MEMBER) {
         AstNode identifier = compiler->ast.nodes.items[target.rhs];
 
         const char *key = compiler->file_buffer + identifier.lhs;
         uint32_t key_len = identifier.rhs - identifier.lhs;
+
+        if (has_op) {
+            chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+
+            compiler_emit_constant(
+                compiler, OBJ_VAL(vm_copy_string(compiler->vm, key, key_len)),
+                source);
+
+            if (!compile_expr(compiler, target.lhs)) {
+                return false;
+            }
+
+            chunk_add_byte(compiler->chunk, OP_GET_SUBSCRIPT, source);
+
+            chunk_add_byte(compiler->chunk, OP_SWP, source);
+
+            chunk_add_byte(compiler->chunk, op, source);
+        }
 
         chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
 
