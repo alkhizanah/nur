@@ -79,6 +79,9 @@ retry:
         if (lexer->buffer[lexer->index] == '=') {
             token.tag = TOK_EQL;
             token.range.end = ++lexer->index;
+        } else if (lexer->buffer[lexer->index] == '>') {
+            token.tag = TOK_RARROW;
+            token.range.end = ++lexer->index;
         } else {
             token.tag = TOK_ASSIGN;
             token.range.end = lexer->index;
@@ -111,9 +114,6 @@ retry:
     case '-':
         if (lexer->buffer[lexer->index] == '=') {
             token.tag = TOK_MINUS_ASSIGN;
-            token.range.end = ++lexer->index;
-        } else if (lexer->buffer[lexer->index] == '>') {
-            token.tag = TOK_RARROW;
             token.range.end = ++lexer->index;
         } else {
             token.tag = TOK_MINUS;

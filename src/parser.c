@@ -483,19 +483,26 @@ static AstNodeIdx parse_function(Parser *parser) {
     AstNodeIdx block;
 
     if (parser_peek(parser).tag == TOK_RARROW) {
-        parser_advance(parser);
+        Token arrow = parser_advance(parser);
 
-        block = parse_stmt(parser);
+        AstNodeIdx value = parse_expr(parser, PR_LOWEST);
+
+        if (value == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
+        }
+
+        block =
+            ast_push(&parser->ast, NODE_RETURN, 0, value, arrow.range.start);
     } else if (parser_peek(parser).tag == TOK_OBRACE) {
         block = parse_block(parser);
+
+        if (block == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
+        }
     } else {
         parser_error(parser, parser_peek(parser).range.start,
                      "expected '->' or '{'\n");
 
-        return INVALID_NODE_IDX;
-    }
-
-    if (block == INVALID_NODE_IDX) {
         return INVALID_NODE_IDX;
     }
 
