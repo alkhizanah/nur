@@ -562,7 +562,7 @@ static void vm_pow_flt_int(Vm *vm, Value lhs, Value rhs) {
     vm_poke(vm, 0, FLT_VAL(pow(flhs, irhs)));
 }
 
-static bool vm_call(Vm *vm, ObjClosure *closure, uint8_t argc) {
+static bool vm_call_closure(Vm *vm, ObjClosure *closure, uint8_t argc) {
     if (argc != closure->fn->arity) {
         vm_error(vm, "expected %d arguments but got %d instead",
                  closure->fn->arity, argc);
@@ -585,25 +585,31 @@ static bool vm_call(Vm *vm, ObjClosure *closure, uint8_t argc) {
     return true;
 }
 
+static bool vm_call_native(Vm *vm, NativeFn fn, uint8_t argc) {
+    Value result;
+
+    if (!fn(vm, vm->sp - argc, argc, &result)) {
+        return false;
+    }
+
+    vm->sp -= argc;
+
+    vm_push(vm, result);
+
+    return true;
+}
+
 static bool vm_call_value(Vm *vm, Value callee, uint8_t argc) {
     if (IS_OBJ(callee)) {
         switch (AS_OBJ(callee)->tag) {
-        case OBJ_FUNCTION:
-            assert(false && "UNREACHABLE");
-
-            break;
-
         case OBJ_CLOSURE:
-            return vm_call(vm, AS_CLOSURE(callee), argc);
+            return vm_call_closure(vm, AS_CLOSURE(callee), argc);
 
         case OBJ_NATIVE:
-            if (!AS_NATIVE(callee)->fn(vm, vm->sp - argc, argc)) {
-                return false;
-            }
+            return vm_call_native(vm, AS_NATIVE(callee)->fn, argc);
 
-            vm->sp -= argc;
-
-            return true;
+        case OBJ_FUNCTION:
+            assert(false && "UNREACHABLE");
 
         default:
             break;

@@ -207,7 +207,7 @@ typedef struct {
     size_t next_gc;
 } Vm;
 
-typedef bool (*NativeFn)(Vm *, Value *argv, uint8_t argc);
+typedef bool (*NativeFn)(Vm *, Value *argv, uint8_t argc, Value *result);
 
 typedef struct {
     Obj obj;
