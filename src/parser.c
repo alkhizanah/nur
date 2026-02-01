@@ -444,7 +444,8 @@ static AstNodeIdx parse_function(Parser *parser) {
 
     Token oparen_token = parser_peek(parser);
 
-    if (oparen_token.tag != TOK_RARROW && oparen_token.tag != TOK_OBRACE) {
+    if (oparen_token.tag != TOK_RARROW && oparen_token.tag != TOK_OBRACE &&
+        oparen_token.tag != TOK_IDENTIFIER) {
         if (oparen_token.tag != TOK_OPAREN) {
             parser_error(parser, parser_peek(parser).range.start,
                          "expected '('\n");
@@ -483,6 +484,12 @@ static AstNodeIdx parse_function(Parser *parser) {
         }
 
         parser_advance(parser);
+    }
+
+    if (oparen_token.tag == TOK_IDENTIFIER) {
+        AstNodeIdx parameter = parse_identifier(parser);
+
+        ARRAY_PUSH(&parameters, parameter);
     }
 
     AstNodeIdx block;
