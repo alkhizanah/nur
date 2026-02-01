@@ -29,7 +29,7 @@ tester.run("copy elements from array to another array", fn () {
 
     i = -1
 
-    while (i += 1) < length(arr) {
+    while (i += 1) < len(arr) {
         arr[i] = zero_arr[i]
     }
 

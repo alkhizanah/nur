@@ -1,9 +1,5 @@
 # The Shell Built-in Module
 
-## Expectations
-
-I expect that you imported the shell module like that
-
 ```
 shell = import("shell")
 ```

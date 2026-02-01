@@ -1,9 +1,5 @@
 # The Time Built-in Module
 
-## Expectations
-
-I expect that you imported the time module like that
-
 ```
 time = import("time")
 ```

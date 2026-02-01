@@ -1,9 +1,5 @@
 # The Input Output Built-in Module
 
-## Expectations
-
-I expect that you imported the io module like that
-
 ```
 io = import("io")
 ```

@@ -1,9 +1,5 @@
 # The Process Built-in Module
 
-## Expectations
-
-I expect that you imported the process module like that
-
 ```
 process = import("process")
 ```

@@ -1,9 +1,5 @@
 # The Operating System Built-in Module
 
-## Expectations
-
-I expect that you imported the os module like that
-
 ```
 os = import("os")
 ```

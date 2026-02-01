@@ -1,9 +1,5 @@
 # The File System Built-in Module
 
-## Expectations
-
-I expect that you imported the fs module like that
-
 ```
 fs = import("fs")
 ```
@@ -16,7 +12,7 @@ Opens a file to read or write
 
 ```
 fs.open("some_file") # some file descriptor
-fs.open(3) # null
+fs.open(3) # error: expected a file path to be a string, got an integer value
 ```
 
 - create
@@ -25,7 +21,7 @@ Creates a file to read or write, opens the file without truncating if exists, to
 
 ```
 fs.create("some_file") # some file descriptor
-fs.create(3) # null
+fs.create(3) # error: expected a file path to be a string, got an integer value
 ```
 
 - delete
@@ -109,5 +105,5 @@ Checks if file can be accessed
 ```
 fs.access("some_file") # true
 fs.access("other_non_existent_file") # false
-fs.access(02) # null
+fs.access(02) # error: expected a file path to be a string, got an integer value
 ```

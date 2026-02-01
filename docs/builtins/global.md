@@ -46,7 +46,7 @@ random(5, 10) # 7.268858764248719
 random(10, 5) # same as above
 random(0.1, 0.2) # 0.1783036218123609
 random(0, 0) # 0.0
-random("", "") # null
+random("", "") # error: expected range start to be a number, got a string value
 ```
 
 - exit
@@ -80,7 +80,7 @@ typeof(print) # "function"
 
 - to_int
 
-Casts (string, float, boolean) to int
+Casts (string, float, boolean) to int, returns null on failure instead of erroring out
 
 ```
 to_int(5) # 5
@@ -92,7 +92,7 @@ to_int("hey") # null
 
 - to_float
 
-Casts (int, boolean) to float
+Casts (int, boolean) to float, returns null on failure instead of erroring out
 
 ```
 to_float(5.5) # 5.5
@@ -113,7 +113,7 @@ to_string(true) # "true"
 to_string("hey") # "hey"
 to_string(null) # "null"
 to_string([1, 2, 3]) # "[1, 2, 3]"
-to_string({2: 4}) # "{2: 4}"
+to_string({"2": 4}) # "{\"2\": 4}"
 ```
 
 - array_push
@@ -124,7 +124,7 @@ Pushes the value provided into an array
 arr = []
 
 array_push(arr, 5)
-array_push(2, 5) # no errors
+array_push(2, 5) # error: expected first argument to be an array to push into, however got an integer value
 ```
 
 - array_pop
@@ -136,7 +136,7 @@ arr = [5]
 
 array_pop(arr) # 5
 array_pop(arr) # null
-array_pop(2) # null
+array_pop(2) # error: expected first argument to be an array to pop from, however got an integer value
 ```
 
 - foreach
@@ -171,10 +171,10 @@ Gives you a ranged array of ints, you can specify the start point, the end point
 # if given a single argument it will use the start point of 0 and the step incrementor of 1
 range(4) # [0, 1, 2, 3]
 
-# if given two arguments it will use the first as the starting point and the second ans the ending point
+# if given two arguments it will use the first as the starting point and the second as the ending point
 range(1, 6) # [1, 2, 3, 4, 5]
 
-# if given three arguments it will act the pass two arugments but it will use the thrid arugment as the step incrementor
+# if given three arguments it will act the pass two arugments but it will use the third arugment as the step incrementor
 range(0, 12, 2) # [0, 2, 4, 6, 8, 10]
 ```
 
@@ -260,9 +260,9 @@ transform(map, fn (k, v) {
 }) # {"cat": 2, "dog": 4, "cow": 8, "car": "SUPRA"}
 ```
 
-- length
+- len
 
-Gives you the length of an (array, string, map)
+Gives you the length of an iterable (array, string, map)
 
 ```
 arr = [1, 2, 3]
@@ -271,15 +271,15 @@ str = "aaa"
 
 map = {1: 2, 3: 4, 4: 5}
 
-length(str) # 3
-length(arr) # 3
-length(map) # 3
-length(89) # null
+len(str) # 3
+len(arr) # 3
+len(map) # 3
+len(89) # null
 ```
 
 - contains
 
-Checks if a value in (array values, string sequences, map keys)
+Checks if a value is in (array values, string sequences, map keys)
 
 ```
 arr = ["a", "b", "c"]
@@ -337,12 +337,13 @@ greeter = fn (name) {
 call(greeter, ["humans"]) # hello, humans!
 ```
 
-- get_parameters
+- function_arity
 
-Gives you the list of parameter names of a function
+Gives you the number of arguments a function requires, does not work on native functions
 
 ```
-get_parameters(fn (foo, bar) {}) # ["foo", "bar"]
+function_arity(fn (foo, bar) {}) # 2
+function_arity(print) # null
 ```
 
 - import
@@ -376,9 +377,9 @@ hash([1, 2]) # null
 Gives you an array of the keys stored in the provided map
 
 ```
-map = {1: 2, 3: 4}
+map = {"1": 2, "3": 4}
 
-println(map_keys(map)) # [1, 3]
+println(map_keys(map)) # ["1", "3"]
 ```
 
 - map_from_keys
@@ -386,9 +387,9 @@ println(map_keys(map)) # [1, 3]
 Gives you the map with keys you provided and all values are null
 
 ```
-map = map_from_keys([1, 3])
+map = map_from_keys(["1", "3"])
 
-println(map) # {1: null, 3: null}
+println(map) # {"1": null, "3": null}
 ```
 
 - map_values
@@ -396,7 +397,7 @@ println(map) # {1: null, 3: null}
 Gives you an array of the values stored in the provided map
 
 ```
-map = {1: 2, 3: 4}
+map = {"": 2, "3": 4}
 
 println(map_values(map)) # [2, 4]
 ```

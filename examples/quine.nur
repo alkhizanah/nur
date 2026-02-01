@@ -1,14 +1,14 @@
 unicode = import("unicode")
 
-src = "unicode = import(\"unicode\")\n\nsrc = \"?\"\n\ni = -1\n\nwhile (i += 1) < length(src) {\n    if unicode.utf8_decode(src[i]) == 63 {\n        j = -1\n\n        while (j += 1) < length(src) {\n            if src[j] == \"\\n\" {\n                print(\"\\\\n\")\n            } else if src[j] == \"\\\"\" {\n                print(\"\\\\\\\"\")\n            } else if src[j] == \"\\\\\" {\n                print(\"\\\\\\\\\")\n            } else {\n                print(src[j])\n            }\n        }\n    } else {\n        print(src[i])\n    }\n}\n"
+src = "unicode = import(\"unicode\")\n\nsrc = \"?\"\n\ni = -1\n\nwhile (i += 1) < len(src) {\n    if unicode.utf8_decode(src[i]) == 63 {\n        j = -1\n\n        while (j += 1) < len(src) {\n            if src[j] == \"\\n\" {\n                print(\"\\\\n\")\n            } else if src[j] == \"\\\"\" {\n                print(\"\\\\\\\"\")\n            } else if src[j] == \"\\\\\" {\n                print(\"\\\\\\\\\")\n            } else {\n                print(src[j])\n            }\n        }\n    } else {\n        print(src[i])\n    }\n}\n"
 
 i = -1
 
-while (i += 1) < length(src) {
+while (i += 1) < len(src) {
     if unicode.utf8_decode(src[i]) == 63 {
         j = -1
 
-        while (j += 1) < length(src) {
+        while (j += 1) < len(src) {
             if src[j] == "\n" {
                 print("\\n")
             } else if src[j] == "\"" {

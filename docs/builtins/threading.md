@@ -1,9 +1,5 @@
 # The Threading Built-in Module
 
-## Expectations
-
-I expect that you imported the threading module like that
-
 ```
 threading = import("threading")
 ```

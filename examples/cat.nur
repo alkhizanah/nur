@@ -11,7 +11,7 @@ duplicate_stdin = fn () {
 concatenate_files = fn () {
     i = 0
 
-    while (i += 1) < length(process.argv) {
+    while (i += 1) < len(process.argv) {
         file_path = process.argv[i]
 
         file = fs.open(file_path)
@@ -29,7 +29,7 @@ concatenate_files = fn () {
     }
 }
 
-if length(process.argv) < 2 {
+if len(process.argv) < 2 {
     duplicate_stdin()
 } else if process.argv[1] == "-" {
     duplicate_stdin()

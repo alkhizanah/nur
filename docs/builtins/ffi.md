@@ -1,9 +1,5 @@
 # The Foreign Function Interface Built-in Module
 
-## Expectations
-
-I expect that you imported the ffi module like that
-
 ```
 ffi = import("ffi")
 ```
