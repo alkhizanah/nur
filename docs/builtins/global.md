@@ -150,15 +150,15 @@ str = "aaa"
 
 map = {1: 2, 3: 4, 4: 5}
 
-foreach(arr, fn (v) {
+foreach(arr, fn v {
     println(v)
 })
 
-foreach(str, fn (s) {
+foreach(str, fn s {
     println(s)
 })
 
-foreach(map, fn (k, v) {
+foreach(map, fn k, v {
     println(k, v)
 })
 ```
@@ -203,12 +203,12 @@ str = "42not4002"
 
 map = {"cat": 2, "dog": 4, "cow": 8, "car": 34}
 
-filter(arr, fn (v) { return ((v % 2) == 0) }) # [2, 4, 6]
+filter(arr, fn v { return ((v % 2) == 0) }) # [2, 4, 6]
 
-filter(str, fn (s) { return s != to_string(0) }) # 42not42
+filter(str, fn s { return s != to_string(0) }) # 42not42
 
 # filter the map based on its keys
-filter(map, fn (k, v) {
+filter(map, fn k, v {
     if k != "car" {
         return true
     }
@@ -217,7 +217,7 @@ filter(map, fn (k, v) {
 }) # {"cat": 2, "dog": 4, "cow": 8}
 
 # filter the map based on its values
-filter(map, fn (k, v) {
+filter(map, fn k, v {
     if v > 12 {
         return true
     }
@@ -237,12 +237,12 @@ str = "42not4002"
 
 map = {"cat": 2, "dog": 4, "cow": 8, "car": 34}
 
-transform(arr, fn (v) { return v + 1 }) # [2, 3, 4, 5, 6, 7]
+transform(arr, fn v { return v + 1 }) # [2, 3, 4, 5, 6, 7]
 
-transform(str, fn (s) { return s + "0" }) # 4020n0o0t040000020
+transform(str, fn s { return s + "0" }) # 4020n0o0t040000020
 
 # transform the map based on its keys
-transform(map, fn (k, v) {
+transform(map, fn k, v {
     if k == "car" {
         return ["toyota", v]
     }
@@ -251,7 +251,7 @@ transform(map, fn (k, v) {
 }) # {"cat": 2, "dog": 4, "cow": 8, "toyota": 34}
 
 # transform the map based on its values
-transform(map, fn (k, v) {
+transform(map, fn k, v {
     if v == 34 {
         return [k, "SUPRA"]
     }
@@ -330,7 +330,7 @@ string_lower("FOO, BAR") # foo, bar
 Makes you able to call a function programmatically and gives you back its return value by passing its arguments as an array
 
 ```
-greeter = fn (name) {
+greeter = fn name {
     println("hello, " + name + "!")
 }
 
@@ -342,7 +342,7 @@ call(greeter, ["humans"]) # hello, humans!
 Gives you the number of arguments a function requires, does not work on native functions
 
 ```
-function_arity(fn (foo, bar) {}) # 2
+function_arity(fn foo, bar {}) # 2
 function_arity(print) # null
 ```
 

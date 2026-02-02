@@ -11,7 +11,7 @@ threading = import("threading")
 Spawns a new thread managed by the operating system and returns handle to it
 
 ```
-thread = threading.spawn(fn (x, y) {
+thread = threading.spawn(fn x, y {
     println(x, y)
 }, [10, 49])
 ```

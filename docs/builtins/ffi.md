@@ -78,7 +78,7 @@ Allocates a FFI Callback that can be passed to a function that accepts a specifi
 Warning: You should call `free_callback` on the output because the garbage collector will not handle this!
 
 ```
-print_i = fn (i) {
+print_i = fn i {
     print(i)
 }
 

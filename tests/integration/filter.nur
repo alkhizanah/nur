@@ -3,7 +3,7 @@ tester = import("tester.nur")
 tester.run("pass-through on an empty map", fn {
     unfiltered_map = {}
 
-    filtered_map = filter(unfiltered_map, fn (k, v) => true)
+    filtered_map = filter(unfiltered_map, fn k, v => true)
 
     return filtered_map == unfiltered_map
 })
@@ -17,7 +17,7 @@ tester.run("pass-through on a non-empty empty map", fn {
         "5": 5,
     }
 
-    filtered_map = filter(unfiltered_map, fn (k, v) => true)
+    filtered_map = filter(unfiltered_map, fn k, v => true)
 
     return filtered_map == unfiltered_map
 })
@@ -31,7 +31,7 @@ tester.run("filter a map based on its member values", fn {
         "5": 5,
     }
 
-    filtered_map = filter(unfiltered_map, fn (k, v) => (v % 2) == 0)
+    filtered_map = filter(unfiltered_map, fn k, v => (v % 2) == 0)
 
     expected_map = {"2": 2, "4": 4}
 

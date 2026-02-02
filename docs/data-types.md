@@ -69,7 +69,7 @@ A map of a string to any value
 A callable value that is called by the virtual machine and must be defined by the user
 
 ```
-fn () {
+fn a, b {
 
 }
 ```

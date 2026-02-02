@@ -1,7 +1,7 @@
 benchmarker = import("benchmarker.nur")
 
 benchmarker.run("fibonacci linear function", fn {
-    fib = fn (n) {
+    fib = fn n {
         a = 0
         b = 1
         c = null
@@ -28,7 +28,7 @@ benchmarker.run("fibonacci linear function", fn {
 benchmarker.run("fibonacci recursive function (cached)", fn {
     cache = {}
 
-    fib = fn (n) {
+    fib = fn n {
         if n < 2 {
             return n
         }
@@ -48,7 +48,7 @@ benchmarker.run("fibonacci recursive function (cached)", fn {
 })
 
 benchmarker.run("fibonacci recursive function (not cached)", fn {
-    fib = fn (n) {
+    fib = fn n {
         if n < 2 {
             return n
         }

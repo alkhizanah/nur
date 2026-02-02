@@ -7,5 +7,5 @@ benchmarker.run("empty loop", fn {
 })
 
 benchmarker.run("empty loop using range", fn {
-    foreach(range(0, 10 ** 6), fn (v) {})
+    foreach(range(0, 10 ** 6), fn v {})
 })

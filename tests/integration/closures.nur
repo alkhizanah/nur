@@ -57,7 +57,7 @@ tester.run("while loop closure", fn {
 
     passed = len(closures) == 10
 
-    foreach(closures, fn (closure) {
+    foreach(closures, fn closure {
         if closure() != 10 {
             passed = false
         }

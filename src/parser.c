@@ -442,52 +442,31 @@ static AstNodeIdx parse_function(Parser *parser) {
 
     AstExtra parameters = {0};
 
-    Token oparen_token = parser_peek(parser);
-
-    if (oparen_token.tag != TOK_RARROW && oparen_token.tag != TOK_OBRACE &&
-        oparen_token.tag != TOK_IDENTIFIER) {
-        if (oparen_token.tag != TOK_OPAREN) {
+    while (parser_peek(parser).tag != TOK_RARROW &&
+           parser_peek(parser).tag != TOK_OBRACE) {
+        if (parser_peek(parser).tag != TOK_IDENTIFIER) {
             parser_error(parser, parser_peek(parser).range.start,
-                         "expected '('\n");
+                         "expected a parameter name to be an identifier\n");
 
             return INVALID_NODE_IDX;
         }
 
-        parser_advance(parser);
+        AstNodeIdx parameter = parse_identifier(parser);
 
-        while (parser_peek(parser).tag != TOK_CPAREN) {
-            if (parser_peek(parser).tag != TOK_IDENTIFIER) {
-                parser_error(parser, parser_peek(parser).range.start,
-                             "expected a parameter name to be an identifier\n");
-
-                return INVALID_NODE_IDX;
-            }
-
-            AstNodeIdx parameter = parse_identifier(parser);
-
-            if (parameter == INVALID_NODE_IDX) {
-                return INVALID_NODE_IDX;
-            }
-
-            if (parser_peek(parser).tag == TOK_COMMA) {
-                parser_advance(parser);
-            }
-
-            if (parser_peek(parser).tag == TOK_EOF) {
-                parser_error(parser, oparen_token.range.start,
-                             "'(' did not get closed\n");
-
-                return INVALID_NODE_IDX;
-            }
-
-            ARRAY_PUSH(&parameters, parameter);
+        if (parameter == INVALID_NODE_IDX) {
+            return INVALID_NODE_IDX;
         }
 
-        parser_advance(parser);
-    }
+        if (parser_peek(parser).tag == TOK_COMMA) {
+            parser_advance(parser);
+        }
 
-    if (oparen_token.tag == TOK_IDENTIFIER) {
-        AstNodeIdx parameter = parse_identifier(parser);
+        if (parser_peek(parser).tag == TOK_EOF) {
+            parser_error(parser, parser_peek(parser).range.start,
+                         "expected `=>` or `{` got end of file\n");
+
+            return INVALID_NODE_IDX;
+        }
 
         ARRAY_PUSH(&parameters, parameter);
     }
@@ -511,11 +490,6 @@ static AstNodeIdx parse_function(Parser *parser) {
         if (block == INVALID_NODE_IDX) {
             return INVALID_NODE_IDX;
         }
-    } else {
-        parser_error(parser, parser_peek(parser).range.start,
-                     "expected '->' or '{'\n");
-
-        return INVALID_NODE_IDX;
     }
 
     if (parameters.count == 0) {

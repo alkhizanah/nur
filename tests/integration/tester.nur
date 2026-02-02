@@ -1,7 +1,7 @@
 stats = {"passed": 0, "failed": 0}
 
 return {
-    "run": fn (label, test) {
+    "run": fn label, test {
         print(label + ".. ")
 
         result = test()

@@ -357,10 +357,11 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node_idx) {
         }
 
         printf(")");
+
         break;
 
     case NODE_FUNCTION:
-        printf("fn (");
+        printf("fn ");
 
         if (node.lhs != INVALID_EXTRA_IDX) {
             uint32_t start = node.lhs + 1;
@@ -374,7 +375,7 @@ void ast_display(const Ast *ast, const char *buffer, AstNodeIdx node_idx) {
             }
         }
 
-        printf(") ");
+        printf(" ");
 
         ast_display(ast, buffer, node.rhs);
 

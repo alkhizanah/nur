@@ -1,7 +1,7 @@
 time = import("time")
 
 return {
-    "run": fn (label, benchmark) {
+    "run": fn label, benchmark {
         start = time.now_ms()
 
         benchmark()
