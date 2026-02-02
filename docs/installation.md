@@ -2,14 +2,14 @@
 
 ## Build from source
 
-Since Nur is a C project that uses the unity build approach, you can just do
+Since Nur is a C project that uses Makefile approach, you can just do
 
 ```
-cc -o nur src/one.c -lm
+make -j$(nproc)
 ```
 
 To release it, or to use it outside of development, you may also want to optimize it:
 
 ```
-cc -o nur src/one.c -lm -O3
+make -j$(nproc) CC="cc -O3"
 ```

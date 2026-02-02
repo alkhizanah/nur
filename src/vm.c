@@ -847,11 +847,13 @@ bool vm_run(Vm *vm, Value *result) {
 
 #define READ_BYTE() (*frame->ip++)
 
-#define READ_SHORT() (((uint16_t)READ_BYTE() << 8) | READ_BYTE())
+#define READ_SHORT()                                                           \
+    (frame->ip += 2, ((uint16_t)frame->ip[-2] << 8) | frame->ip[-1])
 
 #define READ_WORD()                                                            \
-    (((uint32_t)READ_BYTE() << 24) | ((uint32_t)READ_BYTE() << 16) |           \
-     ((uint32_t)READ_BYTE() << 8) | READ_BYTE())
+    (frame->ip += 4, ((uint32_t)frame->ip[-4] << 24) |                         \
+                         ((uint32_t)frame->ip[-3] << 16) |                     \
+                         ((uint32_t)frame->ip[-2] << 8) | frame->ip[-1])
 
 #define READ_CONSTANT()                                                        \
     (frame->closure->fn->chunk.constants.items[READ_SHORT()])
@@ -921,8 +923,10 @@ bool vm_run(Vm *vm, Value *result) {
             Value value;
 
             if (!vm_map_lookup(vm->globals, key, &value)) {
-                vm_error(vm, "'%.*s' is not defined", (int)key->count,
-                         key->items);
+                vm_error(vm,
+                         "'%.*s' is not "
+                         "defined",
+                         (int)key->count, key->items);
 
                 return false;
             }
@@ -971,7 +975,9 @@ bool vm_run(Vm *vm, Value *result) {
 
             for (uint32_t i = 0; i < count * 2; i += 2) {
                 if (!IS_STRING(start[i])) {
-                    vm_error(vm, "expected a string got %s",
+                    vm_error(vm,
+                             "expected a "
+                             "string got %s",
                              value_description(start[i]));
 
                     return false;

@@ -235,11 +235,8 @@ static bool compile_function(Compiler *compiler, AstNode node,
         .file_path = compiler->file_path,
         .ast = compiler->ast,
         .vm = compiler->vm,
-        .locals = {0},
         .locals_count = 0,
-        .upvalues = {0},
         .upvalues_count = 0,
-        .loop = {0},
     };
 
     if (node.lhs != INVALID_EXTRA_IDX) {
@@ -832,5 +829,8 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_CALL:
         return compile_call(compiler, node, source);
+
+    default:
+        return false;
     }
 }

@@ -112,6 +112,9 @@ bool objects_equal(Obj *a, Obj *b) {
 
     case OBJ_UPVALUE:
         return false;
+
+    default:
+        return false;
     }
 }
 
@@ -135,6 +138,9 @@ bool values_exactly_equal(Value a, Value b) {
 
     case VAL_OBJ:
         return objects_equal(AS_OBJ(a), AS_OBJ(b));
+
+    default:
+        return false;
     }
 }
 
@@ -167,6 +173,9 @@ bool values_equal(Value a, Value b) {
 
     case VAL_OBJ:
         return objects_equal(AS_OBJ(a), AS_OBJ(b));
+
+    default:
+        return false;
     }
 }
 
@@ -226,7 +235,11 @@ const char *value_description(Value value) {
 
         case OBJ_UPVALUE:
             return "an upvalue";
+        default:
+            return NULL;
         }
+    default:
+        return NULL;
     }
 }
 
