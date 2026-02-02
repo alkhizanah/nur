@@ -2,6 +2,10 @@ unicode = import("unicode")
 
 tester = import("tester.nur")
 
+tester.run("get the length of an arabic quote", fn {
+    return len("اهلا") == 4
+})
+
 tester.run("encode an english character", fn {
     return unicode.utf8_encode(69) == "E"
 })

@@ -217,16 +217,19 @@ typedef struct {
 
 #define AS_NATIVE(v) ((ObjNative *)AS_OBJ(v))
 
+bool chunks_equal(Chunk, Chunk);
+bool objects_equal(Obj *, Obj *);
+bool values_exactly_equal(Value, Value); // 4 != 4.0
+bool values_equal(Value, Value);         // 4 == 4.0
+
 const char *value_description(Value value);
 void value_display(Value);
 bool value_is_falsey(Value);
 int64_t value_to_int(Value);
 double value_to_float(Value);
 uint32_t string_hash(const char *key, uint32_t count);
-bool chunks_equal(Chunk, Chunk);
-bool objects_equal(Obj *, Obj *);
-bool values_exactly_equal(Value, Value); // 4 != 4.0
-bool values_equal(Value, Value);         // 4 == 4.0
+const char *string_skip_utf8_character(const char *items);
+uint32_t string_utf8_characters_count(const char *start, const char *end);
 
 void vm_stack_reset(Vm *);
 

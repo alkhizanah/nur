@@ -417,3 +417,28 @@ uint32_t string_hash(const char *key, uint32_t count) {
 
     return hash;
 }
+
+const char *string_skip_utf8_character(const char *start) {
+    if ((*start & 0b10000000) == 0b00000000) {
+        return start + 1;
+    } else if ((*start & 0b11100000) == 0b11000000) {
+        return start + 2;
+    } else if ((*start & 0b11110000) == 0b11100000) {
+        return start + 3;
+    } else if ((*start & 0b11111000) == 0b11110000) {
+        return start + 4;
+    } else {
+        return start;
+    }
+}
+
+uint32_t string_utf8_characters_count(const char *start, const char *end) {
+    uint32_t count = 0;
+
+    while (start < end) {
+        start = string_skip_utf8_character(start);
+        count++;
+    }
+
+    return count;
+}

@@ -64,7 +64,9 @@ bool vm_len(Vm *vm, Value *argv, uint8_t argc, Value *result) {
         return true;
 
     case OBJ_STRING:
-        *result = INT_VAL(AS_STRING(arg)->count);
+        *result = INT_VAL(string_utf8_characters_count(
+            AS_STRING(arg)->items,
+            AS_STRING(arg)->items + AS_STRING(arg)->count));
 
         return true;
 
