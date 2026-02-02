@@ -203,9 +203,9 @@ str = "42not4002"
 
 map = {"cat": 2, "dog": 4, "cow": 8, "car": 34}
 
-filter(arr, fn v { return ((v % 2) == 0) }) # [2, 4, 6]
+filter(arr, fn v => ((v % 2) == 0)) # [2, 4, 6]
 
-filter(str, fn s { return s != to_string(0) }) # 42not42
+filter(str, fn s => s != to_string(0)) # 42not42
 
 # filter the map based on its keys
 filter(map, fn k, v {
@@ -237,9 +237,9 @@ str = "42not4002"
 
 map = {"cat": 2, "dog": 4, "cow": 8, "car": 34}
 
-transform(arr, fn v { return v + 1 }) # [2, 3, 4, 5, 6, 7]
+transform(arr, fn v => v + 1) # [2, 3, 4, 5, 6, 7]
 
-transform(str, fn s { return s + "0" }) # 4020n0o0t040000020
+transform(str, fn s => s + "0") # 4020n0o0t040000020
 
 # transform the map based on its keys
 transform(map, fn k, v {
