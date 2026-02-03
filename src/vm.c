@@ -724,6 +724,43 @@ static bool vm_get_subscript(Vm *vm) {
         }
 
         vm_push(vm, array->items[i]);
+    } else if (IS_STRING(target)) {
+        if (!IS_INT(index)) {
+            vm_error(vm, "cannot access a string with %s value",
+                     value_description(index));
+
+            return false;
+        }
+
+        ObjString *string = AS_STRING(target);
+
+        uint32_t characters_count = string_utf8_characters_count(
+            string->items, string->items + string->count);
+
+        int64_t i = AS_INT(index);
+
+        if (i < 0 || i >= characters_count) {
+            vm_error(vm,
+                     "access out of bounds, string has %d characters "
+                     "while the index is %ld",
+                     characters_count, i);
+
+            return false;
+        }
+
+        const char *start = string->items;
+        const char *end = string_utf8_skip_character(start);
+
+        for (uint32_t j = 0; j < i; j++) {
+            start = string_utf8_skip_character(start);
+            end = string_utf8_skip_character(start);
+        }
+
+        uint32_t len = end - start;
+
+        ObjString *indexed = vm_copy_string(vm, start, len);
+
+        vm_push(vm, OBJ_VAL(indexed));
     } else if (IS_MAP(target)) {
         if (!IS_STRING(index)) {
             vm_error(vm, "cannot access a map with %s value",
@@ -747,7 +784,7 @@ static bool vm_get_subscript(Vm *vm) {
 
         vm_push(vm, value);
     } else {
-        vm_error(vm, "expected an array or a map but got %s",
+        vm_error(vm, "expected an array or a string or a map but got %s",
                  value_description(target));
 
         return false;
@@ -782,6 +819,10 @@ static bool vm_set_subscript(Vm *vm) {
         }
 
         array->items[i] = vm_peek(vm, 0);
+    } else if (IS_STRING(target)) {
+        vm_error(vm, "strings are immutable");
+
+        return false;
     } else if (IS_MAP(target)) {
         if (!IS_STRING(index)) {
             vm_error(vm, "cannot access a map with %s value",

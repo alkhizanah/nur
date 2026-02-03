@@ -228,8 +228,10 @@ bool value_is_falsey(Value);
 int64_t value_to_int(Value);
 double value_to_float(Value);
 uint32_t string_hash(const char *key, uint32_t count);
-const char *string_skip_utf8_character(const char *items);
 uint32_t string_utf8_characters_count(const char *start, const char *end);
+uint32_t string_utf8_encode_character(uint32_t rune, char *result); // result should be at least 4 bytes long
+const char *string_utf8_skip_character(const char *start);
+const char *string_utf8_decode_character(const char *start, uint32_t *rune);
 
 void vm_stack_reset(Vm *);
 

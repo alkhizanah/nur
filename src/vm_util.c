@@ -418,7 +418,18 @@ uint32_t string_hash(const char *key, uint32_t count) {
     return hash;
 }
 
-const char *string_skip_utf8_character(const char *start) {
+uint32_t string_utf8_characters_count(const char *start, const char *end) {
+    uint32_t count = 0;
+
+    while (start < end) {
+        start = string_utf8_skip_character(start);
+        count++;
+    }
+
+    return count;
+}
+
+const char *string_utf8_skip_character(const char *start) {
     if ((*start & 0b10000000) == 0b00000000) {
         return start + 1;
     } else if ((*start & 0b11100000) == 0b11000000) {
@@ -432,13 +443,67 @@ const char *string_skip_utf8_character(const char *start) {
     }
 }
 
-uint32_t string_utf8_characters_count(const char *start, const char *end) {
-    uint32_t count = 0;
+uint32_t string_utf8_encode_character(uint32_t rune, char *result) {
+    if (rune <= 0x7F) {
+        result[0] = rune;
 
-    while (start < end) {
-        start = string_skip_utf8_character(start);
-        count++;
+        return 1;
+    } else if (rune <= 0x7FF) {
+        result[0] = 0xC0 | ((rune >> 6) & 0x1F);
+        result[1] = 0x80 | (rune & 0x3F);
+
+        return 2;
+    } else if (rune <= 0xFFFF) {
+        result[0] = 0xE0 | ((rune >> 12) & 0x0F);
+        result[1] = 0x80 | ((rune >> 6) & 0x3F);
+        result[2] = 0x80 | (rune & 0x3F);
+
+        return 3;
+    } else if (rune <= 0x10FFFF) {
+        result[0] = 0xF0 | ((rune >> 18) & 0x07);
+        result[1] = 0x80 | ((rune >> 12) & 0x3F);
+        result[2] = 0x80 | ((rune >> 6) & 0x3F);
+        result[3] = 0x80 | (rune & 0x3F);
+
+        return 4;
+    } else {
+        return 0;
+    }
+}
+
+const char *string_utf8_decode_character(const char *start, uint32_t *rune) {
+    const char *next;
+
+    if ((*start & 0b10000000) == 0b00000000) {
+        *rune = start[0];
+
+        next = start + 1;
+    } else if ((*start & 0b11100000) == 0b11000000) {
+        *rune = ((uint32_t)(start[0] & 0x1f) << 6) |
+                ((uint32_t)(start[1] & 0x3f) << 0);
+
+        next = start + 2;
+    } else if ((*start & 0b11110000) == 0b11100000) {
+        *rune = ((uint32_t)(start[0] & 0x0f) << 12) |
+                ((uint32_t)(start[1] & 0x3f) << 6) |
+                ((uint32_t)(start[2] & 0x3f) << 0);
+
+        next = start + 3;
+    } else if ((*start & 0b11111000) == 0b11110000) {
+        *rune = ((uint32_t)(start[0] & 0x07) << 18) |
+                ((uint32_t)(start[1] & 0x3f) << 12) |
+                ((uint32_t)(start[2] & 0x3f) << 6) |
+                ((uint32_t)(start[3] & 0x3f) << 0);
+
+        next = start + 4;
+    } else {
+        *rune = 0;
+
+        next = start + 1;
     }
 
-    return count;
+    if (*rune >= 0xD800 && *rune <= 0xDFFF)
+        *rune = 0;
+
+    return next;
 }
