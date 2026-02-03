@@ -714,7 +714,11 @@ static bool vm_get_subscript(Vm *vm) {
 
         int64_t i = AS_INT(index);
 
-        if (i < 0 || i >= array->count) {
+        if (i < 0) {
+            i += array->count;
+        }
+
+        if (i >= array->count) {
             vm_error(vm,
                      "access out of bounds, array has %d elements "
                      "while the index is %ld",
@@ -739,7 +743,11 @@ static bool vm_get_subscript(Vm *vm) {
 
         int64_t i = AS_INT(index);
 
-        if (i < 0 || i >= characters_count) {
+        if (i < 0) {
+            i += characters_count;
+        }
+
+        if (i >= characters_count) {
             vm_error(vm,
                      "access out of bounds, string has %d characters "
                      "while the index is %ld",
@@ -809,7 +817,11 @@ static bool vm_set_subscript(Vm *vm) {
 
         int64_t i = AS_INT(index);
 
-        if (i < 0 || i >= array->count) {
+        if (i < 0) {
+            i += array->count;
+        }
+
+        if (i >= array->count) {
             vm_error(vm,
                      "access out of bounds, array has %d elements "
                      "while the index is %ld",
