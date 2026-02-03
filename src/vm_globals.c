@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "array.h"
 #include "vm.h"
 
 void vm_insert_global(Vm *vm, const char *key, Value value) {
@@ -126,6 +127,66 @@ bool vm_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
+bool vm_array_push(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 2) {
+        vm_error(vm, "array_push() takes exactly two arguments, but got %d",
+                 argc);
+
+        return false;
+    }
+
+    if (!IS_ARRAY(argv[0])) {
+        vm_error(
+            vm,
+            "array_push() requires first argument to be an array, but got %s",
+            value_description(argv[0]));
+
+        return false;
+    }
+
+    ObjArray *array = AS_ARRAY(argv[0]);
+
+    Value value = argv[1];
+
+    uint32_t old_capacity = array->capacity;
+
+    ARRAY_PUSH(array, value);
+
+    vm->bytes_allocated += (array->capacity - old_capacity) * sizeof(Value);
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    *result = NULL_VAL;
+
+    return true;
+}
+
+bool vm_array_pop(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 1) {
+        vm_error(vm, "array_pop() takes exactly one argument, but got %d",
+                 argc);
+
+        return false;
+    }
+
+    if (!IS_ARRAY(argv[0])) {
+        vm_error(
+            vm,
+            "array_pop() requires first argument to be an array, but got %s",
+            value_description(argv[0]));
+
+        return false;
+    }
+
+    ObjArray *array = AS_ARRAY(argv[0]);
+
+    *result = array->items[--array->count];
+
+    return true;
+}
+
 void vm_insert_globals(Vm *vm) {
     srand(time(NULL));
 
@@ -133,4 +194,6 @@ void vm_insert_globals(Vm *vm) {
     vm_insert_global_native(vm, "println", vm_println);
     vm_insert_global_native(vm, "len", vm_len);
     vm_insert_global_native(vm, "random", vm_random);
+    vm_insert_global_native(vm, "array_push", vm_array_push);
+    vm_insert_global_native(vm, "array_pop", vm_array_pop);
 }
