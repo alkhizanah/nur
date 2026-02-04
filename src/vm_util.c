@@ -184,6 +184,8 @@ int64_t value_to_int(Value value) {
         return AS_INT(value);
     } else if (IS_FLT(value)) {
         return AS_FLT(value);
+    } else if (IS_BOOL(value)) {
+        return AS_BOOL(value);
     } else {
         return INT64_MAX;
     }
@@ -194,6 +196,8 @@ double value_to_float(Value value) {
         return AS_INT(value);
     } else if (IS_FLT(value)) {
         return AS_FLT(value);
+    } else if (IS_BOOL(value)) {
+        return AS_BOOL(value);
     } else {
         return 0.0 / 0.0;
     }

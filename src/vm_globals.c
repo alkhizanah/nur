@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -187,6 +188,44 @@ bool vm_array_pop(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
+bool vm_to_int(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 1) {
+        vm_error(vm, "to_int() takes exactly one argument, but got %d", argc);
+
+        return false;
+    }
+
+    Value value = argv[0];
+
+    if (IS_INT(value)) {
+        *result = value;
+    } else if (IS_STRING(value)) {
+        ObjString *string = AS_STRING(value);
+
+        char *endptr;
+
+        errno = 0;
+
+        int64_t v = strtoll(string->items, &endptr, 0);
+
+        if (errno == ERANGE || endptr != string->items + string->count) {
+            *result = NULL_VAL;
+
+            return true;
+        }
+
+        *result = INT_VAL(v);
+    } else if (IS_FLT(value)) {
+        *result = INT_VAL(AS_FLT(value));
+    } else if (IS_BOOL(value)) {
+        *result = INT_VAL(AS_BOOL(value));
+    } else {
+        *result = NULL_VAL;
+    }
+
+    return true;
+}
+
 void vm_insert_globals(Vm *vm) {
     srand(time(NULL));
 
@@ -196,4 +235,5 @@ void vm_insert_globals(Vm *vm) {
     vm_insert_global_native(vm, "random", vm_random);
     vm_insert_global_native(vm, "array_push", vm_array_push);
     vm_insert_global_native(vm, "array_pop", vm_array_pop);
+    vm_insert_global_native(vm, "to_int", vm_to_int);
 }
