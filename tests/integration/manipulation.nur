@@ -41,9 +41,15 @@ tester.run("duplicate an array", fn {
 
     arr_copied = arr + []
 
+    passed = arr == arr_copied
+
     arr[0] = 5
 
-    return arr != arr_copied
+    if arr == arr_copied {
+        passed = false
+    }
+
+    return passed
 })
 
 tester.end()

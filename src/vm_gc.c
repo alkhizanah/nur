@@ -429,3 +429,30 @@ ObjString *vm_concat_strings(Vm *vm, ObjString *lhs, ObjString *rhs) {
 
     return string;
 }
+
+ObjArray *vm_concat_arrays(Vm *vm, ObjArray *lhs, ObjArray *rhs) {
+    vm->bytes_allocated += (lhs->count + rhs->count) * sizeof(Value);
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    ObjArray *array = OBJ_ALLOC(vm, OBJ_ARRAY, ObjArray);
+
+    array->items = malloc((lhs->count + rhs->count) * sizeof(Value));
+
+    if (array->items == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    memcpy(array->items, lhs->items, lhs->count * sizeof(Value));
+    memcpy(array->items + lhs->count, rhs->items, rhs->count * sizeof(Value));
+
+    array->count = lhs->count + rhs->count;
+
+    array->capacity = array->count;
+
+    return array;
+}

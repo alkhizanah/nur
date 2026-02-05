@@ -163,6 +163,7 @@ static bool vm_add(Vm *vm) {
         ObjString *result = vm_concat_strings(vm, slhs, srhs);
         vm_pop(vm);
         vm_poke(vm, 0, OBJ_VAL(result));
+
         return true;
     } else if (IS_STRING(rhs)) {
         ObjString *slhs = vm_to_string(vm, lhs);
@@ -170,7 +171,32 @@ static bool vm_add(Vm *vm) {
         ObjString *result = vm_concat_strings(vm, slhs, srhs);
         vm_pop(vm);
         vm_poke(vm, 0, OBJ_VAL(result));
+
         return true;
+    } else if (IS_ARRAY(lhs)) {
+        if (!IS_ARRAY(rhs)) {
+            vm_error(vm,
+                     "can not add %s value to %s value, did you mean to use "
+                     "`array_push`?",
+                     value_description(lhs), value_description(rhs));
+
+            return false;
+        }
+
+        ObjArray *slhs = AS_ARRAY(lhs);
+        ObjArray *srhs = AS_ARRAY(rhs);
+        ObjArray *result = vm_concat_arrays(vm, slhs, srhs);
+        vm_pop(vm);
+        vm_poke(vm, 0, OBJ_VAL(result));
+
+        return true;
+    } else if (IS_ARRAY(rhs)) {
+        vm_error(vm,
+                 "can not add %s value to %s value, did you mean to use "
+                 "`array_push`?",
+                 value_description(lhs), value_description(rhs));
+
+        return false;
     }
 
     if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {

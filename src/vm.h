@@ -266,6 +266,7 @@ ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash);
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
 ObjString *vm_concat_strings(Vm *vm, ObjString *lhs, ObjString *rhs);
 ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count);
+ObjArray *vm_concat_arrays(Vm *vm, ObjArray *lhs, ObjArray *rhs);
 ObjFunction *vm_new_function(Vm *vm, ObjMap *globals, Chunk chunk, uint8_t arity,
                              uint8_t upvalues_count);
 ObjClosure *vm_new_closure(Vm *vm, ObjFunction *);
