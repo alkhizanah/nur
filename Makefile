@@ -23,11 +23,12 @@ SRCS = src/main.c \
 	   src/compiler.c \
 	   src/lexer.c \
 	   src/main.c \
+	   src/fs.c \
 	   src/parser.c \
 	   src/source_location.c \
 	   src/vm.c \
 	   src/vm_gc.c \
-	   src/vm_globals.c \
+	   src/vm_builtins.c \
 	   src/vm_map.c \
 	   src/vm_util.c
 

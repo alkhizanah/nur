@@ -46,8 +46,6 @@ void vm_init(Vm *vm) {
     vm->objects = NULL;
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
-
-    vm->globals = vm_new_map(vm);
 }
 
 bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
@@ -63,7 +61,7 @@ bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
 
     CallFrame *frame = &vm->frames[vm->frame_count++];
 
-    ObjFunction *fn = vm_new_function(vm,
+    ObjFunction *fn = vm_new_function(vm, vm_new_map(vm),
                                       (Chunk){
                                           .file_path = file_path,
                                           .file_content = file_buffer,
@@ -71,6 +69,8 @@ bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
                                       0, 0);
 
     frame->closure = vm_new_closure(vm, fn);
+
+    vm_map_insert_builtins(vm, frame->closure->fn->globals);
 
     frame->slots = vm->stack;
 
@@ -153,33 +153,6 @@ static ObjString *vm_to_string(Vm *vm, Value value) {
     return NULL;
 }
 
-static ObjString *vm_string_concat(Vm *vm, ObjString *lhs, ObjString *rhs) {
-    vm->bytes_allocated += lhs->count + rhs->count;
-
-    if (vm->bytes_allocated > vm->next_gc) {
-        vm_gc(vm);
-    }
-
-    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
-
-    string->items = malloc((lhs->count + rhs->count) * sizeof(char));
-
-    if (string->items == NULL) {
-        fprintf(stderr, "error: out of memory\n");
-
-        exit(1);
-    }
-
-    memcpy(string->items, lhs->items, lhs->count);
-    memcpy(string->items + lhs->count, rhs->items, rhs->count);
-
-    string->count = lhs->count + rhs->count;
-
-    string->hash = string_hash(string->items, string->count);
-
-    return string;
-}
-
 static bool vm_add(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
@@ -187,14 +160,14 @@ static bool vm_add(Vm *vm) {
     if (IS_STRING(lhs)) {
         ObjString *slhs = AS_STRING(lhs);
         ObjString *srhs = vm_to_string(vm, rhs);
-        ObjString *result = vm_string_concat(vm, slhs, srhs);
+        ObjString *result = vm_concat_strings(vm, slhs, srhs);
         vm_pop(vm);
         vm_poke(vm, 0, OBJ_VAL(result));
         return true;
     } else if (IS_STRING(rhs)) {
         ObjString *slhs = vm_to_string(vm, lhs);
         ObjString *srhs = AS_STRING(rhs);
-        ObjString *result = vm_string_concat(vm, slhs, srhs);
+        ObjString *result = vm_concat_strings(vm, slhs, srhs);
         vm_pop(vm);
         vm_poke(vm, 0, OBJ_VAL(result));
         return true;
@@ -975,7 +948,7 @@ bool vm_run(Vm *vm, Value *result) {
 
             Value value;
 
-            if (!vm_map_lookup(vm->globals, key, &value)) {
+            if (!vm_map_lookup(frame->closure->fn->globals, key, &value)) {
                 vm_error(vm,
                          "'%.*s' is not "
                          "defined",
@@ -990,7 +963,8 @@ bool vm_run(Vm *vm, Value *result) {
         }
 
         case OP_SET_GLOBAL:
-            vm_map_insert(vm, vm->globals, READ_STRING(), vm_peek(vm, 0));
+            vm_map_insert(vm, frame->closure->fn->globals, READ_STRING(),
+                          vm_peek(vm, 0));
             break;
 
         case OP_GET_SUBSCRIPT:
@@ -1051,6 +1025,8 @@ bool vm_run(Vm *vm, Value *result) {
 
         case OP_MAKE_CLOSURE: {
             ObjFunction *fn = AS_FUNCTION(READ_CONSTANT());
+
+            fn->globals = frame->closure->fn->globals;
 
             ObjClosure *closure = vm_new_closure(vm, fn);
 

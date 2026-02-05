@@ -227,6 +227,8 @@ static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
     compiler_emit_constant(compiler, FLT_VAL(f), source);
 }
 
+static ObjMap dummy_map;
+
 static bool compile_function(Compiler *compiler, AstNode node,
                              uint32_t source) {
     Compiler fc = {
@@ -262,7 +264,7 @@ static bool compile_function(Compiler *compiler, AstNode node,
 
     CallFrame *frame = &fc.vm->frames[fc.vm->frame_count++];
 
-    ObjFunction *fn = vm_new_function(fc.vm,
+    ObjFunction *fn = vm_new_function(fc.vm, &dummy_map,
                                       (Chunk){
                                           .file_path = fc.file_path,
                                           .file_content = fc.file_buffer,

@@ -7,89 +7,9 @@
 #include "array.h"
 #include "ast.h"
 #include "compiler.h"
+#include "fs.h"
 #include "parser.h"
 #include "vm.h"
-
-int file_exists(const char *file_path) {
-#if _WIN32
-#include <windows.h>
-    return GetFileAttributesA(file_path) != INVALID_FILE_ATTRIBUTES;
-#else
-#include <unistd.h>
-    return access(file_path, F_OK) == 0;
-#endif
-}
-
-char *read_entire_file(const char *file_path) {
-    FILE *file = fopen(file_path, "r");
-
-    if (file == NULL) {
-        fprintf(stderr, "error: could not open file '%s': %s\n", file_path,
-                strerror(errno));
-
-        exit(1);
-    }
-
-    char c;
-
-    fread(&c, 1, 1, file);
-
-    if (ferror(file)) {
-        fprintf(stderr, "error: could not read file '%s': %s\n", file_path,
-                strerror(errno));
-
-        fclose(file);
-
-        exit(1);
-    }
-
-    if (fseek(file, 0, SEEK_END) == -1) {
-        fprintf(stderr, "error: could not get size of file '%s': %s\n",
-                file_path, strerror(errno));
-
-        fclose(file);
-
-        exit(1);
-    }
-
-    long file_size = ftell(file);
-
-    if (file_size == -1) {
-        fprintf(stderr, "error: could not get size of file '%s': %s\n",
-                file_path, strerror(errno));
-
-        fclose(file);
-
-        exit(1);
-    }
-
-    rewind(file);
-
-    char *buffer = malloc(sizeof(char) * (file_size + 1));
-
-    if (buffer == NULL) {
-        fprintf(stderr, "error: out of memory\n");
-
-        fclose(file);
-
-        exit(1);
-    }
-
-    fread(buffer, 1, file_size, file);
-
-    if (ferror(file)) {
-        fprintf(stderr, "error: could not read file '%s': %s\n", file_path,
-                strerror(errno));
-
-        fclose(file);
-
-        exit(1);
-    }
-
-    buffer[file_size] = 0;
-
-    return buffer;
-}
 
 static void disassemble(Chunk chunk) {
     size_t ip = 0;
@@ -381,8 +301,6 @@ int main(int argc, const char **argv) {
 
         char *input_file_content = read_entire_file(input_file_path);
 
-        vm_insert_globals(&vm);
-
         if (!vm_load_file(&vm, input_file_path, input_file_content)) {
             return 1;
         }
@@ -417,8 +335,6 @@ int main(int argc, const char **argv) {
         const char *input_file_path = command;
 
         char *input_file_content = read_entire_file(input_file_path);
-
-        vm_insert_globals(&vm);
 
         if (!vm_load_file(&vm, input_file_path, input_file_content)) {
             return 1;

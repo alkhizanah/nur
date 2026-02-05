@@ -138,6 +138,26 @@ typedef struct {
 
 typedef struct {
     Obj obj;
+    Value *items;
+    uint32_t count;
+    uint32_t capacity;
+} ObjArray;
+
+typedef struct {
+    ObjString *key;
+    Value value;
+} ObjMapEntry;
+
+typedef struct {
+    Obj obj;
+    ObjMapEntry *entries;
+    uint32_t count;
+    uint32_t capacity;
+} ObjMap;
+
+typedef struct {
+    Obj obj;
+    ObjMap *globals;
     Chunk chunk;
     uint8_t arity;
     uint8_t upvalues_count;
@@ -156,25 +176,6 @@ typedef struct {
     ObjUpvalue **upvalues;
     uint8_t upvalues_count;
 } ObjClosure;
-
-typedef struct {
-    Obj obj;
-    Value *items;
-    uint32_t count;
-    uint32_t capacity;
-} ObjArray;
-
-typedef struct {
-    ObjString *key;
-    Value value;
-} ObjMapEntry;
-
-typedef struct {
-    Obj obj;
-    ObjMapEntry *entries;
-    uint32_t count;
-    uint32_t capacity;
-} ObjMap;
 
 #define AS_STRING(v) ((ObjString *)AS_OBJ(v))
 #define AS_CLOSURE(v) ((ObjClosure *)AS_OBJ(v))
@@ -198,8 +199,6 @@ typedef struct {
 
     Value stack[VM_STACK_MAX];
     Value *sp;
-
-    ObjMap *globals;
 
     ObjUpvalue *open_upvalues;
 
@@ -229,17 +228,14 @@ int64_t value_to_int(Value);
 double value_to_float(Value);
 uint32_t string_hash(const char *key, uint32_t count);
 uint32_t string_utf8_characters_count(const char *start, const char *end);
-uint32_t string_utf8_encode_character(uint32_t rune, char *result); // result should be at least 4 bytes long
+uint32_t string_utf8_encode_character(
+    uint32_t rune, char *result); // result should be at least 4 bytes long
 const char *string_utf8_skip_character(const char *start);
 const char *string_utf8_decode_character(const char *start, uint32_t *rune);
 
 void vm_stack_reset(Vm *);
 
 void vm_init(Vm *);
-
-void vm_insert_globals(Vm *);
-void vm_insert_global(Vm *vm, const char *key, Value value);
-void vm_insert_global_native(Vm *vm, const char *key, NativeFn call);
 
 bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer);
 
@@ -250,6 +246,9 @@ void vm_error(Vm *vm, const char *format, ...);
 
 ObjMap *vm_new_map(Vm *vm);
 bool vm_map_insert(Vm *vm, ObjMap *map, ObjString *key, Value value);
+bool vm_map_insert_by_cstr(Vm *vm, ObjMap *map, const char *key, Value value);
+bool vm_map_insert_native_by_cstr(Vm *vm, ObjMap *map, const char *key, NativeFn call);
+void vm_map_insert_builtins(Vm *vm, ObjMap *globals);
 bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value);
 
 void vm_push(Vm *, Value);
@@ -265,8 +264,9 @@ void vm_free_map(Vm *vm, ObjMap *map);
 void vm_free_value(Vm *vm, Value);
 ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash);
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
+ObjString *vm_concat_strings(Vm *vm, ObjString *lhs, ObjString *rhs);
 ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count);
-ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity,
+ObjFunction *vm_new_function(Vm *vm, ObjMap *globals, Chunk chunk, uint8_t arity,
                              uint8_t upvalues_count);
 ObjClosure *vm_new_closure(Vm *vm, ObjFunction *);
 ObjUpvalue *vm_new_upvalue(Vm *vm, Value *);

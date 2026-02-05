@@ -4,17 +4,27 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef WINDOWS
+#include <direct.h>
+#define get_current_working_directory _getcwd
+#else
+#include <unistd.h>
+#define get_current_working_directory getcwd
+#endif
+
 #include "array.h"
+#include "fs.h"
 #include "vm.h"
 
-void vm_insert_global(Vm *vm, const char *key, Value value) {
-    vm_map_insert(vm, vm->globals, vm_copy_string(vm, key, strlen(key)), value);
+bool vm_map_insert_by_cstr(Vm *vm, ObjMap *map, const char *key, Value value) {
+    return vm_map_insert(vm, map, vm_copy_string(vm, key, strlen(key)), value);
 }
 
-void vm_insert_global_native(Vm *vm, const char *key, NativeFn call) {
+bool vm_map_insert_native_by_cstr(Vm *vm, ObjMap *map, const char *key,
+                                  NativeFn fn) {
     ObjNative *native = OBJ_ALLOC(vm, OBJ_NATIVE, ObjNative);
-    native->fn = call;
-    vm_insert_global(vm, key, OBJ_VAL(native));
+    native->fn = fn;
+    return vm_map_insert_by_cstr(vm, map, key, OBJ_VAL(native));
 }
 
 bool vm_print(Vm *vm, Value *argv, uint8_t argc, Value *result) {
@@ -226,14 +236,98 @@ bool vm_to_int(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
-void vm_insert_globals(Vm *vm) {
+static ObjMap *modules = NULL;
+
+bool vm_import(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 1) {
+        vm_error(vm, "import() takes exactly one argument, but got %d", argc);
+
+        return false;
+    }
+
+    if (!IS_STRING(argv[0])) {
+        vm_error(vm, "import() takes a string as an argument, but got %s",
+                 value_description(argv[0]));
+
+        return false;
+    }
+
+    ObjString *original_name = AS_STRING(argv[0]);
+
+    if (vm_map_lookup(modules, original_name, result)) {
+        return true;
+    }
+
+    const char *parent_file_path =
+        vm->frames[vm->frame_count - 1].closure->fn->chunk.file_path;
+
+    ObjString *parent_directory =
+        vm_copy_string(vm, parent_file_path, strlen(parent_file_path));
+
+    while (parent_directory->items[parent_directory->count - 1] != '/'
+#ifdef _WIN32
+           && parent_directory->items[parent_directory->count - 1] != '\\'
+#endif
+    ) {
+        parent_directory->count--;
+    }
+
+    ObjString *new_name =
+        vm_concat_strings(vm, parent_directory, original_name);
+
+    new_name->items =
+        realloc(new_name->items, (new_name->count + 1) * sizeof(char));
+
+    if (new_name->items == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    new_name->items[new_name->count] = '\0'; // Adding null termination
+
+    if (file_exists(new_name->items)) {
+        char *file_content = read_entire_file(new_name->items);
+
+        Vm mvm = {0};
+
+        vm_init(&mvm);
+
+        if (!vm_load_file(&mvm, new_name->items, file_content)) {
+            return false;
+        }
+
+        if (!vm_run(&mvm, result)) {
+            return false;
+        }
+
+        vm_map_insert(vm, modules, new_name, *result);
+
+        return true;
+    }
+
+    vm_error(vm, "module '%.*s' is not found, even if we use '%.*s' instead",
+             (int)original_name->count, original_name->items,
+             (int)new_name->count, new_name->items);
+
+    return false;
+}
+
+void vm_map_insert_builtins(Vm *vm, ObjMap *map) {
     srand(time(NULL));
 
-    vm_insert_global_native(vm, "print", vm_print);
-    vm_insert_global_native(vm, "println", vm_println);
-    vm_insert_global_native(vm, "len", vm_len);
-    vm_insert_global_native(vm, "random", vm_random);
-    vm_insert_global_native(vm, "array_push", vm_array_push);
-    vm_insert_global_native(vm, "array_pop", vm_array_pop);
-    vm_insert_global_native(vm, "to_int", vm_to_int);
+    if (modules == NULL) {
+        modules = vm_new_map(vm);
+    }
+
+    vm_map_insert_by_cstr(vm, map, "__modules__", OBJ_VAL(modules));
+
+    vm_map_insert_native_by_cstr(vm, map, "print", vm_print);
+    vm_map_insert_native_by_cstr(vm, map, "println", vm_println);
+    vm_map_insert_native_by_cstr(vm, map, "len", vm_len);
+    vm_map_insert_native_by_cstr(vm, map, "random", vm_random);
+    vm_map_insert_native_by_cstr(vm, map, "array_push", vm_array_push);
+    vm_map_insert_native_by_cstr(vm, map, "array_pop", vm_array_pop);
+    vm_map_insert_native_by_cstr(vm, map, "to_int", vm_to_int);
+    vm_map_insert_native_by_cstr(vm, map, "import", vm_import);
 }

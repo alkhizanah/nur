@@ -23,6 +23,9 @@ void vm_free_map(Vm *vm, ObjMap *map) {
 }
 
 void vm_mark_object(Vm *vm, Obj *obj) {
+    if (obj->marked)
+        return;
+
     obj->marked = true;
 
     switch (obj->tag) {
@@ -57,6 +60,10 @@ void vm_mark_object(Vm *vm, Obj *obj) {
 
         for (size_t j = 0; j < fn->chunk.constants.count; j++) {
             vm_mark_value(vm, fn->chunk.constants.items[j]);
+        }
+
+        if (fn->globals != NULL) {
+            vm_mark_object(vm, &fn->globals->obj);
         }
 
         break;
@@ -109,8 +116,6 @@ void vm_mark_roots(Vm *vm) {
 
         vm_mark_object(vm, &frame.closure->fn->obj);
     }
-
-    vm_mark_object(vm, &vm->globals->obj);
 }
 
 void vm_free_object(Vm *vm, Obj *obj) {
@@ -213,10 +218,10 @@ static void vm_sweep(Vm *vm) {
         } else {
             Obj *unreached = curr;
 
-            if (prev != NULL) {
-                prev->next = curr->next;
-            } else {
+            if (prev == NULL) {
                 vm->objects = curr->next;
+            } else {
+                prev->next = curr->next;
             }
 
             curr = curr->next;
@@ -258,10 +263,11 @@ Obj *vm_alloc(Vm *vm, ObjTag tag, size_t size) {
     return object;
 }
 
-ObjFunction *vm_new_function(Vm *vm, Chunk chunk, uint8_t arity,
-                             uint8_t upvalues_count) {
+ObjFunction *vm_new_function(Vm *vm, ObjMap *globals, Chunk chunk,
+                             uint8_t arity, uint8_t upvalues_count) {
     ObjFunction *function = OBJ_ALLOC(vm, OBJ_FUNCTION, ObjFunction);
 
+    function->globals = globals;
     function->chunk = chunk;
     function->arity = arity;
     function->upvalues_count = upvalues_count;
@@ -321,6 +327,31 @@ ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash) {
     return string;
 }
 
+void vm_push_to_string(Vm *vm, ObjString *string, char c, bool rehash) {
+    vm->bytes_allocated += 1 * sizeof(*string->items);
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    string->count++;
+
+    string->items =
+        realloc(string->items, string->count * sizeof(*string->items));
+
+    if (string->items == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    string->items[string->count - 1] = c;
+
+    if (rehash) {
+        string->hash = string_hash(string->items, string->count);
+    }
+}
+
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count) {
     vm->bytes_allocated += count * sizeof(*items);
 
@@ -370,4 +401,31 @@ ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count) {
     array->capacity = count;
 
     return array;
+}
+
+ObjString *vm_concat_strings(Vm *vm, ObjString *lhs, ObjString *rhs) {
+    vm->bytes_allocated += lhs->count + rhs->count;
+
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
+
+    string->items = malloc((lhs->count + rhs->count) * sizeof(char));
+
+    if (string->items == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    memcpy(string->items, lhs->items, lhs->count);
+    memcpy(string->items + lhs->count, rhs->items, rhs->count);
+
+    string->count = lhs->count + rhs->count;
+
+    string->hash = string_hash(string->items, string->count);
+
+    return string;
 }
