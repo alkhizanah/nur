@@ -33,6 +33,10 @@ bool vm_print(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     for (uint8_t i = 0; i < argc; i++) {
         Value arg = argv[i];
 
+        if (i > 0) {
+            printf(" ");
+        }
+
         if (IS_STRING(arg)) {
             printf("%.*s", AS_STRING(arg)->count, AS_STRING(arg)->items);
         } else {
