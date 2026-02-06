@@ -363,23 +363,89 @@ bool vm_builtin_error(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return false;
 }
 
-void vm_map_insert_builtins(Vm *vm, ObjMap *map) {
+typedef struct {
+    char *items;
+    size_t count;
+    size_t capacity;
+} StringBuilder;
+
+bool vm_builtin_fs_read_line(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 1) {
+        vm_error(vm, "fs.read_line() takes exactly one argument, but got %d",
+                 argc);
+
+        return false;
+    }
+
+    if (!IS_INT(argv[0])) {
+        vm_error(vm,
+                 "fs.read_line() takes an integer as an argument, but got %s",
+                 value_description(argv[0]));
+
+        return false;
+    }
+
+    int64_t fd = AS_INT(argv[0]);
+
+    FILE *file = (FILE *)fd;
+
+    StringBuilder sb = {0};
+
+    int c;
+
+    while ((c = fgetc(file)) != '\n' && c != '\0') {
+        ARRAY_PUSH(&sb, c);
+    }
+
+    ObjString *s = vm_copy_string(vm, sb.items, sb.count);
+
+    *result = OBJ_VAL(s);
+
+    ARRAY_FREE(&sb);
+
+    return true;
+}
+
+ObjMap *vm_get_fs_module(Vm *vm) {
+    ObjMap *fs = vm_new_map(vm);
+
+    vm_map_insert_native_by_cstr(vm, fs, "read_line", vm_builtin_fs_read_line);
+
+    return fs;
+}
+
+ObjMap *vm_get_io_module(Vm *vm) {
+    ObjMap *io = vm_new_map(vm);
+
+    vm_map_insert_by_cstr(vm, io, "stdin", INT_VAL((intptr_t)stdin));
+    vm_map_insert_by_cstr(vm, io, "stderr", INT_VAL((intptr_t)stderr));
+    vm_map_insert_by_cstr(vm, io, "stdout", INT_VAL((intptr_t)stdout));
+
+    return io;
+}
+
+void vm_map_insert_builtins(Vm *vm, ObjMap *globals) {
     srand(time(NULL));
 
     if (modules == NULL) {
         modules = vm_new_map(vm);
+
+        vm_map_insert_by_cstr(vm, modules, "fs", OBJ_VAL(vm_get_fs_module(vm)));
+        vm_map_insert_by_cstr(vm, modules, "io", OBJ_VAL(vm_get_io_module(vm)));
     }
 
-    vm_map_insert_by_cstr(vm, map, "__modules__", OBJ_VAL(modules));
+    vm_map_insert_by_cstr(vm, globals, "__modules__", OBJ_VAL(modules));
 
-    vm_map_insert_native_by_cstr(vm, map, "print", vm_builtin_print);
-    vm_map_insert_native_by_cstr(vm, map, "println", vm_builtin_println);
-    vm_map_insert_native_by_cstr(vm, map, "len", vm_builtin_len);
-    vm_map_insert_native_by_cstr(vm, map, "random", vm_builtin_random);
-    vm_map_insert_native_by_cstr(vm, map, "array_push", vm_builtin_array_push);
-    vm_map_insert_native_by_cstr(vm, map, "array_pop", vm_builtin_array_pop);
-    vm_map_insert_native_by_cstr(vm, map, "to_int", vm_builtin_to_int);
-    vm_map_insert_native_by_cstr(vm, map, "to_float", vm_builtin_to_float);
-    vm_map_insert_native_by_cstr(vm, map, "import", vm_builtin_import);
-    vm_map_insert_native_by_cstr(vm, map, "error", vm_builtin_error);
+    vm_map_insert_native_by_cstr(vm, globals, "print", vm_builtin_print);
+    vm_map_insert_native_by_cstr(vm, globals, "println", vm_builtin_println);
+    vm_map_insert_native_by_cstr(vm, globals, "len", vm_builtin_len);
+    vm_map_insert_native_by_cstr(vm, globals, "random", vm_builtin_random);
+    vm_map_insert_native_by_cstr(vm, globals, "array_push",
+                                 vm_builtin_array_push);
+    vm_map_insert_native_by_cstr(vm, globals, "array_pop",
+                                 vm_builtin_array_pop);
+    vm_map_insert_native_by_cstr(vm, globals, "to_int", vm_builtin_to_int);
+    vm_map_insert_native_by_cstr(vm, globals, "to_float", vm_builtin_to_float);
+    vm_map_insert_native_by_cstr(vm, globals, "import", vm_builtin_import);
+    vm_map_insert_native_by_cstr(vm, globals, "error", vm_builtin_error);
 }
