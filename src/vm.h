@@ -234,6 +234,7 @@ const char *string_utf8_skip_character(const char *start);
 const char *string_utf8_decode_character(const char *start, uint32_t *rune);
 
 void vm_stack_reset(Vm *);
+void vm_stack_trace(Vm *);
 
 void vm_init(Vm *);
 

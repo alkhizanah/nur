@@ -9,18 +9,7 @@
 #include "source_location.h"
 #include "vm.h"
 
-void vm_error(Vm *vm, const char *format, ...) {
-    va_list args;
-
-    va_start(args, format);
-
-    fprintf(stderr, "error: ");
-    vfprintf(stderr, format, args);
-
-    va_end(args);
-
-    fprintf(stderr, "\n");
-
+void vm_stack_trace(Vm *vm) {
     for (ssize_t i = vm->frame_count - 1; i >= 0; i--) {
         CallFrame *frame = &vm->frames[i];
 
@@ -33,6 +22,20 @@ void vm_error(Vm *vm, const char *format, ...) {
 
         fprintf(stderr, "\tat %s:%u:%u\n", loc.file_path, loc.line, loc.column);
     }
+}
+
+void vm_error(Vm *vm, const char *format, ...) {
+    va_list args;
+
+    va_start(args, format);
+
+    fprintf(stderr, "error: ");
+    vfprintf(stderr, format, args);
+    fprintf(stderr, "\n");
+
+    va_end(args);
+
+    vm_stack_trace(vm);
 }
 
 void vm_stack_reset(Vm *vm) {
