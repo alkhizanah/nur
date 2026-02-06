@@ -317,6 +317,14 @@ bool vm_builtin_import(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return false;
 }
 
+bool vm_builtin_error(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    fprintf(stderr, "error: ");
+    vm_builtin_println(vm, argv, argc, result);
+    vm_stack_trace(vm);
+
+    return false;
+}
+
 void vm_map_insert_builtins(Vm *vm, ObjMap *map) {
     srand(time(NULL));
 
@@ -334,4 +342,5 @@ void vm_map_insert_builtins(Vm *vm, ObjMap *map) {
     vm_map_insert_native_by_cstr(vm, map, "array_pop", vm_builtin_array_pop);
     vm_map_insert_native_by_cstr(vm, map, "to_int", vm_builtin_to_int);
     vm_map_insert_native_by_cstr(vm, map, "import", vm_builtin_import);
+    vm_map_insert_native_by_cstr(vm, map, "error", vm_builtin_error);
 }
