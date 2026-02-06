@@ -2,12 +2,15 @@ time = import("time")
 
 return {
     "run": fn label, benchmark {
-        start = time.now_ms()
+        start_ns = time.now_ns()
 
         benchmark()
 
-        end = time.now_ms()
+        end_ns = time.now_ns()
 
-        println(label + ":", (end - start), "ms")
+        elapsed_ns = end_ns - start_ns
+        elapsed_ms = elapsed_ns / 1000000
+
+        println(label + ":", elapsed_ms, "ms")
     },
 }
