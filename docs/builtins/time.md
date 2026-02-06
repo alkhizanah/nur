@@ -14,6 +14,14 @@ Gives you the current time since the unix epoch in seconds
 time.now() # 1719424371
 ```
 
+- now_ns
+
+Gives you the current time since the unix epoch in nanoseconds
+
+```
+time.now_ms() # 1770392271792555776
+```
+
 - now_ms
 
 Gives you the current time since the unix epoch in milliseconds

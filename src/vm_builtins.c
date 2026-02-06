@@ -407,21 +407,84 @@ bool vm_builtin_fs_read_line(Vm *vm, Value *argv, uint8_t argc, Value *result) {
 }
 
 ObjMap *vm_get_fs_module(Vm *vm) {
-    ObjMap *fs = vm_new_map(vm);
+    ObjMap *fs_mod = vm_new_map(vm);
 
-    vm_map_insert_native_by_cstr(vm, fs, "read_line", vm_builtin_fs_read_line);
+    vm_map_insert_native_by_cstr(vm, fs_mod, "read_line", vm_builtin_fs_read_line);
 
-    return fs;
+    return fs_mod;
 }
 
 ObjMap *vm_get_io_module(Vm *vm) {
-    ObjMap *io = vm_new_map(vm);
+    ObjMap *io_mod = vm_new_map(vm);
 
-    vm_map_insert_by_cstr(vm, io, "stdin", INT_VAL((intptr_t)stdin));
-    vm_map_insert_by_cstr(vm, io, "stderr", INT_VAL((intptr_t)stderr));
-    vm_map_insert_by_cstr(vm, io, "stdout", INT_VAL((intptr_t)stdout));
+    vm_map_insert_by_cstr(vm, io_mod, "stdin", INT_VAL((intptr_t)stdin));
+    vm_map_insert_by_cstr(vm, io_mod, "stderr", INT_VAL((intptr_t)stderr));
+    vm_map_insert_by_cstr(vm, io_mod, "stdout", INT_VAL((intptr_t)stdout));
 
-    return io;
+    return io_mod;
+}
+
+bool vm_builtin_time_now(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    (void)argv;
+
+    if (argc > 0) {
+        vm_error(vm, "time.now() takes no arguments, got %d",
+                 argc);
+
+        return false;
+    }
+
+    *result = INT_VAL(time(NULL));
+
+    return true;
+}
+
+bool vm_builtin_time_now_ns(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    (void)argv;
+
+    if (argc > 0) {
+        vm_error(vm, "time.now_ms() takes no arguments, got %d",
+                 argc);
+
+        return false;
+    }
+
+    struct timespec now;
+
+    timespec_get(&now, TIME_UTC);
+
+    *result = INT_VAL(now.tv_sec * 1e+9 + now.tv_nsec);
+
+    return true;
+}
+
+bool vm_builtin_time_now_ms(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    (void)argv;
+
+    if (argc > 0) {
+        vm_error(vm, "time.now_ms() takes no arguments, got %d",
+                 argc);
+
+        return false;
+    }
+
+    struct timespec now;
+
+    timespec_get(&now, TIME_UTC);
+
+    *result = INT_VAL(now.tv_sec * 1000 + now.tv_nsec / 1000000);
+
+    return true;
+}
+
+ObjMap *vm_get_time_module(Vm *vm) {
+    ObjMap *time_mod = vm_new_map(vm);
+
+    vm_map_insert_native_by_cstr(vm, time_mod, "now", vm_builtin_time_now);
+    vm_map_insert_native_by_cstr(vm, time_mod, "now_ns", vm_builtin_time_now_ns);
+    vm_map_insert_native_by_cstr(vm, time_mod, "now_ms", vm_builtin_time_now_ms);
+
+    return time_mod;
 }
 
 void vm_map_insert_builtins(Vm *vm, ObjMap *globals) {
@@ -432,6 +495,7 @@ void vm_map_insert_builtins(Vm *vm, ObjMap *globals) {
 
         vm_map_insert_by_cstr(vm, modules, "fs", OBJ_VAL(vm_get_fs_module(vm)));
         vm_map_insert_by_cstr(vm, modules, "io", OBJ_VAL(vm_get_io_module(vm)));
+        vm_map_insert_by_cstr(vm, modules, "time", OBJ_VAL(vm_get_time_module(vm)));
     }
 
     vm_map_insert_by_cstr(vm, globals, "__modules__", OBJ_VAL(modules));
