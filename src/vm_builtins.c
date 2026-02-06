@@ -213,6 +213,10 @@ bool vm_builtin_to_int(Vm *vm, Value *argv, uint8_t argc, Value *result) {
 
     if (IS_INT(value)) {
         *result = value;
+    } else if (IS_FLT(value)) {
+        *result = INT_VAL(AS_FLT(value));
+    } else if (IS_BOOL(value)) {
+        *result = INT_VAL(AS_BOOL(value));
     } else if (IS_STRING(value)) {
         ObjString *string = AS_STRING(value);
 
@@ -229,10 +233,44 @@ bool vm_builtin_to_int(Vm *vm, Value *argv, uint8_t argc, Value *result) {
         }
 
         *result = INT_VAL(v);
+    } else {
+        *result = NULL_VAL;
+    }
+
+    return true;
+}
+
+bool vm_builtin_to_float(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 1) {
+        vm_error(vm, "to_float() takes exactly one argument, but got %d", argc);
+
+        return false;
+    }
+
+    Value value = argv[0];
+
+    if (IS_INT(value)) {
+        *result = FLT_VAL(AS_INT(value));
     } else if (IS_FLT(value)) {
-        *result = INT_VAL(AS_FLT(value));
+        *result = value;
     } else if (IS_BOOL(value)) {
-        *result = INT_VAL(AS_BOOL(value));
+        *result = FLT_VAL(AS_BOOL(value));
+    } else if (IS_STRING(value)) {
+        ObjString *string = AS_STRING(value);
+
+        char *endptr;
+
+        errno = 0;
+
+        double v = strtod(string->items, &endptr);
+
+        if (errno == ERANGE || endptr != string->items + string->count) {
+            *result = NULL_VAL;
+
+            return true;
+        }
+
+        *result = FLT_VAL(v);
     } else {
         *result = NULL_VAL;
     }
@@ -341,6 +379,7 @@ void vm_map_insert_builtins(Vm *vm, ObjMap *map) {
     vm_map_insert_native_by_cstr(vm, map, "array_push", vm_builtin_array_push);
     vm_map_insert_native_by_cstr(vm, map, "array_pop", vm_builtin_array_pop);
     vm_map_insert_native_by_cstr(vm, map, "to_int", vm_builtin_to_int);
+    vm_map_insert_native_by_cstr(vm, map, "to_float", vm_builtin_to_float);
     vm_map_insert_native_by_cstr(vm, map, "import", vm_builtin_import);
     vm_map_insert_native_by_cstr(vm, map, "error", vm_builtin_error);
 }
