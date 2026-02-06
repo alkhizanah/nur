@@ -27,7 +27,7 @@ bool vm_map_insert_native_by_cstr(Vm *vm, ObjMap *map, const char *key,
     return vm_map_insert_by_cstr(vm, map, key, OBJ_VAL(native));
 }
 
-bool vm_print(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+bool vm_builtin_print(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     (void)vm;
 
     for (uint8_t i = 0; i < argc; i++) {
@@ -49,15 +49,15 @@ bool vm_print(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
-bool vm_println(Vm *vm, Value *argv, uint8_t argc, Value *result) {
-    vm_print(vm, argv, argc, result);
+bool vm_builtin_println(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    vm_builtin_print(vm, argv, argc, result);
 
     printf("\n");
 
     return true;
 }
 
-bool vm_len(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+bool vm_builtin_len(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     if (argc != 1) {
         vm_error(vm, "len() takes exactly one argument, but got %d", argc);
 
@@ -99,7 +99,7 @@ bool vm_len(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     }
 }
 
-bool vm_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+bool vm_builtin_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     if (argc != 2) {
         vm_error(vm, "random() takes exactly two arguments, but got %d", argc);
 
@@ -142,7 +142,7 @@ bool vm_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
-bool vm_array_push(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+bool vm_builtin_array_push(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     if (argc != 2) {
         vm_error(vm, "array_push() takes exactly two arguments, but got %d",
                  argc);
@@ -178,7 +178,7 @@ bool vm_array_push(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
-bool vm_array_pop(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+bool vm_builtin_array_pop(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     if (argc != 1) {
         vm_error(vm, "array_pop() takes exactly one argument, but got %d",
                  argc);
@@ -202,7 +202,7 @@ bool vm_array_pop(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
-bool vm_to_int(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+bool vm_builtin_to_int(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     if (argc != 1) {
         vm_error(vm, "to_int() takes exactly one argument, but got %d", argc);
 
@@ -242,7 +242,7 @@ bool vm_to_int(Vm *vm, Value *argv, uint8_t argc, Value *result) {
 
 static ObjMap *modules = NULL;
 
-bool vm_import(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+bool vm_builtin_import(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     if (argc != 1) {
         vm_error(vm, "import() takes exactly one argument, but got %d", argc);
 
@@ -326,12 +326,12 @@ void vm_map_insert_builtins(Vm *vm, ObjMap *map) {
 
     vm_map_insert_by_cstr(vm, map, "__modules__", OBJ_VAL(modules));
 
-    vm_map_insert_native_by_cstr(vm, map, "print", vm_print);
-    vm_map_insert_native_by_cstr(vm, map, "println", vm_println);
-    vm_map_insert_native_by_cstr(vm, map, "len", vm_len);
-    vm_map_insert_native_by_cstr(vm, map, "random", vm_random);
-    vm_map_insert_native_by_cstr(vm, map, "array_push", vm_array_push);
-    vm_map_insert_native_by_cstr(vm, map, "array_pop", vm_array_pop);
-    vm_map_insert_native_by_cstr(vm, map, "to_int", vm_to_int);
-    vm_map_insert_native_by_cstr(vm, map, "import", vm_import);
+    vm_map_insert_native_by_cstr(vm, map, "print", vm_builtin_print);
+    vm_map_insert_native_by_cstr(vm, map, "println", vm_builtin_println);
+    vm_map_insert_native_by_cstr(vm, map, "len", vm_builtin_len);
+    vm_map_insert_native_by_cstr(vm, map, "random", vm_builtin_random);
+    vm_map_insert_native_by_cstr(vm, map, "array_push", vm_builtin_array_push);
+    vm_map_insert_native_by_cstr(vm, map, "array_pop", vm_builtin_array_pop);
+    vm_map_insert_native_by_cstr(vm, map, "to_int", vm_builtin_to_int);
+    vm_map_insert_native_by_cstr(vm, map, "import", vm_builtin_import);
 }
