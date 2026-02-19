@@ -2,14 +2,16 @@
 
 ## Build from source
 
-Since Nur is a C project that uses Makefile approach, you can just do
+Since Nur is a C project that uses [mkc](https://github.com/alkhizanah/mkc) build system, use:
 
 ```
-make -j$(nproc)
+mkc -j $(nproc)
 ```
 
-To release it, or to use it outside of development, you may also want to optimize it:
+The built binary will be located at `build/nur`
+
+And to release it, or to use it outside of development, you may also want to optimize it:
 
 ```
-make -j$(nproc) CC="cc -O3"
+mkc -j $(nproc) -O 3
 ```
