@@ -183,8 +183,8 @@ static void disassemble(Chunk chunk) {
             printf("GTE");
             break;
 
-        case OP_COPY_ARRAY:
-            printf("COPY_ARRAY");
+        case OP_COPY_BY_SLICING:
+            printf("COPY_BY_SLICING");
             break;
 
         case OP_MAKE_SLICE:

@@ -363,7 +363,7 @@ static bool compile_slice(Compiler *compiler, AstNode node, uint32_t source) {
 
     if (indices.lhs == INVALID_NODE_IDX) {
         if (indices.rhs == INVALID_NODE_IDX) {
-            opcode = OP_COPY_ARRAY;
+            opcode = OP_COPY_BY_SLICING;
         } else {
             opcode = OP_MAKE_SLICE_UNDER;
         }
