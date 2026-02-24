@@ -7,24 +7,9 @@ compile_flags = []
 link_flags = ["-lm"]
 
 [paths]
-sources = [
-  "src/main.c",
-  "src/ast.c",
-  "src/compiler.c",
-  "src/lexer.c",
-  "src/main.c",
-  "src/fs.c",
-  "src/parser.c",
-  "src/source_location.c",
-  "src/vm.c",
-  "src/vm_gc.c",
-  "src/vm_builtins.c",
-  "src/vm_map.c",
-  "src/vm_util.c",
-]
-
-includes = []
-exclude_dirs = []
+sources = []
+includes = ["src"]
+exclude_dirs = [".ccls-cache"]
 exclude_exts = []
 
 [pkg]
