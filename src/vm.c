@@ -924,7 +924,15 @@ static bool vm_make_slice(Vm *vm) {
     if (IS_ARRAY(target)) {
         ObjArray *array = AS_ARRAY(target);
 
-        if (istart >= array->count) {
+        if (istart < 0) {
+            istart += array->count;
+        }
+
+        if (iend < 0) {
+            iend += array->count;
+        }
+
+        if (istart < 0 || istart >= array->count) {
             vm_error(vm,
                      "sliced array has %d elements, the slice start must be "
                      "less than that, but got %ld",
@@ -933,7 +941,7 @@ static bool vm_make_slice(Vm *vm) {
             return false;
         }
 
-        if (iend > array->count) {
+        if (iend < 0 || iend > array->count) {
             vm_error(vm,
                      "sliced array has %d elements, the slice end must be "
                      "less than that or equal to it, but got %ld",
@@ -942,12 +950,78 @@ static bool vm_make_slice(Vm *vm) {
             return false;
         }
 
+        if (istart > iend) {
+            vm_error(
+                vm,
+                "slicing start must be less than or equal to slicing end, got "
+                "%ld as a start and %ld as an end",
+                istart, iend);
+
+            return false;
+        }
+
         vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + istart,
                                           iend - istart)));
     } else if (IS_STRING(target)) {
-        vm_error(vm, "todo: slice a string");
+        ObjString *string = AS_STRING(target);
 
-        return false;
+        int64_t characters_count = string_utf8_characters_count(
+            string->items, string->items + string->count);
+
+        if (istart < 0) {
+            istart += characters_count;
+        }
+
+        if (iend < 0) {
+            iend += characters_count;
+        }
+
+        if (istart < 0 || istart >= characters_count) {
+            vm_error(vm,
+                     "sliced array has %ld elements, the slice start must be "
+                     "less than that, but got %ld",
+                     characters_count, istart);
+
+            return false;
+        }
+
+        if (iend < 0 || iend > characters_count) {
+            vm_error(vm,
+                     "sliced string has %ld characters, the slice end must be "
+                     "less than that or equal to it, but got %ld",
+                     characters_count, iend);
+
+            return false;
+        }
+
+        if (istart > iend) {
+            vm_error(
+                vm,
+                "slicing start must be less than or equal to slicing end, got "
+                "%ld as a start and %ld as an end",
+                istart, iend);
+
+            return false;
+        }
+
+        const char *b = string->items;
+
+        int64_t c = 0;
+
+        while (c++ < istart) {
+            b = string_utf8_skip_character(b);
+        }
+
+        int64_t astart = b - string->items;
+
+        while (c++ <= iend) {
+            b = string_utf8_skip_character(b);
+        }
+
+        int64_t aend = b - string->items;
+
+        vm_push(vm, OBJ_VAL(vm_copy_string(vm, string->items + astart,
+                                           aend - astart)));
     } else {
         vm_error(vm, "expected an array or a string, got %s",
                  value_description(target));
@@ -975,7 +1049,11 @@ static bool vm_make_slice_under(Vm *vm) {
     if (IS_ARRAY(target)) {
         ObjArray *array = AS_ARRAY(target);
 
-        if (iend > array->count) {
+        if (iend < 0) {
+            iend += array->count;
+        }
+
+        if (iend < 0 || iend > array->count) {
             vm_error(vm,
                      "sliced array has %d elements, the slice end must be "
                      "less than that or equal to it, but got %ld",
@@ -986,9 +1064,34 @@ static bool vm_make_slice_under(Vm *vm) {
 
         vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items, iend)));
     } else if (IS_STRING(target)) {
-        vm_error(vm, "todo: slice a string");
+        ObjString *string = AS_STRING(target);
 
-        return false;
+        int64_t characters_count = string_utf8_characters_count(
+            string->items, string->items + string->count);
+
+        if (iend < 0) {
+            iend += characters_count;
+        }
+
+        if (iend < 0 || iend > characters_count) {
+            vm_error(vm,
+                     "sliced string has %ld characters, the slice end must be "
+                     "less than that or equal to it, but got %ld",
+                     characters_count, iend);
+
+            return false;
+        }
+
+        const char *b = string->items;
+
+        int64_t c = 0;
+
+        while (++c <= iend) {
+            b = string_utf8_skip_character(b);
+        }
+
+        vm_push(vm,
+                OBJ_VAL(vm_copy_string(vm, string->items, b - string->items)));
     } else {
         vm_error(vm, "expected an array or a string, got %s",
                  value_description(target));
@@ -1016,7 +1119,11 @@ static bool vm_make_slice_above(Vm *vm) {
     if (IS_ARRAY(target)) {
         ObjArray *array = AS_ARRAY(target);
 
-        if (istart >= array->count) {
+        if (istart < 0) {
+            istart += array->count;
+        }
+
+        if (istart < 0 || istart >= array->count) {
             vm_error(vm,
                      "sliced array has %d elements, the slice start must be "
                      "less than that, but got %ld",
@@ -1028,9 +1135,36 @@ static bool vm_make_slice_above(Vm *vm) {
         vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + istart,
                                           array->count - istart)));
     } else if (IS_STRING(target)) {
-        vm_error(vm, "todo: slice a string");
+        ObjString *string = AS_STRING(target);
 
-        return false;
+        int64_t characters_count = string_utf8_characters_count(
+            string->items, string->items + string->count);
+
+        if (istart < 0) {
+            istart += characters_count;
+        }
+
+        if (istart < 0 || istart >= characters_count) {
+            vm_error(
+                vm,
+                "sliced string has %ld characters, the slice start must be "
+                "less than that, but got %ld",
+                characters_count, istart);
+
+            return false;
+        }
+
+        const char *b = string->items;
+
+        int64_t c = 0;
+
+        while (c++ < istart) {
+            b = string_utf8_skip_character(b);
+        }
+
+        vm_push(vm,
+                OBJ_VAL(vm_copy_string(
+                    vm, b, string->count - (uintptr_t)(b - string->items))));
     } else {
         vm_error(vm, "expected an array or a string, got %s",
                  value_description(target));
@@ -1219,9 +1353,7 @@ bool vm_run(Vm *vm, Value *result) {
 
             for (uint32_t i = 0; i < count * 2; i += 2) {
                 if (!IS_STRING(start[i])) {
-                    vm_error(vm,
-                             "expected a "
-                             "string got %s",
+                    vm_error(vm, "expected a string got %s",
                              value_description(start[i]));
 
                     return false;
