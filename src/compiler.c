@@ -340,6 +340,46 @@ static bool compile_subscript(Compiler *compiler, AstNode node,
     return true;
 }
 
+static bool compile_slice(Compiler *compiler, AstNode node, uint32_t source) {
+    AstNode indices = compiler->ast.nodes.items[node.rhs];
+
+    if (indices.rhs != INVALID_NODE_IDX) {
+        if (!compile_expr(compiler, indices.rhs)) {
+            return false;
+        }
+    }
+
+    if (indices.lhs != INVALID_NODE_IDX) {
+        if (!compile_expr(compiler, indices.lhs)) {
+            return false;
+        }
+    }
+
+    if (!compile_expr(compiler, node.lhs)) {
+        return false;
+    }
+
+    OpCode opcode;
+
+    if (indices.lhs == INVALID_NODE_IDX) {
+        if (indices.rhs == INVALID_NODE_IDX) {
+            opcode = OP_COPY_ARRAY;
+        } else {
+            opcode = OP_MAKE_SLICE_UNDER;
+        }
+    } else {
+        if (indices.rhs == INVALID_NODE_IDX) {
+            opcode = OP_MAKE_SLICE_ABOVE;
+        } else {
+            opcode = OP_MAKE_SLICE;
+        }
+    }
+
+    chunk_add_byte(compiler->chunk, opcode, source);
+
+    return true;
+}
+
 static bool compile_member(Compiler *compiler, AstNode node, uint32_t source) {
 
     AstNode identifier = compiler->ast.nodes.items[node.rhs];
@@ -762,6 +802,9 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
 
     case NODE_SUBSCRIPT:
         return compile_subscript(compiler, node, source);
+
+    case NODE_SLICE:
+        return compile_slice(compiler, node, source);
 
     case NODE_MEMBER:
         return compile_member(compiler, node, source);

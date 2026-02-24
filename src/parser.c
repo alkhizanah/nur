@@ -211,7 +211,63 @@ static AstNodeIdx parse_member_access(Parser *parser, AstNodeIdx target) {
 static AstNodeIdx parse_subscript_access(Parser *parser, AstNodeIdx target) {
     Token token = parser_advance(parser);
 
-    AstNodeIdx start = parse_expr(parser, PR_LOWEST);
+    AstNodeIdx node;
+
+    if (parser_peek(parser).tag == TOK_COLON) {
+        // a[:??
+        parser_advance(parser);
+
+        AstNodeIdx indices;
+
+        if (parser_peek(parser).tag == TOK_CBRACKET) {
+            // a[:]
+
+            indices = ast_push(&parser->ast, 0, INVALID_NODE_IDX,
+                               INVALID_NODE_IDX, token.range.start);
+        } else {
+            // a[:e]
+
+            AstNodeIdx end = parse_expr(parser, PR_LOWEST);
+
+            indices = ast_push(&parser->ast, 0, INVALID_NODE_IDX, end,
+                               token.range.start);
+        }
+
+        node = ast_push(&parser->ast, NODE_SLICE, target, indices,
+                        token.range.start);
+    } else {
+        AstNodeIdx start = parse_expr(parser, PR_LOWEST);
+
+        if (parser_peek(parser).tag == TOK_COLON) {
+            // a[s:??
+
+            parser_advance(parser);
+
+            AstNodeIdx indices;
+
+            if (parser_peek(parser).tag == TOK_CBRACKET) {
+                // a[s:]
+
+                indices = ast_push(&parser->ast, 0, start, INVALID_NODE_IDX,
+                                   token.range.start);
+            } else {
+                // a[s:e]
+
+                AstNodeIdx end = parse_expr(parser, PR_LOWEST);
+
+                indices =
+                    ast_push(&parser->ast, 0, start, end, token.range.start);
+            }
+
+            node = ast_push(&parser->ast, NODE_SLICE, target, indices,
+                            token.range.start);
+        } else {
+            // a[i]
+
+            node = ast_push(&parser->ast, NODE_SUBSCRIPT, target, start,
+                            token.range.start);
+        }
+    }
 
     if (parser_peek(parser).tag != TOK_CBRACKET) {
         parser_error(parser, token.range.start, "'[' did not get closed\n");
@@ -221,8 +277,7 @@ static AstNodeIdx parse_subscript_access(Parser *parser, AstNodeIdx target) {
 
     parser_advance(parser);
 
-    return ast_push(&parser->ast, NODE_SUBSCRIPT, target, start,
-                    token.range.start);
+    return node;
 }
 
 static AstNodeIdx parse_binary_op(Parser *parser, AstNodeIdx lhs,

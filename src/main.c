@@ -183,6 +183,22 @@ static void disassemble(Chunk chunk) {
             printf("GTE");
             break;
 
+        case OP_COPY_ARRAY:
+            printf("COPY_ARRAY");
+            break;
+
+        case OP_MAKE_SLICE:
+            printf("MAKE_SLICE");
+            break;
+
+        case OP_MAKE_SLICE_UNDER:
+            printf("MAKE_SLICE_UNDER");
+            break;
+
+        case OP_MAKE_SLICE_ABOVE:
+            printf("MAKE_SLICE_ABOVE");
+            break;
+
         case OP_MAKE_ARRAY: {
             uint32_t count =
                 (ip += 4, ((uint16_t)chunk.bytes[ip - 4] << 24) |

@@ -79,6 +79,12 @@ typedef enum : uint8_t {
     NODE_MEMBER,
     // Payload: lhs is the target and rhs is an arbitrary expression
     NODE_SUBSCRIPT,
+    // Payload: lhs is the target, and rhs is an an index to a node with undefined tag, its
+    // lhs is the slicing start and its rhs is the slicing end, the slicing
+    // start may be INVALID_NODE_IDX, if it was, then the start is 0 by default,
+    // end may be INVALID_NODE_IDX, if it was, then the end is the array's
+    // length by default
+    NODE_SLICE,
 } AstNodeTag;
 
 typedef uint32_t AstNodeIdx;

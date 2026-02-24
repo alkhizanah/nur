@@ -88,6 +88,10 @@ typedef enum : uint8_t {
     OP_MAKE_ARRAY,
     OP_MAKE_MAP,
     OP_MAKE_CLOSURE,
+    OP_COPY_ARRAY, // a[:]
+    OP_MAKE_SLICE, // a[s:e]
+    OP_MAKE_SLICE_ABOVE, // a[s:]
+    OP_MAKE_SLICE_UNDER, // a[:e]
     OP_NEG,
     OP_NOT,
     OP_ADD,
