@@ -897,6 +897,136 @@ static void vm_close_upvalues(Vm *vm, Value *last) {
     }
 }
 
+static bool vm_make_slice(Vm *vm) {
+    Value target = vm_pop(vm);
+
+    if (!IS_ARRAY(target)) {
+        vm_error(vm, "%s is not an array value", value_description(target));
+
+        return false;
+    }
+
+    ObjArray *array = AS_ARRAY(target);
+
+    Value start = vm_pop(vm);
+
+    if (!IS_INT(start)) {
+        vm_error(vm, "cannot access an array with %s value",
+                 value_description(start));
+
+        return false;
+    }
+
+    Value end = vm_pop(vm);
+
+    if (!IS_INT(end)) {
+        vm_error(vm, "cannot access an array with %s value",
+                 value_description(end));
+
+        return false;
+    }
+
+    int64_t istart = AS_INT(start);
+
+    if (istart >= array->count) {
+        vm_error(vm,
+                 "sliced array has %d elements, the slice start must be "
+                 "less than that, but got %ld",
+                 array->count, istart);
+
+        return false;
+    }
+
+    int64_t iend = AS_INT(end);
+
+    if (iend > array->count) {
+        vm_error(vm,
+                 "sliced array has %d elements, the slice end must be "
+                 "less than that or equal to it, but got %ld",
+                 array->count, iend);
+
+        return false;
+    }
+
+    vm_push(vm,
+            OBJ_VAL(vm_copy_array(vm, array->items + istart, iend - istart)));
+
+    return true;
+}
+
+static bool vm_make_slice_under(Vm *vm) {
+    Value target = vm_pop(vm);
+
+    if (!IS_ARRAY(target)) {
+        vm_error(vm, "%s is not an array value", value_description(target));
+
+        return false;
+    }
+
+    ObjArray *array = AS_ARRAY(target);
+
+    Value end = vm_pop(vm);
+
+    if (!IS_INT(end)) {
+        vm_error(vm, "cannot access an array with %s value",
+                 value_description(end));
+
+        return false;
+    }
+
+    int64_t iend = AS_INT(end);
+
+    if (iend > array->count) {
+        vm_error(vm,
+                 "sliced array has %d elements, the slice end must be "
+                 "less than that or equal to it, but got %ld",
+                 array->count, iend);
+
+        return false;
+    }
+
+    vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items, iend)));
+
+    return true;
+}
+
+static bool vm_make_slice_above(Vm *vm) {
+    Value target = vm_pop(vm);
+
+    if (!IS_ARRAY(target)) {
+        vm_error(vm, "%s is not an array value", value_description(target));
+
+        return false;
+    }
+
+    ObjArray *array = AS_ARRAY(target);
+
+    Value start = vm_pop(vm);
+
+    if (!IS_INT(start)) {
+        vm_error(vm, "cannot access an array with %s value",
+                 value_description(start));
+
+        return false;
+    }
+
+    int64_t istart = AS_INT(start);
+
+    if (istart >= array->count) {
+        vm_error(vm,
+                 "sliced array has %d elements, the slice start must be "
+                 "less than that, but got %ld",
+                 array->count, istart);
+
+        return false;
+    }
+
+    vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + istart,
+                                      array->count - istart)));
+
+    return true;
+}
+
 bool vm_run(Vm *vm, Value *result) {
     CallFrame *frame = &vm->frames[vm->frame_count - 1];
 
@@ -1037,135 +1167,26 @@ bool vm_run(Vm *vm, Value *result) {
             break;
         }
 
-        case OP_MAKE_SLICE: {
-            Value target = vm_pop(vm);
-
-            if (!IS_ARRAY(target)) {
-                vm_error(vm, "%s is not an array value",
-                         value_description(target));
-            }
-
-            ObjArray *array = AS_ARRAY(target);
-
-            Value start = vm_pop(vm);
-
-            if (!IS_INT(start)) {
-                vm_error(vm, "cannot access an array with %s value",
-                         value_description(start));
-
+        case OP_MAKE_SLICE:
+            if (!vm_make_slice(vm)) {
                 return false;
             }
-
-            Value end = vm_pop(vm);
-
-            if (!IS_INT(end)) {
-                vm_error(vm, "cannot access an array with %s value",
-                         value_description(end));
-
-                return false;
-            }
-
-            int64_t istart = AS_INT(start);
-
-            if (istart >= array->count) {
-                vm_error(
-                    vm,
-                    "sliced array has %d elements, the slice start must be "
-                    "less than that, but got %ld",
-                    array->count, istart);
-
-                return false;
-            }
-
-            int64_t iend = AS_INT(end);
-
-            if (iend > array->count) {
-                vm_error(vm,
-                         "sliced array has %d elements, the slice end must be "
-                         "less than that or equal to it, but got %ld",
-                         array->count, iend);
-
-                return false;
-            }
-
-            vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + istart,
-                                              iend - istart)));
 
             break;
-        }
 
-        case OP_MAKE_SLICE_UNDER: {
-            Value target = vm_pop(vm);
-
-            if (!IS_ARRAY(target)) {
-                vm_error(vm, "%s is not an array value",
-                         value_description(target));
-            }
-
-            ObjArray *array = AS_ARRAY(target);
-
-            Value end = vm_pop(vm);
-
-            if (!IS_INT(end)) {
-                vm_error(vm, "cannot access an array with %s value",
-                         value_description(end));
-
+        case OP_MAKE_SLICE_UNDER:
+            if (!vm_make_slice_under(vm)) {
                 return false;
             }
-
-            int64_t iend = AS_INT(end);
-
-            if (iend > array->count) {
-                vm_error(vm,
-                         "sliced array has %d elements, the slice end must be "
-                         "less than that or equal to it, but got %ld",
-                         array->count, iend);
-
-                return false;
-            }
-
-            vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items,
-                                              iend)));
 
             break;
-        }
 
-        case OP_MAKE_SLICE_ABOVE: {
-            Value target = vm_pop(vm);
-
-            if (!IS_ARRAY(target)) {
-                vm_error(vm, "%s is not an array value",
-                         value_description(target));
-            }
-
-            ObjArray *array = AS_ARRAY(target);
-
-            Value start = vm_pop(vm);
-
-            if (!IS_INT(start)) {
-                vm_error(vm, "cannot access an array with %s value",
-                         value_description(start));
-
+        case OP_MAKE_SLICE_ABOVE:
+            if (!vm_make_slice_above(vm)) {
                 return false;
             }
-
-            int64_t istart = AS_INT(start);
-
-            if (istart >= array->count) {
-                vm_error(
-                    vm,
-                    "sliced array has %d elements, the slice start must be "
-                    "less than that, but got %ld",
-                    array->count, istart);
-
-                return false;
-            }
-
-            vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + istart,
-                                              array->count - istart)));
 
             break;
-        }
 
         case OP_MAKE_MAP: {
             uint32_t count = READ_WORD();
