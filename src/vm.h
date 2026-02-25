@@ -88,10 +88,10 @@ typedef enum : uint8_t {
     OP_MAKE_ARRAY,
     OP_MAKE_MAP,
     OP_MAKE_CLOSURE,
-    OP_MAKE_SLICE, // a[s:e]
+    OP_MAKE_SLICE,       // a[s:e]
     OP_MAKE_SLICE_ABOVE, // a[s:]
     OP_MAKE_SLICE_UNDER, // a[:e]
-    OP_COPY_BY_SLICING, // a[:]
+    OP_COPY_BY_SLICING,  // a[:]
     OP_NEG,
     OP_NOT,
     OP_ADD,
@@ -252,14 +252,28 @@ void vm_error(Vm *vm, const char *format, ...);
 ObjMap *vm_new_map(Vm *vm);
 bool vm_map_insert(Vm *vm, ObjMap *map, ObjString *key, Value value);
 bool vm_map_insert_by_cstr(Vm *vm, ObjMap *map, const char *key, Value value);
-bool vm_map_insert_native_by_cstr(Vm *vm, ObjMap *map, const char *key, NativeFn call);
+bool vm_map_insert_native_by_cstr(Vm *vm, ObjMap *map, const char *key,
+                                  NativeFn call);
 void vm_map_insert_builtins(Vm *vm, ObjMap *globals);
 bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value);
 
-void vm_push(Vm *, Value);
-Value vm_pop(Vm *);
-Value vm_peek(const Vm *, size_t distance);
-void vm_poke(Vm *, size_t distance, Value);
+static inline void vm_push(Vm *vm, Value value) {
+    *vm->sp = value;
+    vm->sp++;
+}
+
+static inline Value vm_pop(Vm *vm) {
+    vm->sp--;
+    return *vm->sp;
+}
+
+static inline Value vm_peek(const Vm *vm, size_t distance) {
+    return vm->sp[-1 - distance];
+}
+
+static inline void vm_poke(Vm *vm, size_t distance, Value value) {
+    vm->sp[-1 - distance] = value;
+}
 
 #define OBJ_ALLOC(vm, tag, type) (type *)vm_alloc(vm, tag, sizeof(type))
 
@@ -272,8 +286,8 @@ ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count);
 ObjString *vm_concat_strings(Vm *vm, ObjString *lhs, ObjString *rhs);
 ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count);
 ObjArray *vm_concat_arrays(Vm *vm, ObjArray *lhs, ObjArray *rhs);
-ObjFunction *vm_new_function(Vm *vm, ObjMap *globals, Chunk chunk, uint8_t arity,
-                             uint8_t upvalues_count);
+ObjFunction *vm_new_function(Vm *vm, ObjMap *globals, Chunk chunk,
+                             uint8_t arity, uint8_t upvalues_count);
 ObjClosure *vm_new_closure(Vm *vm, ObjFunction *);
 ObjUpvalue *vm_new_upvalue(Vm *vm, Value *);
 void vm_mark_object(Vm *vm, Obj *);

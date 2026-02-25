@@ -395,22 +395,6 @@ size_t chunk_add_byte(Chunk *chunk, uint8_t byte, uint32_t source) {
     return chunk->count++;
 }
 
-void vm_push(Vm *vm, Value value) {
-    *vm->sp = value;
-    vm->sp++;
-}
-
-Value vm_pop(Vm *vm) {
-    vm->sp--;
-    return *vm->sp;
-}
-
-Value vm_peek(const Vm *vm, size_t distance) { return vm->sp[-1 - distance]; }
-
-void vm_poke(Vm *vm, size_t distance, Value value) {
-    vm->sp[-1 - distance] = value;
-}
-
 uint32_t string_hash(const char *key, uint32_t count) {
     uint32_t hash = 2166136261u;
 
