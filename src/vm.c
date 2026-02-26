@@ -156,7 +156,7 @@ static ObjString *vm_to_string(Vm *vm, Value value) {
     return NULL;
 }
 
-static bool vm_add(Vm *vm) {
+static inline bool vm_add(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
@@ -1175,377 +1175,409 @@ static bool vm_make_slice_above(Vm *vm) {
 bool vm_run(Vm *vm, Value *result) {
     CallFrame *frame = &vm->frames[vm->frame_count - 1];
 
-#define READ_BYTE() (*frame->ip++)
+#include "vm_readers.h"
 
-#define READ_SHORT()                                                           \
-    (frame->ip += 2, ((uint16_t)frame->ip[-2] << 8) | frame->ip[-1])
+#define vmfetch() op = READ_BYTE();
 
-#define READ_WORD()                                                            \
-    (frame->ip += 4, ((uint32_t)frame->ip[-4] << 24) |                         \
-                         ((uint32_t)frame->ip[-3] << 16) |                     \
-                         ((uint32_t)frame->ip[-2] << 8) | frame->ip[-1])
-
-#define READ_CONSTANT()                                                        \
-    (frame->closure->fn->chunk.constants.items[READ_SHORT()])
-
-#define READ_STRING() (AS_STRING(READ_CONSTANT()))
+#ifdef NUR_NO_JUMPTABLE
+#define vmdispatch() switch (op)
+#define vmcase(op) case op:
+#define vmbreak() break
+#else
+#include "vm_jumptable.h"
+#endif
 
     for (;;) {
-        OpCode opcode = READ_BYTE();
+        OpCode op;
 
-        switch (opcode) {
-        case OP_POP:
-            vm_pop(vm);
-            break;
+        vmfetch();
 
-        case OP_DUP:
-            vm_push(vm, vm_peek(vm, 0));
-            break;
-
-        case OP_SWP: {
-            Value a = vm_peek(vm, 0);
-            Value b = vm_peek(vm, 1);
-            vm_poke(vm, 0, b);
-            vm_poke(vm, 1, a);
-            break;
-        }
-
-        case OP_PUSH_NULL:
-            vm_push(vm, NULL_VAL);
-            break;
-
-        case OP_PUSH_TRUE:
-            vm_push(vm, BOOL_VAL(true));
-            break;
-
-        case OP_PUSH_FALSE:
-            vm_push(vm, BOOL_VAL(false));
-            break;
-
-        case OP_PUSH_CONST:
-            vm_push(vm, READ_CONSTANT());
-            break;
-
-        case OP_GET_LOCAL:
-            vm_push(vm, frame->slots[READ_BYTE()]);
-            break;
-
-        case OP_SET_LOCAL:
-            frame->slots[READ_BYTE()] = vm_peek(vm, 0);
-            break;
-
-        case OP_GET_UPVALUE:
-            vm_push(vm, *frame->closure->upvalues[READ_BYTE()]->location);
-            break;
-
-        case OP_SET_UPVALUE:
-            *frame->closure->upvalues[READ_BYTE()]->location = vm_peek(vm, 0);
-            break;
-
-        case OP_CLOSE_UPVALUE:
-            vm_close_upvalues(vm, vm->sp - 1);
-            vm_pop(vm);
-            break;
-
-        case OP_GET_GLOBAL: {
-            ObjString *key = READ_STRING();
-
-            Value value;
-
-            if (!vm_map_lookup(frame->closure->fn->globals, key, &value)) {
-                vm_error(vm,
-                         "'%.*s' is not "
-                         "defined",
-                         (int)key->count, key->items);
-
-                return false;
+        vmdispatch() {
+            vmcase(OP_POP) {
+                vm_pop(vm);
+                vmbreak();
             }
 
-            vm_push(vm, value);
-
-            break;
-        }
-
-        case OP_SET_GLOBAL:
-            vm_map_insert(vm, frame->closure->fn->globals, READ_STRING(),
-                          vm_peek(vm, 0));
-            break;
-
-        case OP_GET_SUBSCRIPT:
-            if (!vm_get_subscript(vm)) {
-                return false;
+            vmcase(OP_DUP) {
+                vm_push(vm, vm_peek(vm, 0));
+                vmbreak();
             }
 
-            break;
-
-        case OP_SET_SUBSCRIPT:
-            if (!vm_set_subscript(vm)) {
-                return false;
+            vmcase(OP_SWP) {
+                Value a = vm_peek(vm, 0);
+                Value b = vm_peek(vm, 1);
+                vm_poke(vm, 0, b);
+                vm_poke(vm, 1, a);
+                vmbreak();
             }
 
-            break;
-
-        case OP_MAKE_ARRAY: {
-            uint32_t count = READ_WORD();
-
-            ObjArray *array = vm_copy_array(vm, vm->sp - count, count);
-
-            vm->sp -= count;
-
-            vm_push(vm, OBJ_VAL(array));
-
-            break;
-        }
-
-        case OP_COPY_BY_SLICING: {
-            Value target = vm_pop(vm);
-
-            if (IS_ARRAY(target)) {
-                ObjArray *array = AS_ARRAY(target);
-
-                vm_push(vm,
-                        OBJ_VAL(vm_copy_array(vm, array->items, array->count)));
-            } else if (IS_STRING(target)) {
-                ObjString *string = AS_STRING(target);
-
-                vm_push(vm, OBJ_VAL(vm_copy_string(vm, string->items,
-                                                   string->count)));
-            } else {
-                vm_error(vm, "%s is not an array value",
-                         value_description(target));
-
-                return false;
+            vmcase(OP_PUSH_NULL) {
+                vm_push(vm, NULL_VAL);
+                vmbreak();
             }
 
-            break;
-        }
-
-        case OP_MAKE_SLICE:
-            if (!vm_make_slice(vm)) {
-                return false;
+            vmcase(OP_PUSH_TRUE) {
+                vm_push(vm, BOOL_VAL(true));
+                vmbreak();
             }
 
-            break;
-
-        case OP_MAKE_SLICE_UNDER:
-            if (!vm_make_slice_under(vm)) {
-                return false;
+            vmcase(OP_PUSH_FALSE) {
+                vm_push(vm, BOOL_VAL(false));
+                vmbreak();
             }
 
-            break;
-
-        case OP_MAKE_SLICE_ABOVE:
-            if (!vm_make_slice_above(vm)) {
-                return false;
+            vmcase(OP_PUSH_CONST) {
+                vm_push(vm, READ_CONSTANT());
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_GET_LOCAL) {
+                vm_push(vm, frame->slots[READ_BYTE()]);
+                vmbreak();
+            }
 
-        case OP_MAKE_MAP: {
-            uint32_t count = READ_WORD();
+            vmcase(OP_SET_LOCAL) {
+                frame->slots[READ_BYTE()] = vm_peek(vm, 0);
+                vmbreak();
+            }
 
-            ObjMap *map = vm_new_map(vm);
+            vmcase(OP_GET_UPVALUE) {
+                vm_push(vm, *frame->closure->upvalues[READ_BYTE()]->location);
+                vmbreak();
+            }
 
-            Value *start = vm->sp - count * 2;
+            vmcase(OP_SET_UPVALUE) {
+                *frame->closure->upvalues[READ_BYTE()]->location =
+                    vm_peek(vm, 0);
+                vmbreak();
+            }
 
-            for (uint32_t i = 0; i < count * 2; i += 2) {
-                if (!IS_STRING(start[i])) {
-                    vm_error(vm, "expected a string got %s",
-                             value_description(start[i]));
+            vmcase(OP_CLOSE_UPVALUE) {
+                vm_close_upvalues(vm, vm->sp - 1);
+                vm_pop(vm);
+                vmbreak();
+            }
+
+            vmcase(OP_GET_GLOBAL) {
+                ObjString *key = READ_STRING();
+
+                Value value;
+
+                if (!vm_map_lookup(frame->closure->fn->globals, key, &value)) {
+                    vm_error(vm,
+                             "'%.*s' is not "
+                             "defined",
+                             (int)key->count, key->items);
 
                     return false;
                 }
 
-                ObjString *key = AS_STRING(start[i]);
-                Value value = start[i + 1];
+                vm_push(vm, value);
 
-                vm_map_insert(vm, map, key, value);
+                vmbreak();
             }
 
-            vm->sp = start;
+            vmcase(OP_SET_GLOBAL) {
+                vm_map_insert(vm, frame->closure->fn->globals, READ_STRING(),
+                              vm_peek(vm, 0));
+                vmbreak();
+            }
 
-            vm_push(vm, OBJ_VAL(map));
-
-            break;
-        }
-
-        case OP_MAKE_CLOSURE: {
-            ObjFunction *fn = AS_FUNCTION(READ_CONSTANT());
-
-            fn->globals = frame->closure->fn->globals;
-
-            ObjClosure *closure = vm_new_closure(vm, fn);
-
-            for (uint8_t i = 0; i < fn->upvalues_count; i++) {
-                uint8_t is_local = READ_BYTE();
-                uint8_t index = READ_BYTE();
-
-                if (is_local) {
-                    closure->upvalues[i] =
-                        vm_capture_upvalue(vm, frame->slots + index);
-                } else {
-                    closure->upvalues[i] = frame->closure->upvalues[index];
+            vmcase(OP_GET_SUBSCRIPT) {
+                if (!vm_get_subscript(vm)) {
+                    return false;
                 }
+
+                vmbreak();
             }
 
-            vm_push(vm, OBJ_VAL(closure));
+            vmcase(OP_SET_SUBSCRIPT) {
+                if (!vm_set_subscript(vm)) {
+                    return false;
+                }
 
-            break;
-        }
-
-        case OP_EQL:
-            vm_push(vm, BOOL_VAL(values_equal(vm_pop(vm), vm_pop(vm))));
-            break;
-
-        case OP_NEQ:
-            vm_push(vm, BOOL_VAL(!values_equal(vm_pop(vm), vm_pop(vm))));
-            break;
-
-        case OP_NOT:
-            vm_poke(vm, 0, BOOL_VAL(value_is_falsey(vm_peek(vm, 0))));
-            break;
-
-        case OP_NEG:
-            if (!vm_neg(vm)) {
-                return false;
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_MAKE_ARRAY) {
+                uint32_t count = READ_WORD();
 
-        case OP_ADD:
-            if (!vm_add(vm)) {
-                return false;
+                ObjArray *array = vm_copy_array(vm, vm->sp - count, count);
+
+                vm->sp -= count;
+
+                vm_push(vm, OBJ_VAL(array));
+
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_COPY_BY_SLICING) {
+                Value target = vm_pop(vm);
 
-        case OP_SUB:
-            if (!vm_sub(vm)) {
-                return false;
+                if (IS_ARRAY(target)) {
+                    ObjArray *array = AS_ARRAY(target);
+
+                    vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items,
+                                                      array->count)));
+                } else if (IS_STRING(target)) {
+                    ObjString *string = AS_STRING(target);
+
+                    vm_push(vm, OBJ_VAL(vm_copy_string(vm, string->items,
+                                                       string->count)));
+                } else {
+                    vm_error(vm, "%s is not an array value",
+                             value_description(target));
+
+                    return false;
+                }
+
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_MAKE_SLICE) {
+                if (!vm_make_slice(vm)) {
+                    return false;
+                }
 
-        case OP_MUL:
-            if (!vm_mul(vm)) {
-                return false;
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_MAKE_SLICE_UNDER) {
+                if (!vm_make_slice_under(vm)) {
+                    return false;
+                }
 
-        case OP_DIV:
-            if (!vm_div(vm)) {
-                return false;
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_MAKE_SLICE_ABOVE) {
+                if (!vm_make_slice_above(vm)) {
+                    return false;
+                }
 
-        case OP_MOD:
-            if (!vm_mod(vm)) {
-                return false;
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_MAKE_MAP) {
+                uint32_t count = READ_WORD();
 
-        case OP_POW:
-            if (!vm_pow(vm)) {
-                return false;
+                ObjMap *map = vm_new_map(vm);
+
+                Value *start = vm->sp - count * 2;
+
+                for (uint32_t i = 0; i < count * 2; i += 2) {
+                    if (!IS_STRING(start[i])) {
+                        vm_error(vm, "expected a string got %s",
+                                 value_description(start[i]));
+
+                        return false;
+                    }
+
+                    ObjString *key = AS_STRING(start[i]);
+                    Value value = start[i + 1];
+
+                    vm_map_insert(vm, map, key, value);
+                }
+
+                vm->sp = start;
+
+                vm_push(vm, OBJ_VAL(map));
+
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_MAKE_CLOSURE) {
+                ObjFunction *fn = AS_FUNCTION(READ_CONSTANT());
 
-        case OP_LT:
-            if (!vm_lt(vm)) {
-                return false;
+                fn->globals = frame->closure->fn->globals;
+
+                ObjClosure *closure = vm_new_closure(vm, fn);
+
+                for (uint8_t i = 0; i < fn->upvalues_count; i++) {
+                    uint8_t is_local = READ_BYTE();
+                    uint8_t index = READ_BYTE();
+
+                    if (is_local) {
+                        closure->upvalues[i] =
+                            vm_capture_upvalue(vm, frame->slots + index);
+                    } else {
+                        closure->upvalues[i] = frame->closure->upvalues[index];
+                    }
+                }
+
+                vm_push(vm, OBJ_VAL(closure));
+
+                vmbreak();
             }
 
-            break;
-
-        case OP_GT:
-            if (!vm_gt(vm)) {
-                return false;
+            vmcase(OP_EQL) {
+                vm_push(vm, BOOL_VAL(values_equal(vm_pop(vm), vm_pop(vm))));
+                vmbreak();
             }
 
-            break;
-
-        case OP_LTE:
-            if (!vm_lte(vm)) {
-                return false;
+            vmcase(OP_NEQ) {
+                vm_push(vm, BOOL_VAL(!values_equal(vm_pop(vm), vm_pop(vm))));
+                vmbreak();
             }
 
-            break;
-
-        case OP_GTE:
-            if (!vm_gte(vm)) {
-                return false;
+            vmcase(OP_NOT) {
+                vm_poke(vm, 0, BOOL_VAL(value_is_falsey(vm_peek(vm, 0))));
+                vmbreak();
             }
 
-            break;
+            vmcase(OP_NEG) {
+                if (!vm_neg(vm)) {
+                    return false;
+                }
 
-        case OP_CALL:
-            if (!vm_call_value(vm, vm_pop(vm), READ_BYTE())) {
-                return false;
+                vmbreak();
             }
 
-            frame = &vm->frames[vm->frame_count - 1];
+            vmcase(OP_ADD) {
+                if (!vm_add(vm)) {
+                    return false;
+                }
 
-            break;
+                vmbreak();
+            }
 
-        case OP_POP_JUMP_IF_FALSE: {
-            uint16_t offset = READ_SHORT();
+            vmcase(OP_SUB) {
+                if (!vm_sub(vm)) {
+                    return false;
+                }
 
-            if (value_is_falsey(vm_pop(vm)))
+                vmbreak();
+            }
+
+            vmcase(OP_MUL) {
+                if (!vm_mul(vm)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_DIV) {
+                if (!vm_div(vm)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_MOD) {
+                if (!vm_mod(vm)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_POW) {
+                if (!vm_pow(vm)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_LT) {
+                if (!vm_lt(vm)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_GT) {
+                if (!vm_gt(vm)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_LTE) {
+                if (!vm_lte(vm)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_GTE) {
+                if (!vm_gte(vm)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_CALL) {
+                if (!vm_call_value(vm, vm_pop(vm), READ_BYTE())) {
+                    return false;
+                }
+
+                frame = &vm->frames[vm->frame_count - 1];
+
+                vmbreak();
+            }
+
+            vmcase(OP_POP_JUMP_IF_FALSE) {
+                uint16_t offset = READ_SHORT();
+
+                if (value_is_falsey(vm_pop(vm)))
+                    frame->ip += offset;
+
+                vmbreak();
+            }
+
+            vmcase(OP_JUMP_IF_FALSE) {
+                uint16_t offset = READ_SHORT();
+
+                if (value_is_falsey(vm_peek(vm, 0)))
+                    frame->ip += offset;
+
+                vmbreak();
+            }
+
+            vmcase(OP_JUMP) {
+                uint16_t offset = READ_SHORT();
+
                 frame->ip += offset;
 
-            break;
-        }
-
-        case OP_JUMP_IF_FALSE: {
-            uint16_t offset = READ_SHORT();
-
-            if (value_is_falsey(vm_peek(vm, 0)))
-                frame->ip += offset;
-
-            break;
-        }
-
-        case OP_JUMP: {
-            uint16_t offset = READ_SHORT();
-
-            frame->ip += offset;
-
-            break;
-        }
-
-        case OP_LOOP: {
-            uint16_t offset = READ_SHORT();
-
-            frame->ip -= offset;
-
-            break;
-        }
-
-        case OP_RETURN: {
-            Value returned = vm_pop(vm);
-
-            vm_close_upvalues(vm, frame->slots);
-
-            vm->frame_count--;
-
-            if (vm->frame_count == 0) {
-                *result = returned;
-
-                return true;
+                vmbreak();
             }
 
-            vm->sp = frame->slots;
+            vmcase(OP_LOOP) {
+                uint16_t offset = READ_SHORT();
 
-            vm_push(vm, returned);
+                frame->ip -= offset;
 
-            frame = &vm->frames[vm->frame_count - 1];
+                vmbreak();
+            }
 
-            break;
-        }
+            vmcase(OP_RETURN) {
+                Value returned = vm_pop(vm);
+
+                vm_close_upvalues(vm, frame->slots);
+
+                vm->frame_count--;
+
+                if (vm->frame_count == 0) {
+                    *result = returned;
+
+                    return true;
+                }
+
+                vm->sp = frame->slots;
+
+                vm_push(vm, returned);
+
+                frame = &vm->frames[vm->frame_count - 1];
+
+                vmbreak();
+            }
         }
     }
 }
