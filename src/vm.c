@@ -389,7 +389,7 @@ static void vm_div_int(Vm *vm, Value lhs, Value rhs) {
 
     vm_pop(vm);
 
-    if (rem_euclid(ilhs, irhs) == 0) {
+    if (ilhs % irhs == 0) {
         vm_poke(vm, 0, INT_VAL(ilhs / irhs));
     } else {
         vm_poke(vm, 0, FLT_VAL((double)ilhs / (double)irhs));
@@ -533,13 +533,10 @@ static void vm_pow_int(Vm *vm, Value lhs, Value rhs) {
     int64_t ilhs = AS_INT(lhs);
     int64_t irhs = AS_INT(rhs);
     vm_pop(vm);
-
-    double result = pow(ilhs, irhs);
-
-    if (floor(result) == result) {
-        vm_poke(vm, 0, INT_VAL(result));
+    if (irhs < 0) {
+        vm_poke(vm, 0, FLT_VAL(pow(ilhs, irhs)));
     } else {
-        vm_poke(vm, 0, FLT_VAL(result));
+        vm_poke(vm, 0, INT_VAL(pow(ilhs, irhs)));
     }
 }
 
