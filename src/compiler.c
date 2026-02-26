@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -640,8 +641,58 @@ static bool compile_conditional(Compiler *compiler, AstNode node,
     return true;
 }
 
+static bool node_is_int(AstNode n, int64_t *out) {
+    if (n.tag != NODE_INT) {
+        return false;
+    }
+
+    uint64_t v = (uint64_t)n.lhs << 32 | n.rhs;
+    *out = (int64_t)v;
+
+    return true;
+}
+
+static bool node_is_float(AstNode n, double *out) {
+    if (n.tag != NODE_FLOAT) {
+        return false;
+    }
+
+    uint64_t v = (uint64_t)n.lhs << 32 | n.rhs;
+    memcpy(out, &v, sizeof(double));
+
+    return true;
+}
+
+static void emit_int_const(Compiler *compiler, int64_t v, uint32_t source) {
+    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+    compiler_emit_constant(compiler, INT_VAL(v), source);
+}
+
+static void emit_float_const(Compiler *compiler, double v, uint32_t source) {
+    chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
+    compiler_emit_constant(compiler, FLT_VAL(v), source);
+}
+
 static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
                           OpCode opcode) {
+
+    AstNode rhs = compiler->ast.nodes.items[node.rhs];
+
+    int64_t i;
+    double f;
+
+    if (opcode == OP_NEG) {
+        if (node_is_int(rhs, &i)) {
+            emit_int_const(compiler, -i, source);
+            return true;
+        }
+
+        if (node_is_float(rhs, &f)) {
+            emit_float_const(compiler, -f, source);
+            return true;
+        }
+    }
+
     if (!compile_expr(compiler, node.rhs)) {
         return false;
     }
@@ -653,6 +704,96 @@ static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,
 
 static bool compile_binary(Compiler *compiler, AstNode node, uint32_t source,
                            OpCode opcode) {
+
+    AstNode lhs = compiler->ast.nodes.items[node.lhs];
+    AstNode rhs = compiler->ast.nodes.items[node.rhs];
+
+    int64_t li, ri;
+    double lf, rf;
+
+    bool lhs_int = node_is_int(lhs, &li);
+    bool rhs_int = node_is_int(rhs, &ri);
+
+    bool lhs_flt = node_is_float(lhs, &lf);
+    bool rhs_flt = node_is_float(rhs, &rf);
+
+    if ((lhs_int || lhs_flt) && (rhs_int || rhs_flt)) {
+        if (lhs_int && rhs_int) {
+            int64_t a = li;
+            int64_t b = ri;
+
+            switch (opcode) {
+            case OP_ADD:
+                emit_int_const(compiler, a + b, source);
+                return true;
+
+            case OP_SUB:
+                emit_int_const(compiler, a - b, source);
+                return true;
+
+            case OP_MUL:
+                emit_int_const(compiler, a * b, source);
+                return true;
+
+            case OP_DIV:
+                if (b != 0 && a % b == 0)
+                    emit_int_const(compiler, a / b, source);
+                else
+                    emit_float_const(compiler, (double)a / (double)b, source);
+
+                return true;
+
+            case OP_MOD:
+                if (b != 0) {
+                    emit_int_const(compiler, a % b, source);
+                }
+
+                return true;
+
+            case OP_POW: {
+                if (b < 0) {
+                    emit_float_const(compiler, pow(a, b), source);
+                } else {
+                    emit_int_const(compiler, pow(a, b), source);
+                }
+
+                return true;
+            }
+
+            default:
+                break;
+            }
+        } else {
+            double a = lhs_int ? (double)li : lf;
+            double b = rhs_int ? (double)ri : rf;
+
+            switch (opcode) {
+            case OP_ADD:
+                emit_float_const(compiler, a + b, source);
+                return true;
+
+            case OP_SUB:
+                emit_float_const(compiler, a - b, source);
+                return true;
+
+            case OP_MUL:
+                emit_float_const(compiler, a * b, source);
+                return true;
+
+            case OP_DIV:
+                emit_float_const(compiler, a / b, source);
+                return true;
+
+            case OP_POW:
+                emit_float_const(compiler, pow(a, b), source);
+                return true;
+
+            default:
+                break;
+            }
+        }
+    }
+
     if (!compile_expr(compiler, node.lhs)) {
         return false;
     }
