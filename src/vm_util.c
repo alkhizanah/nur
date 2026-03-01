@@ -34,21 +34,7 @@ bool objects_equal(Obj *a, Obj *b) {
 
     switch (a->tag) {
     case OBJ_STRING:
-        if (((ObjString *)a)->count != ((ObjString *)b)->count) {
-            return false;
-        }
-
-        if (((ObjString *)a)->items == ((ObjString *)b)->items) {
-            return true;
-        }
-
-        for (uint32_t i = 0; i < ((ObjString *)a)->count; i++) {
-            if (((ObjString *)a)->items[i] != ((ObjString *)b)->items[i]) {
-                return false;
-            }
-        }
-
-        return true;
+        return false; // a == b must be true if they were equal strings, another benefit of string interning
 
     case OBJ_FUNCTION:
         if (((ObjFunction *)a)->arity != ((ObjFunction *)b)->arity) {

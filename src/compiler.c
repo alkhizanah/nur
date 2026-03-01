@@ -98,7 +98,7 @@ static bool compiler_find_local(Compiler *compiler, const char *name,
             return true;
         }
 
-        if (strncmp(local.name, name, name_len) == 0) {
+        if (memcmp(local.name, name, name_len) == 0) {
             return true;
         }
     }

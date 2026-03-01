@@ -206,7 +206,17 @@ void vm_free_value(Vm *vm, Value value) {
     }
 }
 
-static void vm_sweep(Vm *vm) {
+static void vm_remove_white_strings(Vm *vm) {
+    for (uint32_t i = 0; i < vm->strings->capacity; i++) {
+        ObjMapEntry *entry = &vm->strings->entries[i];
+
+        if (entry->key != NULL && !entry->key->obj.marked) {
+            vm_map_remove(vm->strings, entry->key);
+        }
+    }
+}
+
+static void vm_sweep_objects(Vm *vm) {
     Obj *prev = NULL;
     Obj *curr = vm->objects;
 
@@ -233,8 +243,8 @@ static void vm_sweep(Vm *vm) {
 
 void vm_gc(Vm *vm) {
     vm_mark_roots(vm);
-
-    vm_sweep(vm);
+    vm_remove_white_strings(vm);
+    vm_sweep_objects(vm);
 
     vm->next_gc = vm->bytes_allocated * VM_GC_GROW_FACTOR;
 }
@@ -324,32 +334,9 @@ ObjString *vm_new_string(Vm *vm, char *items, uint32_t count, uint32_t hash) {
     string->count = count;
     string->hash = hash;
 
+    vm_map_insert(vm, vm->strings, string, NULL_VAL);
+
     return string;
-}
-
-void vm_push_to_string(Vm *vm, ObjString *string, char c, bool rehash) {
-    vm->bytes_allocated += 1 * sizeof(*string->items);
-
-    if (vm->bytes_allocated > vm->next_gc) {
-        vm_gc(vm);
-    }
-
-    string->count++;
-
-    string->items =
-        realloc(string->items, string->count * sizeof(*string->items));
-
-    if (string->items == NULL) {
-        fprintf(stderr, "error: out of memory\n");
-
-        exit(1);
-    }
-
-    string->items[string->count - 1] = c;
-
-    if (rehash) {
-        string->hash = string_hash(string->items, string->count);
-    }
 }
 
 ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count) {
@@ -359,23 +346,58 @@ ObjString *vm_copy_string(Vm *vm, const char *items, uint32_t count) {
         vm_gc(vm);
     }
 
-    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
+    uint32_t hash = string_hash(items, count);
 
-    string->items = malloc(count * sizeof(*items));
+    ObjString *interned = vm_find_string(vm, items, count, hash);
 
-    if (string->items == NULL) {
+    if (interned != NULL) {
+        return interned;
+    }
+
+    char *copied_items = malloc(count * sizeof(*items));
+
+    if (copied_items == NULL) {
         fprintf(stderr, "error: out of memory\n");
 
         exit(1);
     }
 
-    memcpy(string->items, items, count * sizeof(*items));
+    memcpy(copied_items, items, count * sizeof(*items));
 
-    string->count = count;
+    return vm_new_string(vm, copied_items, count, hash);
+}
 
-    string->hash = string_hash(items, count);
+ObjString *vm_concat_strings(Vm *vm, ObjString *lhs, ObjString *rhs) {
+    vm->bytes_allocated += lhs->count + rhs->count;
 
-    return string;
+    if (vm->bytes_allocated > vm->next_gc) {
+        vm_gc(vm);
+    }
+
+    char *items = malloc((lhs->count + rhs->count) * sizeof(char));
+
+    if (items == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    memcpy(items, lhs->items, lhs->count);
+    memcpy(items + lhs->count, rhs->items, rhs->count);
+
+    uint32_t count = lhs->count + rhs->count;
+
+    uint32_t hash = string_hash(items, count);
+
+    ObjString *interned = vm_find_string(vm, items, count, hash);
+
+    if (interned != NULL) {
+        free(items);
+
+        return interned;
+    }
+
+    return vm_new_string(vm, items, count, hash);
 }
 
 ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count) {
@@ -401,33 +423,6 @@ ObjArray *vm_copy_array(Vm *vm, const Value *items, uint32_t count) {
     array->capacity = count;
 
     return array;
-}
-
-ObjString *vm_concat_strings(Vm *vm, ObjString *lhs, ObjString *rhs) {
-    vm->bytes_allocated += lhs->count + rhs->count;
-
-    if (vm->bytes_allocated > vm->next_gc) {
-        vm_gc(vm);
-    }
-
-    ObjString *string = OBJ_ALLOC(vm, OBJ_STRING, ObjString);
-
-    string->items = malloc((lhs->count + rhs->count) * sizeof(char));
-
-    if (string->items == NULL) {
-        fprintf(stderr, "error: out of memory\n");
-
-        exit(1);
-    }
-
-    memcpy(string->items, lhs->items, lhs->count);
-    memcpy(string->items + lhs->count, rhs->items, rhs->count);
-
-    string->count = lhs->count + rhs->count;
-
-    string->hash = string_hash(string->items, string->count);
-
-    return string;
 }
 
 ObjArray *vm_concat_arrays(Vm *vm, ObjArray *lhs, ObjArray *rhs) {

@@ -16,8 +16,10 @@
 #include "fs.h"
 #include "vm.h"
 
-bool vm_map_insert_by_cstr(Vm *vm, ObjMap *map, const char *key, Value value) {
-    return vm_map_insert(vm, map, vm_copy_string(vm, key, strlen(key)), value);
+bool vm_map_insert_by_cstr(Vm *vm, ObjMap *map, const char *key_cstr,
+                           Value value) {
+    ObjString *key = vm_copy_string(vm, key_cstr, strlen(key_cstr));
+    return vm_map_insert(vm, map, key, value);
 }
 
 bool vm_map_insert_native_by_cstr(Vm *vm, ObjMap *map, const char *key,
@@ -306,12 +308,17 @@ bool vm_builtin_import(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     ObjString *parent_directory =
         vm_copy_string(vm, parent_file_path, strlen(parent_file_path));
 
-    while (parent_directory->items[parent_directory->count - 1] != '/'
+    while (parent_directory->count > 0 &&
+           parent_directory->items[parent_directory->count - 1] != '/'
 #ifdef _WIN32
            && parent_directory->items[parent_directory->count - 1] != '\\'
 #endif
     ) {
         parent_directory->count--;
+    }
+
+    if (parent_directory->count == 0) {
+        parent_directory = vm_copy_string(vm, "./", 2);
     }
 
     ObjString *new_name =
@@ -334,6 +341,10 @@ bool vm_builtin_import(Vm *vm, Value *argv, uint8_t argc, Value *result) {
         Vm mvm = {0};
 
         vm_init(&mvm);
+
+        vm_free_map(&mvm, mvm.strings);
+
+        mvm.strings = vm->strings;
 
         if (!vm_load_file(&mvm, new_name->items, file_content)) {
             return false;
@@ -409,7 +420,8 @@ bool vm_builtin_fs_read_line(Vm *vm, Value *argv, uint8_t argc, Value *result) {
 ObjMap *vm_get_fs_module(Vm *vm) {
     ObjMap *fs_mod = vm_new_map(vm);
 
-    vm_map_insert_native_by_cstr(vm, fs_mod, "read_line", vm_builtin_fs_read_line);
+    vm_map_insert_native_by_cstr(vm, fs_mod, "read_line",
+                                 vm_builtin_fs_read_line);
 
     return fs_mod;
 }
@@ -428,8 +440,7 @@ bool vm_builtin_time_now(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     (void)argv;
 
     if (argc > 0) {
-        vm_error(vm, "time.now() takes no arguments, got %d",
-                 argc);
+        vm_error(vm, "time.now() takes no arguments, got %d", argc);
 
         return false;
     }
@@ -443,8 +454,7 @@ bool vm_builtin_time_now_ns(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     (void)argv;
 
     if (argc > 0) {
-        vm_error(vm, "time.now_ms() takes no arguments, got %d",
-                 argc);
+        vm_error(vm, "time.now_ms() takes no arguments, got %d", argc);
 
         return false;
     }
@@ -462,8 +472,7 @@ bool vm_builtin_time_now_ms(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     (void)argv;
 
     if (argc > 0) {
-        vm_error(vm, "time.now_ms() takes no arguments, got %d",
-                 argc);
+        vm_error(vm, "time.now_ms() takes no arguments, got %d", argc);
 
         return false;
     }
@@ -481,8 +490,10 @@ ObjMap *vm_get_time_module(Vm *vm) {
     ObjMap *time_mod = vm_new_map(vm);
 
     vm_map_insert_native_by_cstr(vm, time_mod, "now", vm_builtin_time_now);
-    vm_map_insert_native_by_cstr(vm, time_mod, "now_ns", vm_builtin_time_now_ns);
-    vm_map_insert_native_by_cstr(vm, time_mod, "now_ms", vm_builtin_time_now_ms);
+    vm_map_insert_native_by_cstr(vm, time_mod, "now_ns",
+                                 vm_builtin_time_now_ns);
+    vm_map_insert_native_by_cstr(vm, time_mod, "now_ms",
+                                 vm_builtin_time_now_ms);
 
     return time_mod;
 }
@@ -495,7 +506,8 @@ void vm_map_insert_builtins(Vm *vm, ObjMap *globals) {
 
         vm_map_insert_by_cstr(vm, modules, "fs", OBJ_VAL(vm_get_fs_module(vm)));
         vm_map_insert_by_cstr(vm, modules, "io", OBJ_VAL(vm_get_io_module(vm)));
-        vm_map_insert_by_cstr(vm, modules, "time", OBJ_VAL(vm_get_time_module(vm)));
+        vm_map_insert_by_cstr(vm, modules, "time",
+                              OBJ_VAL(vm_get_time_module(vm)));
     }
 
     vm_map_insert_by_cstr(vm, globals, "__modules__", OBJ_VAL(modules));

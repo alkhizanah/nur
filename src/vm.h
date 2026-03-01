@@ -206,6 +206,8 @@ typedef struct {
 
     ObjUpvalue *open_upvalues;
 
+    ObjMap *strings;
+
     Obj *objects;
     size_t bytes_allocated;
     size_t next_gc;
@@ -237,6 +239,9 @@ uint32_t string_utf8_encode_character(
 const char *string_utf8_skip_character(const char *start);
 const char *string_utf8_decode_character(const char *start, uint32_t *rune);
 
+ObjString *vm_find_string(Vm *vm, const char *key, uint32_t count,
+                              uint32_t hash);
+
 void vm_stack_reset(Vm *);
 void vm_stack_trace(Vm *);
 
@@ -256,6 +261,7 @@ bool vm_map_insert_native_by_cstr(Vm *vm, ObjMap *map, const char *key,
                                   NativeFn call);
 void vm_map_insert_builtins(Vm *vm, ObjMap *globals);
 bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value);
+bool vm_map_remove(ObjMap *map, ObjString *key);
 
 static inline void vm_push(Vm *vm, Value value) {
     *vm->sp = value;

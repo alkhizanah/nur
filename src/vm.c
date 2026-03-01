@@ -49,6 +49,8 @@ void vm_init(Vm *vm) {
     vm->objects = NULL;
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
+
+    vm->strings = vm_new_map(vm);
 }
 
 bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
