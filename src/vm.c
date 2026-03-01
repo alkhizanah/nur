@@ -156,11 +156,27 @@ static ObjString *vm_to_string(Vm *vm, Value value) {
     return NULL;
 }
 
-static inline bool vm_add(Vm *vm) {
+static bool vm_add(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if (IS_STRING(lhs)) {
+    if (IS_INT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_add_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_add_int_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else if (IS_FLT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_add_int_flt(vm, rhs, lhs);
+        } else if (IS_FLT(rhs)) {
+            vm_add_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else if (IS_STRING(lhs)) {
         ObjString *slhs = AS_STRING(lhs);
         ObjString *srhs = vm_to_string(vm, rhs);
         ObjString *result = vm_concat_strings(vm, slhs, srhs);
@@ -202,42 +218,10 @@ static inline bool vm_add(Vm *vm) {
         return false;
     }
 
-    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
-        vm_error(vm, "can not add %s value to %s value", value_description(lhs),
-                 value_description(rhs));
+    vm_error(vm, "can not add %s value to %s value", value_description(lhs),
+             value_description(rhs));
 
-        return false;
-    }
-
-    if (lhs.tag == rhs.tag) {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_add_int(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_add_flt(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    } else {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_add_int_flt(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_add_int_flt(vm, rhs, lhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    }
-
-    return true;
+    return false;
 }
 
 static void vm_sub_int(Vm *vm, Value lhs, Value rhs) {
@@ -272,42 +256,28 @@ static bool vm_sub(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+    if (IS_INT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_sub_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_sub_int_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else if (IS_FLT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_sub_flt_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_sub_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else {
         vm_error(vm, "can not subtract %s value from %s value",
                  value_description(rhs), value_description(lhs));
 
         return false;
     }
-
-    if (lhs.tag == rhs.tag) {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_sub_int(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_sub_flt(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    } else {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_sub_int_flt(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_sub_flt_int(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    }
-
-    return true;
 }
 
 static void vm_mul_int(Vm *vm, Value lhs, Value rhs) {
@@ -335,42 +305,28 @@ static bool vm_mul(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+    if (IS_INT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_mul_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_mul_int_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else if (IS_FLT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_mul_int_flt(vm, rhs, lhs);
+        } else if (IS_FLT(rhs)) {
+            vm_mul_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else {
         vm_error(vm, "can not multiply %s value with %s value",
                  value_description(lhs), value_description(rhs));
 
         return false;
     }
-
-    if (lhs.tag == rhs.tag) {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_mul_int(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_mul_flt(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    } else {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_mul_int_flt(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_mul_int_flt(vm, rhs, lhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    }
-
-    return true;
 }
 
 static int64_t rem_euclid(int64_t a, int64_t b) {
@@ -421,42 +377,28 @@ static bool vm_div(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+    if (IS_INT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_div_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_div_int_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else if (IS_FLT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_div_flt_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_div_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else {
         vm_error(vm, "can not divide %s value by %s value",
                  value_description(lhs), value_description(rhs));
 
         return false;
     }
-
-    if (lhs.tag == rhs.tag) {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_div_int(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_div_flt(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    } else {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_div_int_flt(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_div_flt_int(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    }
-
-    return true;
 }
 
 static void vm_mod_int(Vm *vm, Value lhs, Value rhs) {
@@ -491,42 +433,29 @@ static bool vm_mod(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
+    if (IS_INT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_mod_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_mod_int_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else if (IS_FLT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_mod_flt_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_mod_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else {
+
         vm_error(vm, "can not get %s value modulo %s value",
                  value_description(lhs), value_description(rhs));
 
         return false;
     }
-
-    if (lhs.tag == rhs.tag) {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_mod_int(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_mod_flt(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    } else {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_mod_int_flt(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_mod_flt_int(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    }
-
-    return true;
 }
 
 static void vm_pow_int(Vm *vm, Value lhs, Value rhs) {
@@ -559,6 +488,34 @@ static void vm_pow_flt_int(Vm *vm, Value lhs, Value rhs) {
     int64_t irhs = AS_INT(rhs);
     vm_pop(vm);
     vm_poke(vm, 0, FLT_VAL(pow(flhs, irhs)));
+}
+
+static bool vm_pow(Vm *vm) {
+    Value rhs = vm_peek(vm, 0);
+    Value lhs = vm_peek(vm, 1);
+
+    if (IS_INT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_pow_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_pow_int_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else if (IS_FLT(lhs)) {
+        if (IS_INT(rhs)) {
+            vm_pow_flt_int(vm, lhs, rhs);
+        } else if (IS_FLT(rhs)) {
+            vm_pow_flt(vm, lhs, rhs);
+        }
+
+        return true;
+    } else {
+        vm_error(vm, "can not get %s value to the power of %s value",
+                 value_description(lhs), value_description(rhs));
+
+        return false;
+    }
 }
 
 static bool vm_call_closure(Vm *vm, ObjClosure *closure, uint8_t argc) {
@@ -618,48 +575,6 @@ static bool vm_call_value(Vm *vm, Value callee, uint8_t argc) {
     vm_error(vm, "can not call %s value", value_description(callee));
 
     return false;
-}
-
-static bool vm_pow(Vm *vm) {
-    Value rhs = vm_peek(vm, 0);
-    Value lhs = vm_peek(vm, 1);
-
-    if ((!IS_INT(lhs) && !IS_FLT(lhs)) || (!IS_INT(rhs) && !IS_FLT(rhs))) {
-        vm_error(vm, "can not get %s value to the power of %s value",
-                 value_description(lhs), value_description(rhs));
-
-        return false;
-    }
-
-    if (lhs.tag == rhs.tag) {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_pow_int(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_pow_flt(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    } else {
-        switch (lhs.tag) {
-        case VAL_INT:
-            vm_pow_int_flt(vm, lhs, rhs);
-            break;
-
-        case VAL_FLT:
-            vm_pow_flt_int(vm, lhs, rhs);
-            break;
-
-        default:
-            assert(false && "UNREACHABLE");
-        }
-    }
-
-    return true;
 }
 
 #define VM_CMP_FN(name, op)                                                    \
