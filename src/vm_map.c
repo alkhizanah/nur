@@ -37,9 +37,11 @@ ObjString *vm_find_string(Vm *vm, const char *key, uint32_t count,
     for (;;) {
         ObjMapEntry *entry = &vm->strings->entries[index];
 
-        if (entry->key == NULL && IS_NULL(entry->value)) {
-            return NULL;
-        } else if (entry->key->count == count && entry->key->hash == hash &&
+        if (entry->key == NULL) {
+            if (IS_NULL(entry->value)) {
+                return NULL;
+            }
+        } else if (entry->key->hash == hash && entry->key->count == count &&
                    memcmp(entry->key->items, key, count) == 0) {
             return entry->key;
         }
