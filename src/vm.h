@@ -261,7 +261,7 @@ bool vm_map_insert_native_by_cstr(Vm *vm, ObjMap *map, const char *key,
                                   NativeFn call);
 void vm_map_insert_builtins(Vm *vm, ObjMap *globals);
 bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value);
-bool vm_map_remove(ObjMap *map, ObjString *key);
+bool vm_map_delete(ObjMap *map, ObjString *key);
 
 static inline void vm_push(Vm *vm, Value value) {
     *vm->sp = value;

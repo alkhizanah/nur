@@ -206,12 +206,12 @@ void vm_free_value(Vm *vm, Value value) {
     }
 }
 
-static void vm_remove_white_strings(Vm *vm) {
+static void vm_delete_white_strings(Vm *vm) {
     for (uint32_t i = 0; i < vm->strings->capacity; i++) {
         ObjMapEntry *entry = &vm->strings->entries[i];
 
         if (entry->key != NULL && !entry->key->obj.marked) {
-            vm_map_remove(vm->strings, entry->key);
+            vm_map_delete(vm->strings, entry->key);
         }
     }
 }
@@ -243,7 +243,7 @@ static void vm_sweep_objects(Vm *vm) {
 
 void vm_gc(Vm *vm) {
     vm_mark_roots(vm);
-    vm_remove_white_strings(vm);
+    vm_delete_white_strings(vm);
     vm_sweep_objects(vm);
 
     vm->next_gc = vm->bytes_allocated * VM_GC_GROW_FACTOR;

@@ -66,23 +66,6 @@ bool vm_map_lookup(const ObjMap *map, ObjString *key, Value *value) {
     return true;
 }
 
-bool vm_map_remove(ObjMap *map, ObjString *key) {
-    if (map->count == 0) {
-        return false;
-    }
-
-    ObjMapEntry *entry = vm_map_find_entry(map->entries, map->capacity, key);
-
-    if (entry->key == NULL) {
-        return false;
-    }
-
-    entry->key = NULL;
-    entry->value = BOOL_VAL(true);
-
-    return true;
-}
-
 void vm_map_adjust_capacity(Vm *vm, ObjMap *map, uint32_t capacity) {
     vm->bytes_allocated += capacity * sizeof(ObjMapEntry);
 
@@ -155,6 +138,8 @@ bool vm_map_delete(ObjMap *map, ObjString *key) {
 
     entry->key = NULL;
     entry->value = BOOL_VAL(true);
+
+    map->count--;
 
     return true;
 }
