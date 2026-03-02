@@ -43,3 +43,5 @@ typedef struct Compiler {
 bool compile_stmt(Compiler *compiler, AstNodeIdx);
 bool compile_expr(Compiler *compiler, AstNodeIdx);
 bool compile_block(Compiler *compiler, AstNode);
+
+void chunk_optimize(Chunk *old_chunk);

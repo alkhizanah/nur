@@ -34,7 +34,8 @@ bool objects_equal(Obj *a, Obj *b) {
 
     switch (a->tag) {
     case OBJ_STRING:
-        return false; // a == b must be true if they were equal strings, another benefit of string interning
+        return false; // a == b must be true if they were equal strings, another
+                      // benefit of string interning
 
     case OBJ_FUNCTION:
         if (((ObjFunction *)a)->arity != ((ObjFunction *)b)->arity) {
@@ -356,23 +357,24 @@ size_t chunk_add_constant(Chunk *chunk, Value value) {
     return i;
 }
 
+void chunk_adjust_capacity(Chunk *chunk, size_t new_cap) {
+    chunk->bytes = realloc(chunk->bytes, sizeof(*chunk->bytes) * new_cap);
+
+    chunk->sources = realloc(chunk->sources, sizeof(*chunk->sources) * new_cap);
+
+    if (chunk->bytes == NULL || chunk->sources == NULL) {
+        fprintf(stderr, "error: out of memory\n");
+
+        exit(1);
+    }
+
+    chunk->capacity = new_cap;
+}
+
 size_t chunk_add_byte(Chunk *chunk, uint8_t byte, uint32_t source) {
     if (chunk->count + 1 > chunk->capacity) {
-        size_t new_cap =
-            chunk->capacity ? chunk->capacity * 2 : ARRAY_INIT_CAPACITY;
-
-        chunk->bytes = realloc(chunk->bytes, sizeof(*chunk->bytes) * new_cap);
-
-        chunk->sources =
-            realloc(chunk->sources, sizeof(*chunk->sources) * new_cap);
-
-        if (chunk->bytes == NULL || chunk->sources == NULL) {
-            fprintf(stderr, "error: out of memory\n");
-
-            exit(1);
-        }
-
-        chunk->capacity = new_cap;
+        chunk_adjust_capacity(chunk, chunk->capacity ? chunk->capacity * 2
+                                                     : ARRAY_INIT_CAPACITY);
     }
 
     chunk->bytes[chunk->count] = byte;

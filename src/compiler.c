@@ -38,9 +38,7 @@ bool compile_block(Compiler *compiler, AstNode block) {
         }
     }
 
-    uint32_t amount_of_new_locals = compiler->locals_count - prev_locals_count;
-
-    for (uint32_t i = 0; i < amount_of_new_locals; i++) {
+    for (uint32_t i = prev_locals_count; i < compiler->locals_count; i++) {
         Local local = compiler->locals[i];
 
         if (local.is_captured) {
@@ -92,10 +90,6 @@ static bool compiler_find_local(Compiler *compiler, const char *name,
 
         if (local.name_len != name_len) {
             continue;
-        }
-
-        if (local.name == name) {
-            return true;
         }
 
         if (memcmp(local.name, name, name_len) == 0) {
@@ -290,7 +284,8 @@ static bool compile_function(Compiler *compiler, AstNode node,
     fn->upvalues_count = fc.upvalues_count;
 
     chunk_add_byte(compiler->chunk, OP_MAKE_CLOSURE, source);
-    compiler_emit_constant(compiler, OBJ_VAL(frame->closure->fn), source);
+
+    compiler_emit_constant(compiler, OBJ_VAL(fn), source);
 
     for (uint8_t i = 0; i < fc.upvalues_count; i++) {
         chunk_add_byte(compiler->chunk, fc.upvalues[i].is_local, source);
@@ -646,7 +641,7 @@ static bool node_is_int(AstNode n, int64_t *out) {
         return false;
     }
 
-    uint64_t v = (uint64_t)n.lhs << 32 | n.rhs;
+    uint64_t v = ((uint64_t)n.lhs << 32) | n.rhs;
     *out = (int64_t)v;
 
     return true;
@@ -657,8 +652,8 @@ static bool node_is_float(AstNode n, double *out) {
         return false;
     }
 
-    uint64_t v = (uint64_t)n.lhs << 32 | n.rhs;
-    memcpy(out, &v, sizeof(double));
+    uint64_t v = ((uint64_t)n.lhs << 32) | n.rhs;
+    memcpy(out, &v, sizeof(v));
 
     return true;
 }
@@ -1019,4 +1014,147 @@ bool compile_expr(Compiler *compiler, AstNodeIdx node_idx) {
     default:
         return false;
     }
+}
+
+void chunk_optimize(Chunk *old_chunk) {
+    size_t ip = 0;
+
+    Chunk new_chunk = {.file_path = old_chunk->file_path,
+                       .file_content = old_chunk->file_content,
+                       .constants = old_chunk->constants};
+
+    chunk_adjust_capacity(&new_chunk, old_chunk->capacity);
+
+    bool skip_pop = false;
+
+    while (ip < old_chunk->count) {
+        uint32_t source = old_chunk->sources[ip];
+        OpCode opcode = old_chunk->bytes[ip++];
+
+        switch (opcode) {
+        case OP_DUP:
+            if (old_chunk->bytes[ip] == OP_POP) {
+                skip_pop = true;
+            } else {
+                chunk_add_byte(&new_chunk, OP_DUP, source);
+            }
+
+            break;
+
+        case OP_POP:
+            if (skip_pop) {
+                skip_pop = false;
+            } else {
+                chunk_add_byte(&new_chunk, OP_POP, source);
+            }
+
+            break;
+
+        case OP_SWP:
+        case OP_PUSH_NULL:
+        case OP_PUSH_TRUE:
+        case OP_PUSH_FALSE:
+        case OP_GET_SUBSCRIPT:
+        case OP_SET_SUBSCRIPT:
+        case OP_EQL:
+        case OP_NEQ:
+        case OP_NOT:
+        case OP_NEG:
+        case OP_ADD:
+        case OP_SUB:
+        case OP_MUL:
+        case OP_DIV:
+        case OP_MOD:
+        case OP_POW:
+        case OP_LT:
+        case OP_GT:
+        case OP_LTE:
+        case OP_GTE:
+        case OP_COPY_BY_SLICING:
+        case OP_MAKE_SLICE:
+        case OP_CLOSE_UPVALUE:
+        case OP_MAKE_SLICE_UNDER:
+        case OP_MAKE_SLICE_ABOVE:
+        case OP_RETURN:
+            chunk_add_byte(&new_chunk, opcode, source);
+            break;
+
+        case OP_GET_LOCAL:
+        case OP_SET_LOCAL:
+        case OP_GET_UPVALUE:
+        case OP_SET_UPVALUE:
+        case OP_CALL:
+            chunk_add_byte(&new_chunk, opcode, source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            break;
+
+        case OP_POP_JUMP_IF_FALSE:
+        case OP_JUMP:
+        case OP_LOOP:
+        case OP_PUSH_CONST:
+        case OP_GET_GLOBAL:
+        case OP_SET_GLOBAL: {
+            chunk_add_byte(&new_chunk, opcode, source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            break;
+        }
+
+        case OP_MAKE_ARRAY: {
+            chunk_add_byte(&new_chunk, OP_MAKE_ARRAY, source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            break;
+        }
+
+        case OP_MAKE_MAP: {
+            chunk_add_byte(&new_chunk, OP_MAKE_MAP, source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            break;
+        }
+
+        case OP_MAKE_CLOSURE: {
+            chunk_add_byte(&new_chunk, OP_MAKE_CLOSURE, source);
+
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+
+            uint16_t index = ((uint16_t)old_chunk->bytes[ip - 2] << 8) |
+                             old_chunk->bytes[ip - 1];
+
+            ObjFunction *fn = AS_FUNCTION(old_chunk->constants.items[index]);
+
+            for (int i = 0; i < fn->upvalues_count; i++) {
+                chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+                chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            }
+
+            break;
+        }
+
+        default:
+            assert(false && "UNREACHABLE");
+            break;
+        }
+    }
+
+    free(old_chunk->bytes);
+    free(old_chunk->sources);
+
+    for (size_t i = 0; i < new_chunk.constants.count; i++) {
+        Value constant = new_chunk.constants.items[i];
+
+        if (IS_FUNCTION(constant)) {
+            ObjFunction *fn = AS_FUNCTION(constant);
+
+            chunk_optimize(&fn->chunk);
+        }
+    }
+
+    *old_chunk = new_chunk;
 }

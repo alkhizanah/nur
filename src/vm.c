@@ -91,6 +91,8 @@ bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
         return false;
     }
 
+    chunk_optimize(compiler.chunk);
+
     free(parser.ast.nodes.items);
     free(parser.ast.nodes.sources);
     free(parser.ast.extra.items);

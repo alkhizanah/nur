@@ -131,6 +131,7 @@ typedef struct {
 } Chunk;
 
 size_t chunk_add_constant(Chunk *, Value);
+void chunk_adjust_capacity(Chunk *chunk, size_t new_cap);
 size_t chunk_add_byte(Chunk *, uint8_t byte, uint32_t source);
 
 typedef struct {
