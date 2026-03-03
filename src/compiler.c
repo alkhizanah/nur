@@ -399,10 +399,6 @@ static bool compile_member(Compiler *compiler, AstNode node, uint32_t source) {
 
 static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
                            bool has_op, OpCode op) {
-    if (!compile_expr(compiler, node.rhs)) {
-        return false;
-    }
-
     AstNode target = compiler->ast.nodes.items[node.lhs];
 
     if (target.tag == NODE_IDENTIFIER) {
@@ -411,111 +407,87 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
 
         uint32_t index;
 
+        if (!compile_expr(compiler, node.rhs))
+            return false;
+
         if (compiler_find_local(compiler, name, name_len, &index)) {
             if (has_op) {
-                chunk_add_byte(compiler->chunk, OP_GET_LOCAL, source);
-                chunk_add_byte(compiler->chunk, index, source);
-
-                chunk_add_byte(compiler->chunk, OP_SWP, source);
-
+                chunk_add_byte(compiler->chunk, OP_SET_LOCAL_WITH_MATH, source);
                 chunk_add_byte(compiler->chunk, op, source);
+            } else {
+                chunk_add_byte(compiler->chunk, OP_SET_LOCAL, source);
             }
 
-            chunk_add_byte(compiler->chunk, OP_SET_LOCAL, source);
             chunk_add_byte(compiler->chunk, index, source);
-        } else if (compiler_find_upvalue(compiler, name, name_len, &index)) {
+
+            return true;
+        }
+
+        if (compiler_find_upvalue(compiler, name, name_len, &index)) {
             if (has_op) {
-                chunk_add_byte(compiler->chunk, OP_GET_UPVALUE, source);
-                chunk_add_byte(compiler->chunk, index, source);
-
-                chunk_add_byte(compiler->chunk, OP_SWP, source);
-
+                chunk_add_byte(compiler->chunk, OP_SET_UPVALUE_WITH_MATH,
+                               source);
                 chunk_add_byte(compiler->chunk, op, source);
+            } else {
+                chunk_add_byte(compiler->chunk, OP_SET_UPVALUE, source);
             }
 
-            chunk_add_byte(compiler->chunk, OP_SET_UPVALUE, source);
             chunk_add_byte(compiler->chunk, index, source);
-        } else if (has_op) {
-            ObjString *key = vm_copy_string(compiler->vm, name, name_len);
 
-            uint16_t c = chunk_add_constant(compiler->chunk, OBJ_VAL(key));
-
-            chunk_add_byte(compiler->chunk, OP_GET_GLOBAL, source);
-            compiler_emit_short(compiler, c, source);
-
-            chunk_add_byte(compiler->chunk, OP_SWP, source);
-
-            chunk_add_byte(compiler->chunk, op, source);
-
-            chunk_add_byte(compiler->chunk, OP_SET_GLOBAL, source);
-            compiler_emit_short(compiler, c, source);
-        } else if (compiler->parent != NULL) {
-            chunk_add_byte(compiler->chunk, OP_DUP, source);
-
-            if (!compiler_add_local(compiler, name, name_len)) {
-                compiler_error(
-                    compiler, source,
-                    "using %d local variables exceeds the limit of %d\n",
-                    (int)compiler->locals_count + 1, UINT8_MAX);
-
-                return false;
-            }
-        } else {
-            ObjString *key = vm_copy_string(compiler->vm, name, name_len);
-
-            chunk_add_byte(compiler->chunk, OP_SET_GLOBAL, source);
-            compiler_emit_constant(compiler, OBJ_VAL(key), source);
+            return true;
         }
-    } else if (target.tag == NODE_SUBSCRIPT) {
+
+        if (compiler->parent == NULL) {
+            if (has_op) {
+                chunk_add_byte(compiler->chunk, OP_SET_GLOBAL_WITH_MATH,
+                               source);
+                chunk_add_byte(compiler->chunk, op, source);
+            } else {
+                chunk_add_byte(compiler->chunk, OP_SET_GLOBAL, source);
+            }
+
+            compiler_emit_constant(
+                compiler, OBJ_VAL(vm_copy_string(compiler->vm, name, name_len)),
+                source);
+
+            return true;
+        }
+
+        chunk_add_byte(compiler->chunk, OP_DUP, source);
+
+        compiler_add_local(compiler, name, name_len);
+
+        return true;
+    }
+
+    if (target.tag == NODE_SUBSCRIPT) {
+        if (!compile_expr(compiler, node.rhs))
+            return false;
+
+        if (!compile_expr(compiler, target.rhs))
+            return false;
+
+        if (!compile_expr(compiler, target.lhs))
+            return false;
+
         if (has_op) {
-            if (!compile_expr(compiler, target.rhs)) {
-                return false;
-            }
-
-            if (!compile_expr(compiler, target.lhs)) {
-                return false;
-            }
-
-            chunk_add_byte(compiler->chunk, OP_GET_SUBSCRIPT, source);
-
-            chunk_add_byte(compiler->chunk, OP_SWP, source);
-
+            chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT_WITH_MATH, source);
             chunk_add_byte(compiler->chunk, op, source);
+        } else {
+            chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT, source);
         }
 
-        if (!compile_expr(compiler, target.rhs)) {
+        return true;
+    }
+
+    if (target.tag == NODE_MEMBER) {
+        if (!compile_expr(compiler, node.rhs))
             return false;
-        }
 
-        if (!compile_expr(compiler, target.lhs)) {
-            return false;
-        }
-
-        chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT, source);
-
-    } else if (target.tag == NODE_MEMBER) {
         AstNode identifier = compiler->ast.nodes.items[target.rhs];
 
         const char *key = compiler->file_buffer + identifier.lhs;
         uint32_t key_len = identifier.rhs - identifier.lhs;
-
-        if (has_op) {
-            chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
-
-            compiler_emit_constant(
-                compiler, OBJ_VAL(vm_copy_string(compiler->vm, key, key_len)),
-                source);
-
-            if (!compile_expr(compiler, target.lhs)) {
-                return false;
-            }
-
-            chunk_add_byte(compiler->chunk, OP_GET_SUBSCRIPT, source);
-
-            chunk_add_byte(compiler->chunk, OP_SWP, source);
-
-            chunk_add_byte(compiler->chunk, op, source);
-        }
 
         chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
 
@@ -523,22 +495,22 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
             compiler, OBJ_VAL(vm_copy_string(compiler->vm, key, key_len)),
             source);
 
-        if (!compile_expr(compiler, target.lhs)) {
+        if (!compile_expr(compiler, target.lhs))
             return false;
+
+        if (has_op) {
+            chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT_WITH_MATH, source);
+            chunk_add_byte(compiler->chunk, op, source);
+        } else {
+            chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT, source);
         }
 
-        chunk_add_byte(compiler->chunk, OP_SET_SUBSCRIPT, source);
-    } else {
-        compiler_error(
-            compiler, source,
-            "target of an assignment can either be an identifier or "
-            "a subscript (i.e `a[b]`) or a member access (i.e `a.b`), "
-            "other things are not allowed to be assigned to");
-
-        return false;
+        return true;
     }
 
-    return true;
+    compiler_error(compiler, source, "invalid assignment target");
+
+    return false;
 }
 
 static uint32_t compiler_emit_jump(Compiler *compiler, OpCode opcode,
@@ -1025,31 +997,26 @@ void chunk_optimize(Chunk *old_chunk) {
 
     chunk_adjust_capacity(&new_chunk, old_chunk->capacity);
 
-    bool skip_pop = false;
+    OpCode previous = UINT8_MAX;
+    OpCode opcode = UINT8_MAX;
 
     while (ip < old_chunk->count) {
+        previous = opcode;
+        opcode = old_chunk->bytes[ip++];
+
         uint32_t source = old_chunk->sources[ip];
-        OpCode opcode = old_chunk->bytes[ip++];
 
         switch (opcode) {
-        case OP_DUP:
-            if (old_chunk->bytes[ip] == OP_POP) {
-                skip_pop = true;
-            } else {
-                chunk_add_byte(&new_chunk, OP_DUP, source);
-            }
-
-            break;
-
         case OP_POP:
-            if (skip_pop) {
-                skip_pop = false;
+            if (previous == OP_DUP) {
+                new_chunk.count--;
             } else {
                 chunk_add_byte(&new_chunk, OP_POP, source);
             }
 
             break;
 
+        case OP_DUP:
         case OP_SWP:
         case OP_PUSH_NULL:
         case OP_PUSH_TRUE:
@@ -1084,6 +1051,7 @@ void chunk_optimize(Chunk *old_chunk) {
         case OP_GET_UPVALUE:
         case OP_SET_UPVALUE:
         case OP_CALL:
+        case OP_SET_SUBSCRIPT_WITH_MATH:
             chunk_add_byte(&new_chunk, opcode, source);
             chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
             break;
@@ -1093,8 +1061,18 @@ void chunk_optimize(Chunk *old_chunk) {
         case OP_LOOP:
         case OP_PUSH_CONST:
         case OP_GET_GLOBAL:
-        case OP_SET_GLOBAL: {
+        case OP_SET_GLOBAL:
+        case OP_SET_LOCAL_WITH_MATH:
+        case OP_SET_UPVALUE_WITH_MATH: {
             chunk_add_byte(&new_chunk, opcode, source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
+            break;
+        }
+
+        case OP_SET_GLOBAL_WITH_MATH: {
+            chunk_add_byte(&new_chunk, opcode, source);
+            chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
             chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
             chunk_add_byte(&new_chunk, old_chunk->bytes[ip++], source);
             break;
@@ -1138,6 +1116,7 @@ void chunk_optimize(Chunk *old_chunk) {
         }
 
         default:
+            printf("UNHANDLED OPCODE: %d\n", (int)opcode);
             assert(false && "UNREACHABLE");
             break;
         }

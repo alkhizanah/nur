@@ -11,262 +11,296 @@
 #include "parser.h"
 #include "vm.h"
 
+static void disassemble_op(Chunk chunk, size_t *ip) {
+    OpCode opcode = chunk.bytes[(*ip)++];
+
+    switch (opcode) {
+    case OP_POP:
+        printf("POP");
+        break;
+
+    case OP_DUP:
+        printf("DUP");
+        break;
+
+    case OP_SWP:
+        printf("SWP");
+        break;
+
+    case OP_PUSH_NULL:
+        printf("PUSH_NULL");
+        break;
+
+    case OP_PUSH_TRUE:
+        printf("PUSH_TRUE");
+        break;
+
+    case OP_PUSH_FALSE:
+        printf("PUSH_FALSE");
+        break;
+
+    case OP_PUSH_CONST: {
+        uint16_t index = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                        chunk.bytes[*ip - 1]);
+
+        printf("PUSH_CONST %d (", (int)index);
+
+        value_display(chunk.constants.items[index]);
+
+        printf(")");
+
+        break;
+    }
+
+    case OP_MAKE_CLOSURE: {
+        uint16_t index = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                        chunk.bytes[*ip - 1]);
+
+        printf("MAKE_CLOSURE %d (<function>)", (int)index);
+
+        ObjFunction *function = AS_FUNCTION(chunk.constants.items[index]);
+
+        for (int i = 0; i < function->upvalues_count; i++) {
+            int isLocal = chunk.bytes[(*ip)++];
+            int index = chunk.bytes[(*ip)++];
+
+            printf("\n%04zu\t|\t\t%s %d", *ip - 2,
+                   isLocal ? "local" : "upvalue", index);
+        }
+
+        break;
+    }
+
+    case OP_GET_LOCAL:
+        printf("GET_LOCAL %d", (int)chunk.bytes[(*ip)++]);
+        break;
+
+    case OP_SET_LOCAL:
+        printf("SET_LOCAL %d", (int)chunk.bytes[(*ip)++]);
+        break;
+
+    case OP_SET_LOCAL_WITH_MATH:
+        printf("SET_LOCAL_WITH_MATH (");
+        disassemble_op(chunk, ip);
+        printf(") %d", (int)chunk.bytes[(*ip)++]);
+        break;
+
+    case OP_GET_UPVALUE:
+        printf("GET_UPVALUE %d", (int)chunk.bytes[(*ip)++]);
+        break;
+
+    case OP_SET_UPVALUE:
+        printf("SET_UPVALUE %d", (int)chunk.bytes[(*ip)++]);
+        break;
+
+    case OP_SET_UPVALUE_WITH_MATH:
+        printf("SET_UPVALUE_WITH_MATH (");
+        disassemble_op(chunk, ip);
+        printf(") %d", (int)chunk.bytes[(*ip)++]);
+        break;
+
+    case OP_CLOSE_UPVALUE:
+        printf("CLOSE_UPVALUE");
+        break;
+
+    case OP_GET_GLOBAL: {
+        uint16_t index = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                        chunk.bytes[*ip - 1]);
+
+        printf("GET_GLOBAL ");
+
+        value_display(chunk.constants.items[index]);
+
+        break;
+    }
+
+    case OP_SET_GLOBAL: {
+        uint16_t index = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                        chunk.bytes[*ip - 1]);
+
+        printf("SET_GLOBAL ");
+
+        value_display(chunk.constants.items[index]);
+
+        break;
+    }
+
+    case OP_SET_GLOBAL_WITH_MATH: {
+        printf("SET_GLOBAL_WITH_MATH (");
+
+        disassemble_op(chunk, ip);
+
+        printf(") ");
+
+        uint16_t index = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                        chunk.bytes[*ip - 1]);
+
+        value_display(chunk.constants.items[index]);
+
+        break;
+    }
+
+    case OP_GET_SUBSCRIPT:
+        printf("GET_SUBSCRIPT");
+        break;
+
+    case OP_SET_SUBSCRIPT:
+        printf("SET_SUBSCRIPT");
+        break;
+
+    case OP_SET_SUBSCRIPT_WITH_MATH:
+        printf("SET_SUBSCRIPT_WITH_MATH (");
+        disassemble_op(chunk, ip);
+        printf(")");
+        break;
+
+    case OP_EQL:
+        printf("EQL");
+        break;
+
+    case OP_NEQ:
+        printf("NEQ");
+        break;
+
+    case OP_NOT:
+        printf("NOT");
+        break;
+
+    case OP_NEG:
+        printf("NEG");
+        break;
+
+    case OP_ADD:
+        printf("ADD");
+        break;
+
+    case OP_SUB:
+        printf("SUB");
+        break;
+
+    case OP_MUL:
+        printf("MUL");
+        break;
+
+    case OP_DIV:
+        printf("DIV");
+        break;
+
+    case OP_MOD:
+        printf("MOD");
+        break;
+
+    case OP_POW:
+        printf("POW");
+
+        break;
+
+    case OP_LT:
+        printf("LT");
+        break;
+
+    case OP_GT:
+        printf("GT");
+        break;
+
+    case OP_LTE:
+        printf("LTE");
+        break;
+
+    case OP_GTE:
+        printf("GTE");
+        break;
+
+    case OP_COPY_BY_SLICING:
+        printf("COPY_BY_SLICING");
+        break;
+
+    case OP_MAKE_SLICE:
+        printf("MAKE_SLICE");
+        break;
+
+    case OP_MAKE_SLICE_UNDER:
+        printf("MAKE_SLICE_UNDER");
+        break;
+
+    case OP_MAKE_SLICE_ABOVE:
+        printf("MAKE_SLICE_ABOVE");
+        break;
+
+    case OP_MAKE_ARRAY: {
+        uint32_t count = (*ip += 4, ((uint16_t)chunk.bytes[*ip - 4] << 24) |
+                                        ((uint16_t)chunk.bytes[*ip - 3] << 16) |
+                                        ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                        chunk.bytes[*ip - 1]);
+
+        printf("MAKE_ARRAY %d", (int)count);
+
+        break;
+    }
+
+    case OP_MAKE_MAP: {
+        uint32_t count = (*ip += 4, ((uint16_t)chunk.bytes[*ip - 4] << 24) |
+                                        ((uint16_t)chunk.bytes[*ip - 3] << 16) |
+                                        ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                        chunk.bytes[*ip - 1]);
+
+        printf("MAKE_MAP %d", (int)count);
+
+        break;
+    }
+
+    case OP_CALL:
+        printf("CALL %d", (int)chunk.bytes[(*ip)++]);
+        break;
+
+    case OP_POP_JUMP_IF_FALSE: {
+        uint16_t offset = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                         chunk.bytes[*ip - 1]);
+
+        printf("POP_JUMP_IF_FALSE TO %zu", *ip + offset);
+
+        break;
+    }
+
+    case OP_JUMP_IF_FALSE: {
+        uint16_t offset = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                         chunk.bytes[*ip - 1]);
+
+        printf("JUMP_IF_FALSE TO %zu", *ip + offset);
+
+        break;
+    }
+
+    case OP_JUMP: {
+        uint16_t offset = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                         chunk.bytes[*ip - 1]);
+
+        printf("JUMP TO %zu", *ip + offset);
+
+        break;
+    }
+
+    case OP_LOOP: {
+        uint16_t offset = (*ip += 2, ((uint16_t)chunk.bytes[*ip - 2] << 8) |
+                                         chunk.bytes[*ip - 1]);
+
+        printf("LOOP TO %zu", *ip - offset);
+
+        break;
+    }
+
+    case OP_RETURN:
+        printf("RETURN");
+        break;
+    }
+}
+
 static void disassemble(Chunk chunk) {
     size_t ip = 0;
 
     for (; ip < chunk.count; printf("\n")) {
         printf("%04zu\t", ip);
-
-        OpCode opcode = chunk.bytes[ip++];
-
-        switch (opcode) {
-        case OP_POP:
-            printf("POP");
-            break;
-
-        case OP_DUP:
-            printf("DUP");
-            break;
-
-        case OP_SWP:
-            printf("SWP");
-            break;
-
-        case OP_PUSH_NULL:
-            printf("PUSH_NULL");
-            break;
-
-        case OP_PUSH_TRUE:
-            printf("PUSH_TRUE");
-            break;
-
-        case OP_PUSH_FALSE:
-            printf("PUSH_FALSE");
-            break;
-
-        case OP_PUSH_CONST: {
-            uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                           chunk.bytes[ip - 1]);
-
-            printf("PUSH_CONST %d (", (int)index);
-
-            value_display(chunk.constants.items[index]);
-
-            printf(")");
-
-            break;
-        }
-
-        case OP_MAKE_CLOSURE: {
-            uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                           chunk.bytes[ip - 1]);
-
-            printf("MAKE_CLOSURE %d (<function>)", (int)index);
-
-            ObjFunction *function = AS_FUNCTION(chunk.constants.items[index]);
-
-            for (int i = 0; i < function->upvalues_count; i++) {
-                int isLocal = chunk.bytes[ip++];
-                int index = chunk.bytes[ip++];
-
-                printf("\n%04zu\t|\t\t%s %d", ip - 2,
-                       isLocal ? "local" : "upvalue", index);
-            }
-
-            break;
-        }
-
-        case OP_GET_LOCAL:
-            printf("GET_LOCAL %d", (int)chunk.bytes[ip++]);
-            break;
-
-        case OP_SET_LOCAL:
-            printf("SET_LOCAL %d", (int)chunk.bytes[ip++]);
-            break;
-
-        case OP_GET_UPVALUE:
-            printf("GET_UPVALUE %d", (int)chunk.bytes[ip++]);
-            break;
-
-        case OP_SET_UPVALUE:
-            printf("SET_UPVALUE %d", (int)chunk.bytes[ip++]);
-            break;
-
-        case OP_CLOSE_UPVALUE:
-            printf("CLOSE_UPVALUE");
-            break;
-
-        case OP_GET_GLOBAL: {
-            uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                           chunk.bytes[ip - 1]);
-
-            printf("GET_GLOBAL ");
-
-            value_display(chunk.constants.items[index]);
-
-            break;
-        }
-
-        case OP_SET_GLOBAL: {
-            uint16_t index = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                           chunk.bytes[ip - 1]);
-
-            printf("SET_GLOBAL ");
-
-            value_display(chunk.constants.items[index]);
-
-            break;
-        }
-
-        case OP_GET_SUBSCRIPT:
-            printf("GET_SUBSCRIPT");
-            break;
-
-        case OP_SET_SUBSCRIPT:
-            printf("SET_SUBSCRIPT");
-            break;
-
-        case OP_EQL:
-            printf("EQL");
-            break;
-
-        case OP_NEQ:
-            printf("NEQ");
-            break;
-
-        case OP_NOT:
-            printf("NOT");
-            break;
-
-        case OP_NEG:
-            printf("NEG");
-            break;
-
-        case OP_ADD:
-            printf("ADD");
-            break;
-
-        case OP_SUB:
-            printf("SUB");
-            break;
-
-        case OP_MUL:
-            printf("MUL");
-            break;
-
-        case OP_DIV:
-            printf("DIV");
-            break;
-
-        case OP_MOD:
-            printf("MOD");
-            break;
-
-        case OP_POW:
-            printf("POW");
-
-            break;
-
-        case OP_LT:
-            printf("LT");
-            break;
-
-        case OP_GT:
-            printf("GT");
-            break;
-
-        case OP_LTE:
-            printf("LTE");
-            break;
-
-        case OP_GTE:
-            printf("GTE");
-            break;
-
-        case OP_COPY_BY_SLICING:
-            printf("COPY_BY_SLICING");
-            break;
-
-        case OP_MAKE_SLICE:
-            printf("MAKE_SLICE");
-            break;
-
-        case OP_MAKE_SLICE_UNDER:
-            printf("MAKE_SLICE_UNDER");
-            break;
-
-        case OP_MAKE_SLICE_ABOVE:
-            printf("MAKE_SLICE_ABOVE");
-            break;
-
-        case OP_MAKE_ARRAY: {
-            uint32_t count =
-                (ip += 4, ((uint16_t)chunk.bytes[ip - 4] << 24) |
-                              ((uint16_t)chunk.bytes[ip - 3] << 16) |
-                              ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                              chunk.bytes[ip - 1]);
-
-            printf("MAKE_ARRAY %d", (int)count);
-
-            break;
-        }
-
-        case OP_MAKE_MAP: {
-            uint32_t count =
-                (ip += 4, ((uint16_t)chunk.bytes[ip - 4] << 24) |
-                              ((uint16_t)chunk.bytes[ip - 3] << 16) |
-                              ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                              chunk.bytes[ip - 1]);
-
-            printf("MAKE_MAP %d", (int)count);
-
-            break;
-        }
-
-        case OP_CALL:
-            printf("CALL %d", (int)chunk.bytes[ip++]);
-            break;
-
-        case OP_POP_JUMP_IF_FALSE: {
-            uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                            chunk.bytes[ip - 1]);
-
-            printf("POP_JUMP_IF_FALSE TO %zu", ip + offset);
-
-            break;
-        }
-
-        case OP_JUMP_IF_FALSE: {
-            uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                            chunk.bytes[ip - 1]);
-
-            printf("JUMP_IF_FALSE TO %zu", ip + offset);
-
-            break;
-        }
-
-        case OP_JUMP: {
-            uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                            chunk.bytes[ip - 1]);
-
-            printf("JUMP TO %zu", ip + offset);
-
-            break;
-        }
-
-        case OP_LOOP: {
-            uint16_t offset = (ip += 2, ((uint16_t)chunk.bytes[ip - 2] << 8) |
-                                            chunk.bytes[ip - 1]);
-
-            printf("LOOP TO %zu", ip - offset);
-
-            break;
-        }
-
-        case OP_RETURN:
-            printf("RETURN");
-            break;
-        }
+        disassemble_op(chunk, &ip);
     }
 
     for (size_t i = 0; i < chunk.constants.count; i++) {

@@ -616,10 +616,7 @@ VM_CMP_FN(vm_gt, >);
 VM_CMP_FN(vm_lte, <=);
 VM_CMP_FN(vm_gte, >=);
 
-static bool vm_get_subscript(Vm *vm) {
-    Value target = vm_pop(vm);
-    Value index = vm_pop(vm);
-
+static bool vm_get_subscript(Vm *vm, Value target, Value index) {
     if (IS_ARRAY(target)) {
         if (!IS_INT(index)) {
             vm_error(vm, "cannot access an array with %s value",
@@ -719,10 +716,7 @@ static bool vm_get_subscript(Vm *vm) {
     return true;
 }
 
-static bool vm_set_subscript(Vm *vm) {
-    Value target = vm_pop(vm);
-    Value index = vm_pop(vm);
-
+static bool vm_set_subscript(Vm *vm, Value target, Value index) {
     if (IS_ARRAY(target)) {
         if (!IS_INT(index)) {
             vm_error(vm, "cannot access an array with %s value",
@@ -1091,6 +1085,63 @@ static bool vm_make_slice_above(Vm *vm) {
     return true;
 }
 
+static bool vm_execute_math(Vm *vm, OpCode op) {
+    switch (op) {
+    case OP_ADD: {
+        if (!vm_add(vm)) {
+            return false;
+        }
+
+        break;
+    }
+
+    case OP_SUB: {
+        if (!vm_sub(vm)) {
+            return false;
+        }
+
+        break;
+    }
+
+    case OP_MUL: {
+        if (!vm_mul(vm)) {
+            return false;
+        }
+
+        break;
+    }
+
+    case OP_DIV: {
+        if (!vm_div(vm)) {
+            return false;
+        }
+
+        break;
+    }
+
+    case OP_MOD: {
+        if (!vm_mod(vm)) {
+            return false;
+        }
+
+        break;
+    }
+
+    case OP_POW: {
+        if (!vm_pow(vm)) {
+            return false;
+        }
+
+        break;
+    }
+
+    default:
+        assert(false && "UNREACHABLE");
+    }
+
+    return true;
+}
+
 bool vm_run(Vm *vm, Value *result) {
     CallFrame *frame = &vm->frames[vm->frame_count - 1];
 
@@ -1160,6 +1211,22 @@ bool vm_run(Vm *vm, Value *result) {
                 vmbreak();
             }
 
+            vmcase(OP_SET_LOCAL_WITH_MATH) {
+                OpCode op = READ_BYTE();
+                uint8_t index = READ_BYTE();
+
+                Value rhs = vm_pop(vm);
+                Value lhs = frame->slots[index];
+
+                vm_push(vm, lhs);
+                vm_push(vm, rhs);
+
+                vm_execute_math(vm, op);
+
+                frame->slots[index] = vm_peek(vm, 0);
+                vmbreak();
+            }
+
             vmcase(OP_GET_UPVALUE) {
                 vm_push(vm, *frame->closure->upvalues[READ_BYTE()]->location);
                 vmbreak();
@@ -1168,6 +1235,23 @@ bool vm_run(Vm *vm, Value *result) {
             vmcase(OP_SET_UPVALUE) {
                 *frame->closure->upvalues[READ_BYTE()]->location =
                     vm_peek(vm, 0);
+                vmbreak();
+            }
+
+            vmcase(OP_SET_UPVALUE_WITH_MATH) {
+                OpCode op = READ_BYTE();
+                uint8_t index = READ_BYTE();
+
+                Value rhs = vm_pop(vm);
+                Value lhs = frame->slots[index];
+
+                vm_push(vm, lhs);
+                vm_push(vm, rhs);
+
+                vm_execute_math(vm, op);
+
+                *frame->closure->upvalues[index]->location = vm_peek(vm, 0);
+
                 vmbreak();
             }
 
@@ -1199,11 +1283,42 @@ bool vm_run(Vm *vm, Value *result) {
             vmcase(OP_SET_GLOBAL) {
                 vm_map_insert(vm, frame->closure->fn->globals, READ_STRING(),
                               vm_peek(vm, 0));
+
+                vmbreak();
+            }
+
+            vmcase(OP_SET_GLOBAL_WITH_MATH) {
+                OpCode op = READ_BYTE();
+                ObjString *key = READ_STRING();
+
+                Value rhs = vm_pop(vm);
+                Value lhs;
+
+                if (!vm_map_lookup(frame->closure->fn->globals, key, &lhs)) {
+                    vm_error(vm,
+                             "'%.*s' is not "
+                             "defined",
+                             (int)key->count, key->items);
+
+                    return false;
+                }
+
+                vm_push(vm, lhs);
+                vm_push(vm, rhs);
+
+                vm_execute_math(vm, op);
+
+                vm_map_insert(vm, frame->closure->fn->globals, key,
+                              vm_peek(vm, 0));
+
                 vmbreak();
             }
 
             vmcase(OP_GET_SUBSCRIPT) {
-                if (!vm_get_subscript(vm)) {
+                Value target = vm_pop(vm);
+                Value index = vm_pop(vm);
+
+                if (!vm_get_subscript(vm, target, index)) {
                     return false;
                 }
 
@@ -1211,7 +1326,34 @@ bool vm_run(Vm *vm, Value *result) {
             }
 
             vmcase(OP_SET_SUBSCRIPT) {
-                if (!vm_set_subscript(vm)) {
+                Value target = vm_pop(vm);
+                Value index = vm_pop(vm);
+
+                if (!vm_set_subscript(vm, target, index)) {
+                    return false;
+                }
+
+                vmbreak();
+            }
+
+            vmcase(OP_SET_SUBSCRIPT_WITH_MATH) {
+                OpCode op = READ_BYTE();
+
+                Value target = vm_pop(vm);
+                Value index = vm_pop(vm);
+                Value rhs = vm_pop(vm);
+
+                if (!vm_get_subscript(vm, target, index)) {
+                    return false;
+                }
+
+                vm_push(vm, rhs);
+
+                if (!vm_execute_math(vm, op)) {
+                    return false;
+                }
+
+                if (!vm_set_subscript(vm, target, index)) {
                     return false;
                 }
 
