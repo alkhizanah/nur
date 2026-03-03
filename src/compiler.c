@@ -542,7 +542,6 @@ static void compiler_emit_loop(Compiler *compiler, uint32_t source) {
 
 static bool compile_while_loop(Compiler *compiler, AstNode node,
                                uint32_t source) {
-
     Loop prev_loop = compiler->loop;
 
     compiler->loop = (Loop){

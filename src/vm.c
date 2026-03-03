@@ -1243,7 +1243,7 @@ bool vm_run(Vm *vm, Value *result) {
                 uint8_t index = READ_BYTE();
 
                 Value rhs = vm_pop(vm);
-                Value lhs = frame->slots[index];
+                Value lhs = *frame->closure->upvalues[index]->location;
 
                 vm_push(vm, lhs);
                 vm_push(vm, rhs);
@@ -1267,10 +1267,8 @@ bool vm_run(Vm *vm, Value *result) {
                 Value value;
 
                 if (!vm_map_lookup(frame->closure->fn->globals, key, &value)) {
-                    vm_error(vm,
-                             "'%.*s' is not "
-                             "defined",
-                             (int)key->count, key->items);
+                    vm_error(vm, "'%.*s' is not defined", (int)key->count,
+                             key->items);
 
                     return false;
                 }
