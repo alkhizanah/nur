@@ -18,8 +18,6 @@ while true {
         continue
     }
 
-    println(parsed_input)
-
     if parsed_input > secret {
         println("Try again with a number smaller than that")
     } else if parsed_input < secret {
