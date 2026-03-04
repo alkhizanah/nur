@@ -109,43 +109,15 @@ bool vm_load_file(Vm *vm, const char *file_path, const char *file_buffer) {
 static bool vm_neg(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
 
-    switch (rhs.tag) {
-    case VAL_INT:
-        vm_poke(vm, 0, INT_VAL(-AS_INT(rhs)));
+    if (IS_NUM(rhs)) {
+        vm_poke(vm, 0, NUM_VAL(-AS_NUM(rhs)));
 
         return true;
-
-    case VAL_FLT:
-        vm_poke(vm, 0, FLT_VAL(-AS_FLT(rhs)));
-
-        return true;
-
-    default:
-        vm_error(vm, "can not negate %s value", value_description(rhs));
-
-        return false;
     }
-}
 
-static void vm_add_int(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, INT_VAL(ilhs + irhs));
-}
+    vm_error(vm, "can not negate %s value", value_description(rhs));
 
-static void vm_add_flt(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(flhs + frhs));
-}
-
-static void vm_add_int_flt(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(ilhs + frhs));
+    return false;
 }
 
 static ObjString *vm_to_string(Vm *vm, Value value) {
@@ -164,23 +136,13 @@ static bool vm_add(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if (IS_INT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_add_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_add_int_flt(vm, lhs, rhs);
-        }
-
+    if (IS_NUM(lhs) && IS_NUM(rhs)) {
+        vm_pop(vm);
+        vm_poke(vm, 0, NUM_VAL(AS_NUM(lhs) + AS_NUM(rhs)));
         return true;
-    } else if (IS_FLT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_add_int_flt(vm, rhs, lhs);
-        } else if (IS_FLT(rhs)) {
-            vm_add_flt(vm, lhs, rhs);
-        }
+    }
 
-        return true;
-    } else if (IS_STRING(lhs)) {
+    if (IS_STRING(lhs)) {
         ObjString *slhs = AS_STRING(lhs);
         ObjString *srhs = vm_to_string(vm, rhs);
         ObjString *result = vm_concat_strings(vm, slhs, srhs);
@@ -188,7 +150,9 @@ static bool vm_add(Vm *vm) {
         vm_poke(vm, 0, OBJ_VAL(result));
 
         return true;
-    } else if (IS_STRING(rhs)) {
+    }
+
+    if (IS_STRING(rhs)) {
         ObjString *slhs = vm_to_string(vm, lhs);
         ObjString *srhs = AS_STRING(rhs);
         ObjString *result = vm_concat_strings(vm, slhs, srhs);
@@ -196,7 +160,9 @@ static bool vm_add(Vm *vm) {
         vm_poke(vm, 0, OBJ_VAL(result));
 
         return true;
-    } else if (IS_ARRAY(lhs)) {
+    }
+
+    if (IS_ARRAY(lhs)) {
         if (!IS_ARRAY(rhs)) {
             vm_error(vm,
                      "can not add %s value to %s value, did you mean to use "
@@ -213,7 +179,9 @@ static bool vm_add(Vm *vm) {
         vm_poke(vm, 0, OBJ_VAL(result));
 
         return true;
-    } else if (IS_ARRAY(rhs)) {
+    }
+
+    if (IS_ARRAY(rhs)) {
         vm_error(vm,
                  "can not add %s value to %s value, did you mean to use "
                  "`array_push`?",
@@ -228,298 +196,89 @@ static bool vm_add(Vm *vm) {
     return false;
 }
 
-static void vm_sub_int(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, INT_VAL(ilhs - irhs));
-}
-
-static void vm_sub_flt(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(flhs - frhs));
-}
-
-static void vm_sub_int_flt(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(ilhs - frhs));
-}
-
-static void vm_sub_flt_int(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(flhs - irhs));
-}
-
-static bool vm_sub(Vm *vm) {
+static inline bool vm_sub(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if (IS_INT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_sub_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_sub_int_flt(vm, lhs, rhs);
-        }
-
+    if (IS_NUM(lhs) && IS_NUM(rhs)) {
+        vm_pop(vm);
+        vm_poke(vm, 0, NUM_VAL(AS_NUM(lhs) - AS_NUM(rhs)));
         return true;
-    } else if (IS_FLT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_sub_flt_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_sub_flt(vm, lhs, rhs);
-        }
-
-        return true;
-    } else {
-        vm_error(vm, "can not subtract %s value from %s value",
-                 value_description(rhs), value_description(lhs));
-
-        return false;
     }
+
+    vm_error(vm, "can not subtract %s value from %s value",
+             value_description(rhs), value_description(lhs));
+
+    return false;
 }
 
-static void vm_mul_int(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, INT_VAL(ilhs * irhs));
-}
-
-static void vm_mul_flt(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(flhs * frhs));
-}
-
-static void vm_mul_int_flt(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(ilhs * frhs));
-}
-
-static bool vm_mul(Vm *vm) {
+static inline bool vm_mul(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if (IS_INT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_mul_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_mul_int_flt(vm, lhs, rhs);
-        }
-
+    if (IS_NUM(lhs) && IS_NUM(rhs)) {
+        vm_pop(vm);
+        vm_poke(vm, 0, NUM_VAL(AS_NUM(lhs) * AS_NUM(rhs)));
         return true;
-    } else if (IS_FLT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_mul_int_flt(vm, rhs, lhs);
-        } else if (IS_FLT(rhs)) {
-            vm_mul_flt(vm, lhs, rhs);
-        }
-
-        return true;
-    } else {
-        vm_error(vm, "can not multiply %s value with %s value",
-                 value_description(lhs), value_description(rhs));
-
-        return false;
     }
+
+    vm_error(vm, "can not multiply %s value with %s value",
+             value_description(lhs), value_description(rhs));
+
+    return false;
 }
 
-static int64_t rem_euclid(int64_t a, int64_t b) {
-    int64_t r = a % b;
-    return r < 0 ? r + (b < 0 ? -b : b) : r;
-}
-
-static double frem_euclid(double a, double b) {
+static inline double rem_euclid(double a, double b) {
     double r = fmod(a, b);
     return r < 0 ? r + (b < 0 ? -b : b) : r;
 }
 
-static void vm_div_int(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    int64_t irhs = AS_INT(rhs);
-
-    vm_pop(vm);
-
-    if (ilhs % irhs == 0) {
-        vm_poke(vm, 0, INT_VAL(ilhs / irhs));
-    } else {
-        vm_poke(vm, 0, FLT_VAL((double)ilhs / (double)irhs));
-    }
-}
-
-static void vm_div_flt(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(flhs / frhs));
-}
-
-static void vm_div_int_flt(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(ilhs / frhs));
-}
-
-static void vm_div_flt_int(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(flhs / irhs));
-}
-
-static bool vm_div(Vm *vm) {
+static inline bool vm_div(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if (IS_INT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_div_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_div_int_flt(vm, lhs, rhs);
-        }
-
+    if (IS_NUM(lhs) && IS_NUM(rhs)) {
+        vm_pop(vm);
+        vm_poke(vm, 0, NUM_VAL(AS_NUM(lhs) / AS_NUM(rhs)));
         return true;
-    } else if (IS_FLT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_div_flt_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_div_flt(vm, lhs, rhs);
-        }
-
-        return true;
-    } else {
-        vm_error(vm, "can not divide %s value by %s value",
-                 value_description(lhs), value_description(rhs));
-
-        return false;
     }
+
+    vm_error(vm, "can not divide %s value by %s value", value_description(lhs),
+             value_description(rhs));
+
+    return false;
 }
 
-static void vm_mod_int(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, INT_VAL(rem_euclid(ilhs, irhs)));
-}
-
-static void vm_mod_flt(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(frem_euclid(flhs, frhs)));
-}
-
-static void vm_mod_int_flt(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(frem_euclid(ilhs, frhs)));
-}
-
-static void vm_mod_flt_int(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(frem_euclid(flhs, irhs)));
-}
-
-static bool vm_mod(Vm *vm) {
+static inline bool vm_mod(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if (IS_INT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_mod_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_mod_int_flt(vm, lhs, rhs);
-        }
-
+    if (IS_NUM(lhs) && IS_NUM(rhs)) {
+        vm_pop(vm);
+        vm_poke(vm, 0, NUM_VAL(rem_euclid(AS_NUM(lhs), AS_NUM(rhs))));
         return true;
-    } else if (IS_FLT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_mod_flt_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_mod_flt(vm, lhs, rhs);
-        }
-
-        return true;
-    } else {
-
-        vm_error(vm, "can not get %s value modulo %s value",
-                 value_description(lhs), value_description(rhs));
-
-        return false;
     }
+
+    vm_error(vm, "can not get %s value modulo %s value", value_description(lhs),
+             value_description(rhs));
+
+    return false;
 }
 
-static void vm_pow_int(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    if (irhs < 0) {
-        vm_poke(vm, 0, FLT_VAL(pow(ilhs, irhs)));
-    } else {
-        vm_poke(vm, 0, INT_VAL(pow(ilhs, irhs)));
-    }
-}
-
-static void vm_pow_flt(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(pow(flhs, frhs)));
-}
-
-static void vm_pow_int_flt(Vm *vm, Value lhs, Value rhs) {
-    int64_t ilhs = AS_INT(lhs);
-    double frhs = AS_FLT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(pow(ilhs, frhs)));
-}
-
-static void vm_pow_flt_int(Vm *vm, Value lhs, Value rhs) {
-    double flhs = AS_FLT(lhs);
-    int64_t irhs = AS_INT(rhs);
-    vm_pop(vm);
-    vm_poke(vm, 0, FLT_VAL(pow(flhs, irhs)));
-}
-
-static bool vm_pow(Vm *vm) {
+static inline bool vm_pow(Vm *vm) {
     Value rhs = vm_peek(vm, 0);
     Value lhs = vm_peek(vm, 1);
 
-    if (IS_INT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_pow_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_pow_int_flt(vm, lhs, rhs);
-        }
-
+    if (IS_NUM(lhs) && IS_NUM(rhs)) {
+        vm_pop(vm);
+        vm_poke(vm, 0, NUM_VAL(pow(AS_NUM(lhs), AS_NUM(rhs))));
         return true;
-    } else if (IS_FLT(lhs)) {
-        if (IS_INT(rhs)) {
-            vm_pow_flt_int(vm, lhs, rhs);
-        } else if (IS_FLT(rhs)) {
-            vm_pow_flt(vm, lhs, rhs);
-        }
-
-        return true;
-    } else {
-        vm_error(vm, "can not get %s value to the power of %s value",
-                 value_description(lhs), value_description(rhs));
-
-        return false;
     }
+
+    vm_error(vm, "can not get %s value to the power of %s value",
+             value_description(lhs), value_description(rhs));
+
+    return false;
 }
 
 static bool vm_call_closure(Vm *vm, ObjClosure *closure, uint8_t argc) {
@@ -586,29 +345,16 @@ static bool vm_call_value(Vm *vm, Value callee, uint8_t argc) {
         Value rhs = vm_peek(vm, 0);                                            \
         Value lhs = vm_peek(vm, 1);                                            \
                                                                                \
-        if ((!IS_INT(lhs) && !IS_FLT(lhs)) ||                                  \
-            (!IS_INT(rhs) && !IS_FLT(rhs))) {                                  \
-            vm_error(vm, "can not compare %s value with %s value",             \
-                     value_description(lhs), value_description(rhs));          \
-                                                                               \
-            return false;                                                      \
+        if (IS_NUM(lhs) && IS_NUM(rhs)) {                                      \
+            vm_pop(vm);                                                        \
+            vm_poke(vm, 0, BOOL_VAL(AS_NUM(lhs) op AS_NUM(rhs)));              \
+            return true;                                                       \
         }                                                                      \
                                                                                \
-        vm_pop(vm);                                                            \
+        vm_error(vm, "can not compare %s value with %s value",                 \
+                 value_description(lhs), value_description(rhs));              \
                                                                                \
-        if (IS_INT(lhs)) {                                                     \
-            if (IS_INT(rhs)) {                                                 \
-                vm_poke(vm, 0, BOOL_VAL(AS_INT(lhs) op AS_INT(rhs)));          \
-            } else {                                                           \
-                vm_poke(vm, 0, BOOL_VAL(AS_INT(lhs) op AS_FLT(rhs)));          \
-            }                                                                  \
-        } else if (IS_INT(rhs)) {                                              \
-            vm_poke(vm, 0, BOOL_VAL(AS_FLT(lhs) op AS_INT(rhs)));              \
-        } else {                                                               \
-            vm_poke(vm, 0, BOOL_VAL(AS_FLT(lhs) op AS_FLT(rhs)));              \
-        }                                                                      \
-                                                                               \
-        return true;                                                           \
+        return false;                                                          \
     }
 
 VM_CMP_FN(vm_lt, <);
@@ -618,7 +364,7 @@ VM_CMP_FN(vm_gte, >=);
 
 static bool vm_get_subscript(Vm *vm, Value target, Value index) {
     if (IS_ARRAY(target)) {
-        if (!IS_INT(index)) {
+        if (!IS_NUM(index)) {
             vm_error(vm, "cannot access an array with %s value",
                      value_description(index));
 
@@ -627,24 +373,24 @@ static bool vm_get_subscript(Vm *vm, Value target, Value index) {
 
         ObjArray *array = AS_ARRAY(target);
 
-        int64_t i = AS_INT(index);
+        double i = AS_NUM(index);
 
         if (i < 0) {
             i += array->count;
         }
 
-        if (i >= array->count) {
+        if (i >= array->count || (i - floor(i)) != 0) {
             vm_error(vm,
                      "access out of bounds, array has %d elements "
-                     "while the index is %ld",
+                     "while the index is %g",
                      array->count, i);
 
             return false;
         }
 
-        vm_push(vm, array->items[i]);
+        vm_push(vm, array->items[(size_t)i]);
     } else if (IS_STRING(target)) {
-        if (!IS_INT(index)) {
+        if (!IS_NUM(index)) {
             vm_error(vm, "cannot access a string with %s value",
                      value_description(index));
 
@@ -656,16 +402,16 @@ static bool vm_get_subscript(Vm *vm, Value target, Value index) {
         uint32_t characters_count = string_utf8_characters_count(
             string->items, string->items + string->count);
 
-        int64_t i = AS_INT(index);
+        double i = AS_NUM(index);
 
         if (i < 0) {
             i += characters_count;
         }
 
-        if (i >= characters_count) {
+        if (i >= characters_count || (i - floor(i)) != 0) {
             vm_error(vm,
                      "access out of bounds, string has %d characters "
-                     "while the index is %ld",
+                     "while the index is %g",
                      characters_count, i);
 
             return false;
@@ -718,7 +464,7 @@ static bool vm_get_subscript(Vm *vm, Value target, Value index) {
 
 static bool vm_set_subscript(Vm *vm, Value target, Value index) {
     if (IS_ARRAY(target)) {
-        if (!IS_INT(index)) {
+        if (!IS_NUM(index)) {
             vm_error(vm, "cannot access an array with %s value",
                      value_description(index));
 
@@ -727,22 +473,22 @@ static bool vm_set_subscript(Vm *vm, Value target, Value index) {
 
         ObjArray *array = AS_ARRAY(target);
 
-        int64_t i = AS_INT(index);
+        double i = AS_NUM(index);
 
         if (i < 0) {
             i += array->count;
         }
 
-        if (i >= array->count) {
+        if (i >= array->count || (i - floor(i)) != 0) {
             vm_error(vm,
                      "access out of bounds, array has %d elements "
-                     "while the index is %ld",
+                     "while the index is %g",
                      array->count, i);
 
             return false;
         }
 
-        array->items[i] = vm_peek(vm, 0);
+        array->items[(size_t)i] = vm_peek(vm, 0);
     } else if (IS_STRING(target)) {
         vm_error(vm, "strings are immutable");
 
@@ -812,8 +558,8 @@ static bool vm_make_slice(Vm *vm) {
 
     Value start = vm_pop(vm);
 
-    if (!IS_INT(start)) {
-        vm_error(vm, "cannot slice using %s value, expected an integer",
+    if (!IS_NUM(start)) {
+        vm_error(vm, "cannot slice using %s value, expected a number",
                  value_description(start));
 
         return false;
@@ -821,95 +567,99 @@ static bool vm_make_slice(Vm *vm) {
 
     Value end = vm_pop(vm);
 
-    if (!IS_INT(end)) {
-        vm_error(vm, "cannot slice using %s value, expected an integer",
+    if (!IS_NUM(end)) {
+        vm_error(vm, "cannot slice using %s value, expected a number",
                  value_description(end));
 
         return false;
     }
 
-    int64_t istart = AS_INT(start);
-    int64_t iend = AS_INT(end);
+    double fstart = AS_NUM(start);
+    double fend = AS_NUM(end);
 
     if (IS_ARRAY(target)) {
         ObjArray *array = AS_ARRAY(target);
 
-        if (istart < 0) {
-            istart += array->count;
+        if (fstart < 0) {
+            fstart += array->count;
         }
 
-        if (iend < 0) {
-            iend += array->count;
+        if (fend < 0) {
+            fend += array->count;
         }
 
-        if (istart < 0 || istart >= array->count) {
+        if (fstart < 0 || fstart >= array->count ||
+            (fstart - floor(fstart)) != 0) {
             vm_error(vm,
-                     "sliced array has %d elements, the slice start must be "
-                     "less than that, but got %ld",
-                     array->count, istart);
+                     "sliced array has %d elements, the slice start must be an "
+                     "integer less than that and greater than zero, but got %g",
+                     array->count, fstart);
 
             return false;
         }
 
-        if (iend < 0 || iend > array->count) {
+        if (fend < 0 || fend > array->count || (fend - floor(fend)) != 0) {
             vm_error(vm,
-                     "sliced array has %d elements, the slice end must be "
-                     "less than that or equal to it, but got %ld",
-                     array->count, iend);
+                     "sliced array has %d elements, the slice end must be an "
+                     "integer less than that and greater than zero, but got %g",
+                     array->count, fend);
 
             return false;
         }
 
-        if (istart > iend) {
+        if (fstart > fend) {
             vm_error(
                 vm,
                 "slicing start must be less than or equal to slicing end, got "
-                "%ld as a start and %ld as an end",
-                istart, iend);
+                "%g as a start and %g as an end",
+                fstart, fend);
 
             return false;
         }
 
-        vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + istart,
-                                          iend - istart)));
+        vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + (size_t)fstart,
+                                          fend - fstart)));
     } else if (IS_STRING(target)) {
         ObjString *string = AS_STRING(target);
 
         int64_t characters_count = string_utf8_characters_count(
             string->items, string->items + string->count);
 
-        if (istart < 0) {
-            istart += characters_count;
+        if (fstart < 0) {
+            fstart += characters_count;
         }
 
-        if (iend < 0) {
-            iend += characters_count;
+        if (fend < 0) {
+            fend += characters_count;
         }
 
-        if (istart < 0 || istart >= characters_count) {
-            vm_error(vm,
-                     "sliced array has %ld elements, the slice start must be "
-                     "less than that, but got %ld",
-                     characters_count, istart);
+        if (fstart < 0 || fstart >= characters_count ||
+            (fstart - floor(fstart)) != 0) {
+            vm_error(
+                vm,
+                "sliced string has %ld characters, the slice start must be "
+                "an integer less than that and greater than zero, but got %g",
+                characters_count, fstart);
 
             return false;
         }
 
-        if (iend < 0 || iend > characters_count) {
-            vm_error(vm,
-                     "sliced string has %ld characters, the slice end must be "
-                     "less than that or equal to it, but got %ld",
-                     characters_count, iend);
+        if (fend < 0 || fend > characters_count || (fend - floor(fend)) != 0) {
+            vm_error(
+                vm,
+                "sliced string has %ld characters, the slice end must be "
+                "an integer less than that and greater than zero, but got %g",
+                characters_count, fend);
 
             return false;
         }
 
-        if (istart > iend) {
+        if (fstart > fend) {
             vm_error(
                 vm,
                 "slicing start must be less than or equal to slicing end, got "
-                "%ld as a start and %ld as an end",
-                istart, iend);
+                "%g as a start and %g as an end",
+                fstart, fend);
 
             return false;
         }
@@ -918,13 +668,13 @@ static bool vm_make_slice(Vm *vm) {
 
         int64_t c = 0;
 
-        while (c++ < istart) {
+        while (c++ < fstart) {
             b = string_utf8_skip_character(b);
         }
 
         int64_t astart = b - string->items;
 
-        while (c++ <= iend) {
+        while (c++ <= fend) {
             b = string_utf8_skip_character(b);
         }
 
@@ -947,47 +697,48 @@ static bool vm_make_slice_under(Vm *vm) {
 
     Value end = vm_pop(vm);
 
-    if (!IS_INT(end)) {
-        vm_error(vm, "cannot slice using %s value, expected an integer",
+    if (!IS_NUM(end)) {
+        vm_error(vm, "cannot slice using %s value, expected a number",
                  value_description(end));
 
         return false;
     }
 
-    int64_t iend = AS_INT(end);
+    double fend = AS_NUM(end);
 
     if (IS_ARRAY(target)) {
         ObjArray *array = AS_ARRAY(target);
 
-        if (iend < 0) {
-            iend += array->count;
+        if (fend < 0) {
+            fend += array->count;
         }
 
-        if (iend < 0 || iend > array->count) {
+        if (fend < 0 || fend > array->count || (fend - floor(fend)) != 0) {
             vm_error(vm,
-                     "sliced array has %d elements, the slice end must be "
-                     "less than that or equal to it, but got %ld",
-                     array->count, iend);
+                     "sliced array has %d elements, the slice end must be an "
+                     "integer less than that and greater than zero, but got %g",
+                     array->count, fend);
 
             return false;
         }
 
-        vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items, iend)));
+        vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items, fend)));
     } else if (IS_STRING(target)) {
         ObjString *string = AS_STRING(target);
 
         int64_t characters_count = string_utf8_characters_count(
             string->items, string->items + string->count);
 
-        if (iend < 0) {
-            iend += characters_count;
+        if (fend < 0) {
+            fend += characters_count;
         }
 
-        if (iend < 0 || iend > characters_count) {
-            vm_error(vm,
-                     "sliced string has %ld characters, the slice end must be "
-                     "less than that or equal to it, but got %ld",
-                     characters_count, iend);
+        if (fend < 0 || fend > characters_count || (fend - floor(fend)) != 0) {
+            vm_error(
+                vm,
+                "sliced string has %ld characters, the slice end must be "
+                "an integer less than that and greater than zero, but got %g",
+                characters_count, fend);
 
             return false;
         }
@@ -996,7 +747,7 @@ static bool vm_make_slice_under(Vm *vm) {
 
         int64_t c = 0;
 
-        while (++c <= iend) {
+        while (++c <= fend) {
             b = string_utf8_skip_character(b);
         }
 
@@ -1017,49 +768,51 @@ static bool vm_make_slice_above(Vm *vm) {
 
     Value start = vm_pop(vm);
 
-    if (!IS_INT(start)) {
-        vm_error(vm, "cannot slice using %s value, expected an integer",
+    if (!IS_NUM(start)) {
+        vm_error(vm, "cannot slice using %s value, expected a number",
                  value_description(start));
 
         return false;
     }
 
-    int64_t istart = AS_INT(start);
+    double fstart = AS_NUM(start);
 
     if (IS_ARRAY(target)) {
         ObjArray *array = AS_ARRAY(target);
 
-        if (istart < 0) {
-            istart += array->count;
+        if (fstart < 0) {
+            fstart += array->count;
         }
 
-        if (istart < 0 || istart >= array->count) {
+        if (fstart < 0 || fstart >= array->count ||
+            (fstart - floor(fstart)) != 0) {
             vm_error(vm,
-                     "sliced array has %d elements, the slice start must be "
-                     "less than that, but got %ld",
-                     array->count, istart);
+                     "sliced array has %d elements, the slice start must be an "
+                     "integer less than that and greater than zero, but got %g",
+                     array->count, fstart);
 
             return false;
         }
 
-        vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + istart,
-                                          array->count - istart)));
+        vm_push(vm, OBJ_VAL(vm_copy_array(vm, array->items + (size_t)fstart,
+                                          array->count - fstart)));
     } else if (IS_STRING(target)) {
         ObjString *string = AS_STRING(target);
 
         int64_t characters_count = string_utf8_characters_count(
             string->items, string->items + string->count);
 
-        if (istart < 0) {
-            istart += characters_count;
+        if (fstart < 0) {
+            fstart += characters_count;
         }
 
-        if (istart < 0 || istart >= characters_count) {
+        if (fstart < 0 || fstart >= characters_count ||
+            (fstart - floor(fstart)) != 0) {
             vm_error(
                 vm,
                 "sliced string has %ld characters, the slice start must be "
-                "less than that, but got %ld",
-                characters_count, istart);
+                "an integer less than that and greater than zero, but got %g",
+                characters_count, fstart);
 
             return false;
         }
@@ -1068,7 +821,7 @@ static bool vm_make_slice_above(Vm *vm) {
 
         int64_t c = 0;
 
-        while (c++ < istart) {
+        while (c++ < fstart) {
             b = string_utf8_skip_character(b);
         }
 
@@ -1085,7 +838,7 @@ static bool vm_make_slice_above(Vm *vm) {
     return true;
 }
 
-static bool vm_execute_math(Vm *vm, OpCode op) {
+static inline bool vm_execute_math(Vm *vm, OpCode op) {
     switch (op) {
     case OP_ADD: {
         if (!vm_add(vm)) {
@@ -1157,9 +910,9 @@ bool vm_run(Vm *vm, Value *result) {
 #include "vm_jumptable.h"
 #endif
 
-    for (;;) {
-        OpCode op;
+    OpCode op;
 
+    for (;;) {
         vmfetch();
 
         vmdispatch() {

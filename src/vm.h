@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 typedef enum {
     OBJ_CLOSURE,
@@ -20,18 +21,18 @@ typedef struct Obj {
     struct Obj *next;
 } Obj;
 
+#ifdef NUR_NO_NAN_BOXING
+
 typedef enum : uint8_t {
     VAL_NULL,
     VAL_BOOL,
-    VAL_INT,
-    VAL_FLT,
+    VAL_NUM,
     VAL_OBJ,
 } ValueTag;
 
 typedef union {
     bool _bool;
-    int64_t _int;
-    double _flt;
+    double _num;
     Obj *_obj;
 } ValuePayload;
 
@@ -42,14 +43,53 @@ typedef struct {
 
 #define IS_NULL(v) ((v).tag == VAL_NULL)
 #define IS_BOOL(v) ((v).tag == VAL_BOOL)
-#define IS_INT(v) ((v).tag == VAL_INT)
-#define IS_FLT(v) ((v).tag == VAL_FLT)
+#define IS_NUM(v) ((v).tag == VAL_NUM)
 #define IS_OBJ(v) ((v).tag == VAL_OBJ)
 
 #define AS_BOOL(v) ((v).payload._bool)
-#define AS_INT(v) ((v).payload._int)
-#define AS_FLT(v) ((v).payload._flt)
+#define AS_NUM(v) ((v).payload._num)
 #define AS_OBJ(v) ((v).payload._obj)
+
+#define NULL_VAL ((Value){.tag = VAL_NULL})
+#define BOOL_VAL(v) ((Value){.tag = VAL_BOOL, .payload = {._bool = (v)}})
+#define NUM_VAL(v) ((Value){.tag = VAL_NUM, .payload = {._num = (v)}})
+#define OBJ_VAL(v) ((Value){.tag = VAL_OBJ, .payload = {._obj = (Obj *)(v)}})
+
+#else
+
+typedef uint64_t Value;
+
+#define SIGN_BIT 0x8000000000000000ull
+#define QNAN 0x7ffc000000000000ull
+
+#define TAG_NULL 1
+#define TAG_BOOL 2
+#define TAG_OBJ 3
+
+#define IS_NUM(v) (((v) & QNAN) != QNAN)
+#define IS_NULL(v) ((v) == (QNAN | (uint64_t)TAG_NULL << 48))
+#define IS_BOOL(v) (((v) & (QNAN | (uint64_t)7 << 48)) == (QNAN | (uint64_t)TAG_BOOL << 48))
+#define IS_OBJ(v) (((v) & (QNAN | (uint64_t)7 << 48)) == (QNAN | (uint64_t)TAG_OBJ << 48))
+
+static inline Value NUM_VAL(double num) {
+    Value v;
+    memcpy(&v, &num, sizeof(double));
+    return v;
+}
+
+static inline double AS_NUM(Value v) {
+    double num;
+    memcpy(&num, &v, sizeof(double));
+    return num;
+}
+
+#define AS_BOOL(v) (bool)((v) & 1)
+#define AS_OBJ(v) ((Obj *)(uintptr_t)((v) & 0x0000ffffffffffffull))
+
+#define BOOL_VAL(b) (QNAN | ((uint64_t)TAG_BOOL << 48) | (uint64_t)(b))
+#define OBJ_VAL(obj) (QNAN | ((uint64_t)TAG_OBJ << 48) | (uint64_t)(uintptr_t)(obj))
+#define NULL_VAL (QNAN | (uint64_t)TAG_NULL << 48)
+#endif
 
 static inline bool is_obj_tag(Value v, ObjTag tag) {
     return IS_OBJ(v) && AS_OBJ(v)->tag == tag;
@@ -61,12 +101,6 @@ static inline bool is_obj_tag(Value v, ObjTag tag) {
 #define IS_ARRAY(v) is_obj_tag(v, OBJ_ARRAY)
 #define IS_MAP(v) is_obj_tag(v, OBJ_MAP)
 #define IS_STRING(v) is_obj_tag(v, OBJ_STRING)
-
-#define NULL_VAL ((Value){.tag = VAL_NULL})
-#define BOOL_VAL(v) ((Value){.tag = VAL_BOOL, .payload = {._bool = (v)}})
-#define INT_VAL(v) ((Value){.tag = VAL_INT, .payload = {._int = (v)}})
-#define FLT_VAL(v) ((Value){.tag = VAL_FLT, .payload = {._flt = (v)}})
-#define OBJ_VAL(v) ((Value){.tag = VAL_OBJ, .payload = {._obj = (Obj *)(v)}})
 
 typedef enum : uint8_t {
     OP_POP,
@@ -229,14 +263,11 @@ typedef struct {
 
 bool chunks_equal(Chunk, Chunk);
 bool objects_equal(Obj *, Obj *);
-bool values_exactly_equal(Value, Value); // 4 != 4.0
-bool values_equal(Value, Value);         // 4 == 4.0
+bool values_equal(Value, Value);
 
 const char *value_description(Value value);
 void value_display(Value);
 bool value_is_falsey(Value);
-int64_t value_to_int(Value);
-double value_to_float(Value);
 uint32_t string_hash(const char *key, uint32_t count);
 uint32_t string_utf8_characters_count(const char *start, const char *end);
 uint32_t string_utf8_encode_character(
@@ -245,7 +276,7 @@ const char *string_utf8_skip_character(const char *start);
 const char *string_utf8_decode_character(const char *start, uint32_t *rune);
 
 ObjString *vm_find_string(Vm *vm, const char *key, uint32_t count,
-                              uint32_t hash);
+                          uint32_t hash);
 
 void vm_stack_reset(Vm *);
 void vm_stack_trace(Vm *);

@@ -105,7 +105,8 @@ bool objects_equal(Obj *a, Obj *b) {
     }
 }
 
-bool values_exactly_equal(Value a, Value b) {
+bool values_equal(Value a, Value b) {
+#ifdef NUR_NO_NAN_BOXING
     if (a.tag != b.tag) {
         return false;
     }
@@ -117,11 +118,8 @@ bool values_exactly_equal(Value a, Value b) {
     case VAL_BOOL:
         return AS_BOOL(a) == AS_BOOL(b);
 
-    case VAL_INT:
-        return AS_INT(a) == AS_INT(b);
-
-    case VAL_FLT:
-        return AS_FLT(a) == AS_FLT(b);
+    case VAL_NUM:
+        return AS_NUM(a) == AS_NUM(b);
 
     case VAL_OBJ:
         return objects_equal(AS_OBJ(a), AS_OBJ(b));
@@ -129,85 +127,36 @@ bool values_exactly_equal(Value a, Value b) {
     default:
         return false;
     }
-}
-
-bool values_equal(Value a, Value b) {
-    if (a.tag != b.tag && !((a.tag == VAL_INT && b.tag == VAL_FLT) ||
-                            (a.tag == VAL_FLT && b.tag == VAL_INT))) {
-        return false;
+#else
+    if (IS_NUM(a) && IS_NUM(b)) {
+        return AS_NUM(a) == AS_NUM(b);
     }
 
-    switch (a.tag) {
-    case VAL_NULL:
-        return true;
-
-    case VAL_BOOL:
-        return AS_BOOL(a) == AS_BOOL(b);
-
-    case VAL_INT:
-        if (b.tag == VAL_FLT) {
-            return AS_INT(a) == AS_FLT(b);
-        } else {
-            return AS_INT(a) == AS_INT(b);
-        }
-
-    case VAL_FLT:
-        if (b.tag == VAL_INT) {
-            return AS_FLT(a) == AS_INT(b);
-        } else {
-            return AS_FLT(a) == AS_FLT(b);
-        }
-
-    case VAL_OBJ:
+    if (IS_OBJ(a) && IS_OBJ(b)) {
         return objects_equal(AS_OBJ(a), AS_OBJ(b));
-
-    default:
-        return false;
     }
-}
 
-int64_t value_to_int(Value value) {
-    if (IS_INT(value)) {
-        return AS_INT(value);
-    } else if (IS_FLT(value)) {
-        return AS_FLT(value);
-    } else if (IS_BOOL(value)) {
-        return AS_BOOL(value);
-    } else {
-        return INT64_MAX;
-    }
-}
-
-double value_to_float(Value value) {
-    if (IS_INT(value)) {
-        return AS_INT(value);
-    } else if (IS_FLT(value)) {
-        return AS_FLT(value);
-    } else if (IS_BOOL(value)) {
-        return AS_BOOL(value);
-    } else {
-        return 0.0 / 0.0;
-    }
+    return a == b;
+#endif
 }
 
 bool value_is_falsey(Value v) {
     return IS_NULL(v) || (IS_BOOL(v) && !AS_BOOL(v)) ||
-           (IS_INT(v) && AS_INT(v) == 0) || (IS_FLT(v) && AS_FLT(v) == 0) ||
+           (IS_NUM(v) && AS_NUM(v) == 0) ||
            (IS_STRING(v) && AS_STRING(v)->count == 0) ||
            (IS_ARRAY(v) && AS_ARRAY(v)->count == 0) ||
            (IS_MAP(v) && AS_MAP(v)->count == 0);
 }
 
 const char *value_description(Value value) {
+#ifdef NUR_NO_NAN_BOXING
     switch (value.tag) {
     case VAL_NULL:
         return "a null";
     case VAL_BOOL:
         return "a boolean";
-    case VAL_INT:
-        return "an integer";
-    case VAL_FLT:
-        return "a floating point";
+    case VAL_NUM:
+        return "a number";
     case VAL_OBJ:
         switch (AS_OBJ(value)->tag) {
         case OBJ_STRING:
@@ -232,6 +181,45 @@ const char *value_description(Value value) {
     default:
         return NULL;
     }
+#else
+    if (IS_NULL(value)) {
+        return "a null";
+    }
+
+    if (IS_BOOL(value)) {
+        return "a boolean";
+    }
+
+    if (IS_NUM(value)) {
+        return "a number";
+    }
+
+    if (IS_OBJ(value)) {
+        switch (AS_OBJ(value)->tag) {
+        case OBJ_STRING:
+            return "a string";
+
+        case OBJ_ARRAY:
+            return "an array";
+
+        case OBJ_MAP:
+            return "a map";
+
+        case OBJ_CLOSURE:
+        case OBJ_FUNCTION:
+        case OBJ_NATIVE:
+            return "a function";
+
+        case OBJ_UPVALUE:
+            return "an upvalue";
+
+        default:
+            return NULL;
+        }
+    }
+
+    return NULL;
+#endif
 }
 
 void object_display(Obj *obj) {
@@ -320,6 +308,7 @@ void object_display(Obj *obj) {
 }
 
 void value_display(Value value) {
+#ifdef NUR_NO_NAN_BOXING
     switch (value.tag) {
     case VAL_NULL:
         printf("null");
@@ -329,23 +318,30 @@ void value_display(Value value) {
         printf(AS_BOOL(value) ? "true" : "false");
         break;
 
-    case VAL_INT:
-        printf("%ld", AS_INT(value));
-        break;
-
-    case VAL_FLT:
-        printf("%g", AS_FLT(value));
+    case VAL_NUM:
+        printf("%g", AS_NUM(value));
         break;
 
     case VAL_OBJ:
         object_display(AS_OBJ(value));
         break;
     }
+#else
+    if (IS_NULL(value)) {
+        printf("null");
+    } else if (IS_BOOL(value)) {
+        printf(AS_BOOL(value) ? "true" : "false");
+    } else if (IS_NUM(value)) {
+        printf("%g", AS_NUM(value));
+    } else if (IS_OBJ(value)) {
+        object_display(AS_OBJ(value));
+    }
+#endif
 }
 
 size_t chunk_add_constant(Chunk *chunk, Value value) {
     for (size_t i = 0; i < chunk->constants.count; i++) {
-        if (values_exactly_equal(chunk->constants.items[i], value)) {
+        if (values_equal(chunk->constants.items[i], value)) {
             return i;
         }
     }

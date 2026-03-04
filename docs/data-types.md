@@ -10,23 +10,12 @@ null
 
 ## Number
 
-- Int
-
-A 64-bit number with no floating-points
+A 64-bit floating-points number specified by IEEE 754
 
 ```
-7
--19
--90
-```
-
-- Float
-
-A 64-bit floating-points number
-
-```
-0.5
+55
 55.0
+0.5
 -1.5
 200.19
 ```

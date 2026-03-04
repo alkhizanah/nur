@@ -211,7 +211,7 @@ static void compile_string(Compiler *compiler, AstNode node, uint32_t source) {
 static void compile_int(Compiler *compiler, AstNode node, uint32_t source) {
     uint64_t v = (uint64_t)node.lhs << 32 | node.rhs;
     chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
-    compiler_emit_constant(compiler, INT_VAL(v), source);
+    compiler_emit_constant(compiler, NUM_VAL(v), source);
 }
 
 static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
@@ -219,7 +219,7 @@ static void compile_float(Compiler *compiler, AstNode node, uint32_t source) {
     double f;
     memcpy(&f, &v, sizeof(double));
     chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
-    compiler_emit_constant(compiler, FLT_VAL(f), source);
+    compiler_emit_constant(compiler, NUM_VAL(f), source);
 }
 
 static ObjMap dummy_map;
@@ -631,12 +631,12 @@ static bool node_is_float(AstNode n, double *out) {
 
 static void emit_int_const(Compiler *compiler, int64_t v, uint32_t source) {
     chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
-    compiler_emit_constant(compiler, INT_VAL(v), source);
+    compiler_emit_constant(compiler, NUM_VAL(v), source);
 }
 
 static void emit_float_const(Compiler *compiler, double v, uint32_t source) {
     chunk_add_byte(compiler->chunk, OP_PUSH_CONST, source);
-    compiler_emit_constant(compiler, FLT_VAL(v), source);
+    compiler_emit_constant(compiler, NUM_VAL(v), source);
 }
 
 static bool compile_unary(Compiler *compiler, AstNode node, uint32_t source,

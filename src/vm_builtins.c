@@ -77,19 +77,19 @@ bool vm_builtin_len(Vm *vm, Value *argv, uint8_t argc, Value *result) {
 
     switch (AS_OBJ(arg)->tag) {
     case OBJ_ARRAY:
-        *result = INT_VAL(AS_ARRAY(arg)->count);
+        *result = NUM_VAL(AS_ARRAY(arg)->count);
 
         return true;
 
     case OBJ_STRING:
-        *result = INT_VAL(string_utf8_characters_count(
+        *result = NUM_VAL(string_utf8_characters_count(
             AS_STRING(arg)->items,
             AS_STRING(arg)->items + AS_STRING(arg)->count));
 
         return true;
 
     case OBJ_MAP:
-        *result = INT_VAL(AS_MAP(arg)->count);
+        *result = NUM_VAL(AS_MAP(arg)->count);
 
         return true;
 
@@ -111,7 +111,7 @@ bool vm_builtin_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     Value first = argv[0];
     Value second = argv[1];
 
-    if (!IS_INT(first) && !IS_FLT(first)) {
+    if (!IS_NUM(first)) {
         vm_error(vm,
                  "error: expected first argument to be a number, got %s value",
                  value_description(first));
@@ -119,7 +119,7 @@ bool vm_builtin_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
         return false;
     }
 
-    if (!IS_INT(second) && !IS_FLT(second)) {
+    if (!IS_NUM(second)) {
         vm_error(vm,
                  "error: expected second argument to be a number, got %s value",
                  value_description(second));
@@ -127,8 +127,8 @@ bool vm_builtin_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
         return false;
     }
 
-    double min = value_to_float(first);
-    double max = value_to_float(second);
+    double min = AS_NUM(first);
+    double max = AS_NUM(second);
 
     if (min > max) {
         double temp = max;
@@ -139,7 +139,7 @@ bool vm_builtin_random(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     double r = (double)rand() / ((double)RAND_MAX + 1.0);
     double v = min + r * (max - min);
 
-    *result = FLT_VAL(v);
+    *result = NUM_VAL(v);
 
     return true;
 }
@@ -204,45 +204,7 @@ bool vm_builtin_array_pop(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
-bool vm_builtin_to_int(Vm *vm, Value *argv, uint8_t argc, Value *result) {
-    if (argc != 1) {
-        vm_error(vm, "to_int() takes exactly one argument, but got %d", argc);
-
-        return false;
-    }
-
-    Value value = argv[0];
-
-    if (IS_INT(value)) {
-        *result = value;
-    } else if (IS_FLT(value)) {
-        *result = INT_VAL(AS_FLT(value));
-    } else if (IS_BOOL(value)) {
-        *result = INT_VAL(AS_BOOL(value));
-    } else if (IS_STRING(value)) {
-        ObjString *string = AS_STRING(value);
-
-        char *endptr;
-
-        errno = 0;
-
-        int64_t v = strtoll(string->items, &endptr, 0);
-
-        if (errno == ERANGE || endptr != string->items + string->count) {
-            *result = NULL_VAL;
-
-            return true;
-        }
-
-        *result = INT_VAL(v);
-    } else {
-        *result = NULL_VAL;
-    }
-
-    return true;
-}
-
-bool vm_builtin_to_float(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+bool vm_builtin_to_number(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     if (argc != 1) {
         vm_error(vm, "to_float() takes exactly one argument, but got %d", argc);
 
@@ -251,12 +213,10 @@ bool vm_builtin_to_float(Vm *vm, Value *argv, uint8_t argc, Value *result) {
 
     Value value = argv[0];
 
-    if (IS_INT(value)) {
-        *result = FLT_VAL(AS_INT(value));
-    } else if (IS_FLT(value)) {
+    if (IS_NUM(value)) {
         *result = value;
     } else if (IS_BOOL(value)) {
-        *result = FLT_VAL(AS_BOOL(value));
+        *result = NUM_VAL(AS_BOOL(value));
     } else if (IS_STRING(value)) {
         ObjString *string = AS_STRING(value);
 
@@ -272,7 +232,7 @@ bool vm_builtin_to_float(Vm *vm, Value *argv, uint8_t argc, Value *result) {
             return true;
         }
 
-        *result = FLT_VAL(v);
+        *result = NUM_VAL(v);
     } else {
         *result = NULL_VAL;
     }
@@ -388,15 +348,15 @@ bool vm_builtin_fs_read_line(Vm *vm, Value *argv, uint8_t argc, Value *result) {
         return false;
     }
 
-    if (!IS_INT(argv[0])) {
+    if (!IS_NUM(argv[0])) {
         vm_error(vm,
-                 "fs.read_line() takes an integer as an argument, but got %s",
+                 "fs.read_line() takes a number as an argument, but got %s",
                  value_description(argv[0]));
 
         return false;
     }
 
-    int64_t fd = AS_INT(argv[0]);
+    intptr_t fd = AS_NUM(argv[0]);
 
     FILE *file = (FILE *)fd;
 
@@ -429,9 +389,9 @@ ObjMap *vm_get_fs_module(Vm *vm) {
 ObjMap *vm_get_io_module(Vm *vm) {
     ObjMap *io_mod = vm_new_map(vm);
 
-    vm_map_insert_by_cstr(vm, io_mod, "stdin", INT_VAL((intptr_t)stdin));
-    vm_map_insert_by_cstr(vm, io_mod, "stderr", INT_VAL((intptr_t)stderr));
-    vm_map_insert_by_cstr(vm, io_mod, "stdout", INT_VAL((intptr_t)stdout));
+    vm_map_insert_by_cstr(vm, io_mod, "stdin", NUM_VAL((intptr_t)stdin));
+    vm_map_insert_by_cstr(vm, io_mod, "stderr", NUM_VAL((intptr_t)stderr));
+    vm_map_insert_by_cstr(vm, io_mod, "stdout", NUM_VAL((intptr_t)stdout));
 
     return io_mod;
 }
@@ -445,7 +405,7 @@ bool vm_builtin_time_now(Vm *vm, Value *argv, uint8_t argc, Value *result) {
         return false;
     }
 
-    *result = INT_VAL(time(NULL));
+    *result = NUM_VAL(time(NULL));
 
     return true;
 }
@@ -463,7 +423,7 @@ bool vm_builtin_time_now_ns(Vm *vm, Value *argv, uint8_t argc, Value *result) {
 
     timespec_get(&now, TIME_UTC);
 
-    *result = INT_VAL(now.tv_sec * 1e+9 + now.tv_nsec);
+    *result = NUM_VAL(now.tv_sec * 1e+9 + now.tv_nsec);
 
     return true;
 }
@@ -481,7 +441,7 @@ bool vm_builtin_time_now_ms(Vm *vm, Value *argv, uint8_t argc, Value *result) {
 
     timespec_get(&now, TIME_UTC);
 
-    *result = INT_VAL(now.tv_sec * 1000 + now.tv_nsec / 1000000);
+    *result = NUM_VAL(now.tv_sec * 1000 + now.tv_nsec / 1000000);
 
     return true;
 }
@@ -520,8 +480,7 @@ void vm_map_insert_builtins(Vm *vm, ObjMap *globals) {
                                  vm_builtin_array_push);
     vm_map_insert_native_by_cstr(vm, globals, "array_pop",
                                  vm_builtin_array_pop);
-    vm_map_insert_native_by_cstr(vm, globals, "to_int", vm_builtin_to_int);
-    vm_map_insert_native_by_cstr(vm, globals, "to_float", vm_builtin_to_float);
+    vm_map_insert_native_by_cstr(vm, globals, "to_number", vm_builtin_to_number);
     vm_map_insert_native_by_cstr(vm, globals, "import", vm_builtin_import);
     vm_map_insert_native_by_cstr(vm, globals, "error", vm_builtin_error);
 }

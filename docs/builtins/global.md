@@ -78,21 +78,9 @@ typeof({}) # "map"
 typeof(print) # "function"
 ```
 
-- to_int
+- to_number
 
-Casts (string, float, boolean) to int, returns null on failure instead of erroring out
-
-```
-to_int(5) # 5
-to_int(5.5) # 5
-to_int(true) # 1
-to_int("5") # 5
-to_int("hey") # null
-```
-
-- to_float
-
-Casts (int, boolean) to float, returns null on failure instead of erroring out
+Casts (number, string, boolean) to a number, returns null on failure instead of erroring out
 
 ```
 to_float(5.5) # 5.5
@@ -124,7 +112,7 @@ Pushes the value provided into an array
 arr = []
 
 array_push(arr, 5)
-array_push(2, 5) # error: expected first argument to be an array to push into, however got an integer value
+array_push(2, 5) # error: expected first argument to be an array to push into, however got a number value
 ```
 
 - array_pop
@@ -136,7 +124,7 @@ arr = [5]
 
 array_pop(arr) # 5
 array_pop(arr) # null
-array_pop(2) # error: expected first argument to be an array to pop from, however got an integer value
+array_pop(2) # error: expected first argument to be an array to pop from, however got a number value
 ```
 
 - foreach

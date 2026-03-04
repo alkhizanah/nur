@@ -22,6 +22,6 @@ Decode the UTF-8 representation to an int
 
 ```
 unicode.utf8_decode("?") # 63
-unicode.utf8_decode(2) # error: can not decode an integer value
+unicode.utf8_decode(2) # error: can not decode a number value
 ```
 

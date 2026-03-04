@@ -12,7 +12,7 @@ Opens a file to read or write
 
 ```
 fs.open("some_file") # some file descriptor
-fs.open(3) # error: expected a file path to be a string, got an integer value
+fs.open(3) # error: expected a file path to be a string, got a number value
 ```
 
 - create
@@ -21,7 +21,7 @@ Creates a file to read or write, opens the file without truncating if exists, to
 
 ```
 fs.create("some_file") # some file descriptor
-fs.create(3) # error: expected a file path to be a string, got an integer value
+fs.create(3) # error: expected a file path to be a string, got a number value
 ```
 
 - delete
@@ -105,5 +105,5 @@ Checks if file can be accessed
 ```
 fs.access("some_file") # true
 fs.access("other_non_existent_file") # false
-fs.access(02) # error: expected a file path to be a string, got an integer value
+fs.access(02) # error: expected a file path to be a string, got a number value
 ```
