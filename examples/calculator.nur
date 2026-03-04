@@ -11,7 +11,7 @@ while true {
         break
     }
 
-    if (parsed_lhs = to_float(raw_lhs)) == null {
+    if (parsed_lhs = to_number(raw_lhs)) == null {
         println(raw_lhs, "is not a number")
 
         continue
@@ -23,7 +23,7 @@ while true {
         break
     }
 
-    if (parsed_rhs = to_float(raw_rhs)) == null {
+    if (parsed_rhs = to_number(raw_rhs)) == null {
         println(raw_rhs, "is not a number")
 
         continue

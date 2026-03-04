@@ -1,7 +1,7 @@
 fs = import("fs")
 io = import("io")
 
-secret = to_int(random(0, 10))
+secret = floor(random(0, 10))
 
 while true {
     println()
@@ -12,11 +12,13 @@ while true {
         break
     }
 
-    if (parsed_input = to_int(raw_input)) == null {
+    if (parsed_input = to_number(raw_input)) == null {
         println("Try again with a number")
 
         continue
     }
+
+    println(parsed_input)
 
     if parsed_input > secret {
         println("Try again with a number smaller than that")
@@ -25,6 +27,6 @@ while true {
     } else {
         println("You got it! Now the secret will change")
 
-        secret = to_int(random(0, 10))
+        secret = floor(random(0, 10))
     }
 }

@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -204,9 +205,31 @@ bool vm_builtin_array_pop(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
+bool vm_builtin_floor(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 1) {
+        vm_error(vm, "floor() takes exactly one argument, but got %d", argc);
+
+        return false;
+    }
+
+    Value value = argv[0];
+
+    if (!IS_NUM(value)) {
+        vm_error(vm, "floor() takes a number, but got %s",
+                 value_description(value));
+
+        return false;
+    }
+
+    *result = NUM_VAL(floor(AS_NUM(value)));
+
+    return true;
+}
+
 bool vm_builtin_to_number(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     if (argc != 1) {
-        vm_error(vm, "to_float() takes exactly one argument, but got %d", argc);
+        vm_error(vm, "to_number() takes exactly one argument, but got %d",
+                 argc);
 
         return false;
     }
@@ -349,8 +372,7 @@ bool vm_builtin_fs_read_line(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     }
 
     if (!IS_NUM(argv[0])) {
-        vm_error(vm,
-                 "fs.read_line() takes a number as an argument, but got %s",
+        vm_error(vm, "fs.read_line() takes a number as an argument, but got %s",
                  value_description(argv[0]));
 
         return false;
@@ -480,7 +502,9 @@ void vm_map_insert_builtins(Vm *vm, ObjMap *globals) {
                                  vm_builtin_array_push);
     vm_map_insert_native_by_cstr(vm, globals, "array_pop",
                                  vm_builtin_array_pop);
-    vm_map_insert_native_by_cstr(vm, globals, "to_number", vm_builtin_to_number);
+    vm_map_insert_native_by_cstr(vm, globals, "to_number",
+                                 vm_builtin_to_number);
+    vm_map_insert_native_by_cstr(vm, globals, "floor", vm_builtin_floor);
     vm_map_insert_native_by_cstr(vm, globals, "import", vm_builtin_import);
     vm_map_insert_native_by_cstr(vm, globals, "error", vm_builtin_error);
 }

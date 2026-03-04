@@ -77,7 +77,7 @@ tester.run("filter a string based on its values", fn {
 
     expected_str = "24"
 
-    filtered_str = filter(unfiltered_str, fn v => ((to_int(v)) % 2) == 0)
+    filtered_str = filter(unfiltered_str, fn v => ((to_number(v)) % 2) == 0)
 
     return filtered_str == expected_str
 })

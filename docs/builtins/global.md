@@ -83,11 +83,11 @@ typeof(print) # "function"
 Casts (number, string, boolean) to a number, returns null on failure instead of erroring out
 
 ```
-to_float(5.5) # 5.5
-to_float(5) # 5.0
-to_float(true) # 1.0
-to_float("5.5") # 5.5
-to_float("hey") # null
+to_number(5.5) # 5.5
+to_number(5) # 5.0
+to_number(true) # 1.0
+to_number("5.5") # 5.5
+to_number("hey") # null
 ```
 
 - to_string
