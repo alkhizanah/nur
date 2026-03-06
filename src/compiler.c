@@ -407,10 +407,10 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
 
         uint32_t index;
 
-        if (!compile_expr(compiler, node.rhs))
-            return false;
-
         if (compiler_find_local(compiler, name, name_len, &index)) {
+            if (!compile_expr(compiler, node.rhs))
+                return false;
+
             if (has_op) {
                 chunk_add_byte(compiler->chunk, OP_SET_LOCAL_WITH_MATH, source);
                 chunk_add_byte(compiler->chunk, op, source);
@@ -424,6 +424,9 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
         }
 
         if (compiler_find_upvalue(compiler, name, name_len, &index)) {
+            if (!compile_expr(compiler, node.rhs))
+                return false;
+
             if (has_op) {
                 chunk_add_byte(compiler->chunk, OP_SET_UPVALUE_WITH_MATH,
                                source);
@@ -438,6 +441,9 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
         }
 
         if (compiler->parent == NULL) {
+            if (!compile_expr(compiler, node.rhs))
+                return false;
+
             if (has_op) {
                 chunk_add_byte(compiler->chunk, OP_SET_GLOBAL_WITH_MATH,
                                source);
@@ -453,9 +459,21 @@ static bool compile_assign(Compiler *compiler, AstNode node, uint32_t source,
             return true;
         }
 
+        bool is_function =
+            compiler->ast.nodes.items[node.rhs].tag == NODE_FUNCTION;
+
+        if (is_function) {
+            compiler_add_local(compiler, name, name_len);
+        }
+
+        if (!compile_expr(compiler, node.rhs))
+            return false;
+
         chunk_add_byte(compiler->chunk, OP_DUP, source);
 
-        compiler_add_local(compiler, name, name_len);
+        if (!is_function) {
+            compiler_add_local(compiler, name, name_len);
+        }
 
         return true;
     }
