@@ -68,8 +68,10 @@ typedef uint64_t Value;
 
 #define IS_NUM(v) (((v) & QNAN) != QNAN)
 #define IS_NULL(v) ((v) == (QNAN | (uint64_t)TAG_NULL << 48))
-#define IS_BOOL(v) (((v) & (QNAN | (uint64_t)7 << 48)) == (QNAN | (uint64_t)TAG_BOOL << 48))
-#define IS_OBJ(v) (((v) & (QNAN | (uint64_t)7 << 48)) == (QNAN | (uint64_t)TAG_OBJ << 48))
+#define IS_BOOL(v)                                                             \
+    (((v) & (QNAN | (uint64_t)7 << 48)) == (QNAN | (uint64_t)TAG_BOOL << 48))
+#define IS_OBJ(v)                                                              \
+    (((v) & (QNAN | (uint64_t)7 << 48)) == (QNAN | (uint64_t)TAG_OBJ << 48))
 
 static inline Value NUM_VAL(double num) {
     Value v;
@@ -87,7 +89,8 @@ static inline double AS_NUM(Value v) {
 #define AS_OBJ(v) ((Obj *)(uintptr_t)((v) & 0x0000ffffffffffffull))
 
 #define BOOL_VAL(b) (QNAN | ((uint64_t)TAG_BOOL << 48) | (uint64_t)(b))
-#define OBJ_VAL(obj) (QNAN | ((uint64_t)TAG_OBJ << 48) | (uint64_t)(uintptr_t)(obj))
+#define OBJ_VAL(obj)                                                           \
+    (QNAN | ((uint64_t)TAG_OBJ << 48) | (uint64_t)(uintptr_t)(obj))
 #define NULL_VAL (QNAN | (uint64_t)TAG_NULL << 48)
 #endif
 
@@ -265,6 +268,7 @@ bool chunks_equal(Chunk, Chunk);
 bool objects_equal(Obj *, Obj *);
 bool values_equal(Value, Value);
 
+ObjString *vm_value_to_string(Vm *vm, Value value);
 const char *value_description(Value value);
 void value_display(Value);
 bool value_is_falsey(Value);

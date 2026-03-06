@@ -263,6 +263,83 @@ bool vm_builtin_to_number(Vm *vm, Value *argv, uint8_t argc, Value *result) {
     return true;
 }
 
+bool vm_builtin_to_string(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 1) {
+        vm_error(vm, "to_string() takes exactly one argument, but got %d",
+                 argc);
+
+        return false;
+    }
+
+    *result = OBJ_VAL(vm_value_to_string(vm, argv[0]));
+
+    return true;
+}
+
+bool vm_builtin_contains(Vm *vm, Value *argv, uint8_t argc, Value *result) {
+    if (argc != 2) {
+        vm_error(vm, "contains() takes exactly two arguments, but got %d",
+                 argc);
+
+        return false;
+    }
+
+    Value first = argv[0];
+    Value second = argv[1];
+
+    if (IS_ARRAY(first)) {
+        ObjArray *array = AS_ARRAY(first);
+
+        *result = BOOL_VAL(false);
+
+        for (uint32_t i = 0; i < array->count; i++) {
+            if (values_equal(second, array->items[i])) {
+                *result = BOOL_VAL(true);
+
+                break;
+            }
+        }
+
+        return true;
+    }
+
+    if (IS_MAP(first)) {
+        ObjMap *map = AS_MAP(first);
+
+        if (!IS_STRING(second)) {
+            vm_error(vm,
+                     "contains() expected the second argument (the map's key) "
+                     "to be a string, but got %s",
+                     value_description(second));
+
+            return false;
+        }
+
+        ObjString *key = AS_STRING(second);
+
+        Value value;
+
+        bool found = vm_map_lookup(map, key, &value);
+
+        *result = BOOL_VAL(found);
+
+        return true;
+    }
+
+    if (IS_STRING(first)) {
+        vm_error(vm, "todo: contains() on a string");
+
+        return false;
+    }
+
+    vm_error(vm,
+             "contains() requires first argument to be an array or a string or "
+             "a map, but got %s",
+             value_description(first));
+
+    return false;
+}
+
 static ObjMap *modules = NULL;
 
 bool vm_builtin_import(Vm *vm, Value *argv, uint8_t argc, Value *result) {
@@ -504,7 +581,10 @@ void vm_map_insert_builtins(Vm *vm, ObjMap *globals) {
                                  vm_builtin_array_pop);
     vm_map_insert_native_by_cstr(vm, globals, "to_number",
                                  vm_builtin_to_number);
+    vm_map_insert_native_by_cstr(vm, globals, "to_string",
+                                 vm_builtin_to_string);
     vm_map_insert_native_by_cstr(vm, globals, "floor", vm_builtin_floor);
     vm_map_insert_native_by_cstr(vm, globals, "import", vm_builtin_import);
     vm_map_insert_native_by_cstr(vm, globals, "error", vm_builtin_error);
+    vm_map_insert_native_by_cstr(vm, globals, "contains", vm_builtin_contains);
 }

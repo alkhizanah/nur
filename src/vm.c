@@ -120,16 +120,31 @@ static bool vm_neg(Vm *vm) {
     return false;
 }
 
-static ObjString *vm_to_string(Vm *vm, Value value) {
+ObjString *vm_value_to_string(Vm *vm, Value value) {
     if (IS_STRING(value)) {
         return AS_STRING(value);
     }
 
-    vm_error(vm, "todo: convert other values to a string");
+    if (IS_NUM(value)) {
+        char buffer[1024];
+        int len = snprintf(buffer, sizeof(buffer), "%.14g", AS_NUM(value));
+        return vm_copy_string(vm, buffer, len);
+    }
 
+    if (IS_BOOL(value)) {
+        if (AS_BOOL(value)) {
+            return vm_copy_string(vm, "true", 4);
+        } else {
+            return vm_copy_string(vm, "false", 5);
+        }
+    }
+
+    if (IS_NULL(value)) {
+        return vm_copy_string(vm, "null", 4);
+    }
+
+    vm_error(vm, "cannot convert value to string");
     exit(1);
-
-    return NULL;
 }
 
 static bool vm_add(Vm *vm) {
@@ -144,7 +159,7 @@ static bool vm_add(Vm *vm) {
 
     if (IS_STRING(lhs)) {
         ObjString *slhs = AS_STRING(lhs);
-        ObjString *srhs = vm_to_string(vm, rhs);
+        ObjString *srhs = vm_value_to_string(vm, rhs);
         ObjString *result = vm_concat_strings(vm, slhs, srhs);
         vm_pop(vm);
         vm_poke(vm, 0, OBJ_VAL(result));
@@ -153,7 +168,7 @@ static bool vm_add(Vm *vm) {
     }
 
     if (IS_STRING(rhs)) {
-        ObjString *slhs = vm_to_string(vm, lhs);
+        ObjString *slhs = vm_value_to_string(vm, lhs);
         ObjString *srhs = AS_STRING(rhs);
         ObjString *result = vm_concat_strings(vm, slhs, srhs);
         vm_pop(vm);

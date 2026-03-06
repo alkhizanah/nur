@@ -1,5 +1,39 @@
 benchmarker = import("benchmarker.nur")
 
+benchmarker.run("fibonacci recursive function (not cached)", fn {
+    fib = fn n {
+        if n < 2 {
+            return n
+        }
+
+        return fib(n - 1) + fib(n - 2)
+    }
+
+    println(fib(30))
+})
+
+benchmarker.run("fibonacci recursive function (cached)", fn {
+    cache = {}
+
+    fib = fn n {
+        if n < 2 {
+            return n
+        }
+
+        if contains(cache, to_string(n)) {
+            return cache[to_string(n)]
+        }
+
+        result = fib(n - 1) + fib(n - 2)
+
+        cache[to_string(n)] = result
+
+        return result
+    }
+
+    println(fib(30))
+})
+
 benchmarker.run("fibonacci linear function", fn {
     fib = fn n {
         a = 0
@@ -20,40 +54,6 @@ benchmarker.run("fibonacci linear function", fn {
         }
 
         return c
-    }
-
-    println(fib(30))
-})
-
-benchmarker.run("fibonacci recursive function (cached)", fn {
-    cache = {}
-
-    fib = fn n {
-        if n < 2 {
-            return n
-        }
-
-        if contains(cache, n) {
-            return cache[n]
-        }
-
-        result = fib(n - 1) + fib(n - 2)
-
-        cache[n] = result
-
-        return result
-    }
-
-    println(fib(30))
-})
-
-benchmarker.run("fibonacci recursive function (not cached)", fn {
-    fib = fn n {
-        if n < 2 {
-            return n
-        }
-
-        return fib(n - 1) + fib(n - 2)
     }
 
     println(fib(30))
